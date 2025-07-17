@@ -36,21 +36,21 @@ function sendJSON(res, data, status = 200) {
   
   res.writeHead(status, {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': frontendUrl,
+    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Credentials': 'true'
   });
   res.end(JSON.stringify(data));
 }
 
 // Función helper para manejar CORS preflight
 function handleCORS(res) {
-  const frontendUrl = process.env.FRONTEND_URL || 'https://trebodeluxe-front.onrender.com';
-  
   res.writeHead(200, {
-    'Access-Control-Allow-Origin': frontendUrl,
+    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Credentials': 'true'
   });
   res.end();
 }
