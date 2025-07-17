@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Treboluxe - Cargando...</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+
+        .loading-container {
+            text-align: center;
+            padding: 2rem;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .logo {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, #fff, #e0e7ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 2rem auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .message {
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            opacity: 0.9;
+        }
+
+        .submessage {
+            font-size: 0.9rem;
+            opacity: 0.7;
+            margin-bottom: 1rem;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 1rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #3b82f6);
+            width: 0%;
+            border-radius: 2px;
+            animation: loading 3s ease-in-out infinite;
+        }
+
+        @keyframes loading {
+            0% { width: 0%; }
+            50% { width: 70%; }
+            100% { width: 100%; }
+        }
+
+        .render-info {
+            margin-top: 1.5rem;
+            font-size: 0.8rem;
+            opacity: 0.6;
+            line-height: 1.4;
+        }
+
+        .error-message {
+            color: #fbbf24;
+            font-size: 0.9rem;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .retry-button {
+            background: linear-gradient(45deg, #10b981, #3b82f6);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            margin-top: 1rem;
+            display: none;
+            transition: transform 0.2s ease;
+        }
+
+        .retry-button:hover {
+            transform: translateY(-2px);
+        }
+
+        @media (max-width: 480px) {
+            .loading-container {
+                padding: 1.5rem;
+            }
+            
+            .logo {
+                font-size: 2rem;
+            }
+            
+            .message {
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-container">
+        <div class="logo">TREBOLUXE</div>
+        
+        <div class="spinner"></div>
+        
+        <div class="message" id="message">Iniciando aplicación...</div>
+        <div class="submessage" id="submessage">Esto puede tomar unos momentos</div>
+        
+        <div class="progress-bar">
+            <div class="progress-fill"></div>
+        </div>
+        
+        <div class="status-indicator">
+            <div class="status-dot"></div>
+            <span id="status-text">Verificando servicios</span>
+        </div>
+        
+        <div class="render-info">
+            <p>Si es la primera vez que accedes hoy, el servidor puede estar iniciando desde el modo sleep.</p>
+            <p>Esto es normal y solo toma unos segundos.</p>
+        </div>
+        
+        <div class="error-message" id="error-message">
+            No se pudo conectar con el servidor principal. Reintentando...
+        </div>
+        
+        <button class="retry-button" id="retry-button" onclick="location.reload()">
+            Reintentar
+        </button>
+    </div>
+
+    <script>
+        // Configuración
+        const FRONTEND_URL = 'https://trebodeluxe-front.onrender.com'; // Cambia por tu URL del frontend
+        const MAX_RETRIES = 30;
+        const RETRY_INTERVAL = 2000; // 2 segundos
+        
+        let retryCount = 0;
+        let checkInterval;
+        
+        // Mensajes de estado
+        const messages = [
+            'Iniciando aplicación...',
+            'Verificando servicios...',
+            'Conectando con el servidor...',
+            'Preparando la tienda...',
+            'Casi listo...'
+        ];
+        
+        // Elementos del DOM
+        const messageEl = document.getElementById('message');
+        const submessageEl = document.getElementById('submessage');
+        const statusTextEl = document.getElementById('status-text');
+        const errorMessageEl = document.getElementById('error-message');
+        const retryButtonEl = document.getElementById('retry-button');
+        
+        // Función para cambiar mensaje
+        function updateMessage(index) {
+            if (index < messages.length) {
+                messageEl.textContent = messages[index];
+                statusTextEl.textContent = messages[index];
+            }
+        }
+        
+        // Función para verificar si el frontend está listo
+        async function checkFrontendStatus() {
+            try {
+                // Primero verificar a través del endpoint del backend
+                const backendResponse = await fetch('/api/frontend-status', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (backendResponse.ok) {
+                    const data = await backendResponse.json();
+                    if (data.status === 'ready') {
+                        // Frontend está listo, redirigir
+                        messageEl.textContent = '¡Listo!';
+                        submessageEl.textContent = 'Redirigiendo a la tienda...';
+                        statusTextEl.textContent = 'Conectado';
+                        
+                        setTimeout(() => {
+                            window.location.href = data.frontendUrl || FRONTEND_URL;
+                        }, 1000);
+                        
+                        return true;
+                    }
+                }
+                
+                // Si el backend no puede verificar, intentar directamente
+                const directResponse = await fetch(FRONTEND_URL + '/api/health', {
+                    method: 'GET',
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (directResponse.ok) {
+                    // Frontend está listo, redirigir
+                    messageEl.textContent = '¡Listo!';
+                    submessageEl.textContent = 'Redirigiendo a la tienda...';
+                    statusTextEl.textContent = 'Conectado';
+                    
+                    setTimeout(() => {
+                        window.location.href = FRONTEND_URL;
+                    }, 1000);
+                    
+                    return true;
+                }
+            } catch (error) {
+                console.log('Frontend no está listo aún:', error.message);
+            }
+            
+            return false;
+        }
+        
+        // Función para verificar si el frontend está disponible (alternativa)
+        async function checkFrontendAvailability() {
+            try {
+                const response = await fetch(FRONTEND_URL, {
+                    method: 'HEAD',
+                    mode: 'no-cors'
+                });
+                
+                // Si llegamos aquí sin error, el frontend probablemente está disponible
+                messageEl.textContent = '¡Listo!';
+                submessageEl.textContent = 'Redirigiendo a la tienda...';
+                statusTextEl.textContent = 'Conectado';
+                
+                setTimeout(() => {
+                    window.location.href = FRONTEND_URL;
+                }, 1000);
+                
+                return true;
+            } catch (error) {
+                console.log('Frontend no disponible:', error.message);
+            }
+            
+            return false;
+        }
+        
+        // Función principal de verificación
+        async function checkAndRedirect() {
+            console.log(`Intento ${retryCount + 1} de ${MAX_RETRIES}`);
+            
+            // Actualizar mensaje según el progreso
+            const messageIndex = Math.min(Math.floor(retryCount / 6), messages.length - 1);
+            updateMessage(messageIndex);
+            
+            // Intentar verificar el estado del frontend
+            const isReady = await checkFrontendStatus();
+            
+            if (isReady) {
+                clearInterval(checkInterval);
+                return;
+            }
+            
+            retryCount++;
+            
+            // Si hemos agotado los intentos, mostrar error
+            if (retryCount >= MAX_RETRIES) {
+                clearInterval(checkInterval);
+                messageEl.textContent = 'Tiempo de espera agotado';
+                submessageEl.textContent = 'El servidor principal no responde';
+                statusTextEl.textContent = 'Error de conexión';
+                errorMessageEl.style.display = 'block';
+                retryButtonEl.style.display = 'inline-block';
+                
+                // Intentar redirigir de todas formas después de un tiempo
+                setTimeout(() => {
+                    window.location.href = FRONTEND_URL;
+                }, 5000);
+            }
+        }
+        
+        // Iniciar verificación
+        function startChecking() {
+            // Verificar inmediatamente
+            checkAndRedirect();
+            
+            // Después verificar cada 2 segundos
+            checkInterval = setInterval(checkAndRedirect, RETRY_INTERVAL);
+        }
+        
+        // Iniciar cuando la página carga
+        document.addEventListener('DOMContentLoaded', () => {
+            // Esperar un poco antes de comenzar
+            setTimeout(startChecking, 1000);
+        });
+        
+        // Manejar visibilidad de la página
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && retryCount >= MAX_RETRIES) {
+                location.reload();
+            }
+        });
+    </script>
+</body>
+</html>

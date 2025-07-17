@@ -11,6 +11,61 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// Servir archivos estáticos desde la carpeta public
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    message: 'Server is running'
+  });
+});
+
+// Ruta para servir la pantalla de carga
+app.get('/loading', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'loading.html'));
+});
+
+// Ruta raíz que redirige a la pantalla de carga
+app.get('/', (req, res) => {
+  res.redirect('/loading');
+});
+
+// Endpoint para verificar el estado del frontend
+app.get('/api/frontend-status', async (req, res) => {
+  const frontendUrl = process.env.FRONTEND_URL || 'https://trebodeluxe-front.onrender.com';
+  
+  try {
+    const fetch = (await import('node-fetch')).default;
+    const response = await fetch(`${frontendUrl}/api/health`, {
+      method: 'GET',
+      timeout: 5000
+    });
+    
+    if (response.ok) {
+      res.json({ 
+        status: 'ready', 
+        message: 'Frontend is ready',
+        frontendUrl: frontendUrl
+      });
+    } else {
+      res.status(503).json({ 
+        status: 'not_ready', 
+        message: 'Frontend is not ready yet' 
+      });
+    }
+  } catch (error) {
+    res.status(503).json({ 
+      status: 'not_ready', 
+      message: 'Frontend is not ready yet',
+      error: error.message 
+    });
+  }
+});
+
 // Datos de ejemplo (en producción usarías una base de datos)
 let products = [
   {
