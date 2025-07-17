@@ -1,6 +1,45 @@
 # Treboluxe Backend API
 
-Backend API para la tienda de ropa online Treboluxe. Desarrollado con Node.js, Express y CORS.
+Backend API para la tienda de ropa online Treboluxe con **pantalla de carga integrada**.
+
+## 🚨 IMPORTANTE: Solución a Error path-to-regexp
+
+Si experimentas el error:
+```
+TypeError: Missing parameter name at 1: https://git.new/pathToRegexpError
+```
+
+**Usa el servidor simple**: `node simple-server.js` (ver [FIX-PATH-TO-REGEXP.md](FIX-PATH-TO-REGEXP.md))
+
+## 🎯 Dos Servidores Disponibles
+
+| Servidor | Propósito | Comando | Dependencias |
+|---|---|---|---|
+| `simple-server.js` | **Producción** - Pantalla de carga | `npm start` | ✅ Solo Node.js |
+| `server.js` | Desarrollo - API completa | `npm run api` | Express, CORS, etc. |
+
+## 🚀 Quick Start
+
+```bash
+# Clonar repositorio
+git clone <repo-url>
+cd Trebodeluxe-backend
+
+# Instalar dependencias (opcional para simple-server)
+npm install
+
+# Iniciar servidor de carga (recomendado para producción)
+npm start
+
+# O iniciar servidor completo (desarrollo)
+npm run api
+```
+
+## 🌐 URLs Importantes
+
+- **Pantalla de carga**: `http://localhost:5000/loading`
+- **Health check**: `http://localhost:5000/health`
+- **Estado del frontend**: `http://localhost:5000/api/frontend-status`
 
 ## 🚀 Características
 
