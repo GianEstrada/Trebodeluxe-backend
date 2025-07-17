@@ -6,7 +6,7 @@ services:
     plan: free # o cualquier otro plan de render
     branch: main # o la rama que uses para producción
     buildCommand: npm install
-    startCommand: npm start
+    startCommand: node simple-server.js
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV

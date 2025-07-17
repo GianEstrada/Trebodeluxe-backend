@@ -4,7 +4,8 @@
   "description": "Backend para la aplicación Trebodeluxe",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js",
+    "start": "node simple-server.js",
+    "start:original": "node src/index.js",
     "dev": "nodemon src/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
