@@ -23,10 +23,13 @@ const app = express();
 // Middlewares
 app.use(helmet()); // Seguridad HTTP
 app.use(morgan('dev')); // Registro de solicitudes HTTP
+// Configuración de CORS más permisiva para desarrollo
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  origin: true, // Esto permite solicitudes de cualquier origen
+  credentials: true, // Permite credenciales
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
+  exposedHeaders: ['Access-Control-Allow-Origin']
 }));
 app.use(express.json()); // Parsear cuerpo de solicitudes JSON
 app.use(express.urlencoded({ extended: true })); // Parsear cuerpo de solicitudes URL-encoded
