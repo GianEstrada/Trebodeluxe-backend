@@ -25,13 +25,27 @@ const pool = new Pool({
   }
 });
 
-// Variable para seguir el estado de la conexión
+// Variables para seguir el estado de la conexión
 let isDbConnected = false;
+let isCheckingConnection = false;
+let lastConnectionAttempt = 0;
 
 // Verificar la conexión a la DB
 const checkDbConnection = async () => {
+  const now = Date.now();
+  
+  // Si ya estamos verificando o si no ha pasado 1 segundo desde el último intento, no hacer nada
+  if (isCheckingConnection || (now - lastConnectionAttempt < 1000)) {
+    return isDbConnected;
+  }
+
+  isCheckingConnection = true;
+  lastConnectionAttempt = now;
+
   try {
     const client = await pool.connect();
+    // Verificar que realmente podemos hacer una consulta
+    await client.query('SELECT 1');
     console.log('Conexión exitosa a la base de datos PostgreSQL');
     isDbConnected = true;
     client.release();
@@ -40,6 +54,8 @@ const checkDbConnection = async () => {
     console.error('Error al conectar a la base de datos PostgreSQL:', err);
     isDbConnected = false;
     return false;
+  } finally {
+    isCheckingConnection = false;
   }
 };
 
