@@ -517,40 +517,7 @@ app.put('/api/home-images', (req, res) => {
 });
 
 // ========== AUTENTICACIÓN ==========
-// POST - Login de usuario
-app.post('/api/auth/login', (req, res) => {
-  try {
-    const { email, password } = req.body;
-    
-    // Validación básica (en producción deberías usar bcrypt y JWT)
-    if (email === 'admin@treboluxe.com' && password === 'admin123') {
-      res.json({
-        success: true,
-        message: 'Login exitoso',
-        data: {
-          user: {
-            id: 1,
-            email: 'admin@treboluxe.com',
-            name: 'Administrador',
-            role: 'admin'
-          },
-          token: 'example-jwt-token'
-        }
-      });
-    } else {
-      res.status(401).json({
-        success: false,
-        message: 'Credenciales inválidas'
-      });
-    }
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error en el servidor',
-      error: error.message
-    });
-  }
-});
+// La ruta POST para /api/auth/login se define más abajo en la sección RUTAS DE AUTENTICACIÓN
 
 // ========== CATEGORÍAS ==========
 // GET - Obtener categorías disponibles

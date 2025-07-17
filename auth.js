@@ -111,6 +111,8 @@ class AuthService {
   // Inicio de sesión
   async login(email, password) {
     try {
+      console.log(`Intento de login para el usuario: ${email}`);
+      
       // Validar datos requeridos
       if (!email || !password) {
         throw new Error('Email y contraseña son requeridos');
@@ -119,22 +121,26 @@ class AuthService {
       // Buscar usuario
       const user = await this.db.getUserByEmail(email);
       if (!user) {
+        console.log(`Usuario no encontrado: ${email}`);
         throw new Error('Credenciales inválidas');
       }
 
       // Verificar contraseña
       const isPasswordValid = await this.verifyPassword(password, user.password);
       if (!isPasswordValid) {
+        console.log(`Contraseña inválida para usuario: ${email}`);
         throw new Error('Credenciales inválidas');
       }
 
       // Verificar si el usuario está activo
       if (!user.isActive) {
+        console.log(`Cuenta desactivada: ${email}`);
         throw new Error('Cuenta desactivada');
       }
 
       // Generar tokens
       const tokens = this.generateTokens(user);
+      console.log(`Login exitoso para: ${email}`);
 
       // Guardar refresh token
       const refreshExpiresAt = new Date();
