@@ -564,6 +564,35 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // Servir archivos estáticos desde /public
+    if (method === 'GET' && pathname.startsWith('/') && pathname !== '/') {
+      const filePath = path.join(__dirname, 'public', pathname);
+      
+      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+        const ext = path.extname(filePath).toLowerCase();
+        const contentTypes = {
+          '.html': 'text/html',
+          '.css': 'text/css',
+          '.js': 'text/javascript',
+          '.json': 'application/json',
+          '.png': 'image/png',
+          '.jpg': 'image/jpeg',
+          '.gif': 'image/gif',
+          '.svg': 'image/svg+xml'
+        };
+        
+        const contentType = contentTypes[ext] || 'text/plain';
+        const content = fs.readFileSync(filePath);
+        
+        res.writeHead(200, { 
+          'Content-Type': contentType,
+          'Access-Control-Allow-Origin': '*'
+        });
+        res.end(content);
+        return;
+      }
+    }
+
     // Ruta no encontrada
     sendJSON(res, {
       success: false,
