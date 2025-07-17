@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const dotenv = require('dotenv');
 const path = require('path');
+const db = require('./config/db');
 
 // Cargar variables de entorno
 dotenv.config();
@@ -35,8 +36,32 @@ app.get('/', (req, res) => {
   res.json({ message: 'API de Trebodeluxe Backend' });
 });
 
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok', message: 'El servidor está funcionando correctamente' });
+app.get('/api/health', async (req, res) => {
+  try {
+    const isDbConnected = await db.checkConnection();
+    
+    if (isDbConnected) {
+      return res.status(200).json({ 
+        status: 'ok', 
+        message: 'El servidor está funcionando correctamente',
+        database: 'connected'
+      });
+    } else {
+      return res.status(500).json({ 
+        status: 'error', 
+        message: 'Conexión a la base de datos establecida pero no se recibieron datos',
+        database: 'error'
+      });
+    }
+  } catch (error) {
+    console.error('Error en health check:', error);
+    return res.status(500).json({ 
+      status: 'error', 
+      message: 'Error al conectar con la base de datos',
+      database: 'disconnected',
+      error: error.message
+    });
+  }
 });
 
 // Rutas de la API

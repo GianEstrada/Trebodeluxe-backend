@@ -8,9 +8,43 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const dotenv = require('dotenv');
+const { Pool } = require('pg');
 
 // Cargar variables de entorno
 dotenv.config();
+
+// Configuración de la conexión a la base de datos
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASS,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT,
+  ssl: {
+    rejectUnauthorized: false // Necesario para conexiones SSL a servicios como Render
+  }
+});
+
+// Variable para seguir el estado de la conexión
+let isDbConnected = false;
+
+// Verificar la conexión a la DB
+const checkDbConnection = async () => {
+  try {
+    const client = await pool.connect();
+    console.log('Conexión exitosa a la base de datos PostgreSQL');
+    isDbConnected = true;
+    client.release();
+    return true;
+  } catch (err) {
+    console.error('Error al conectar a la base de datos PostgreSQL:', err);
+    isDbConnected = false;
+    return false;
+  }
+};
+
+// Verificar la conexión al iniciar
+checkDbConnection();
 
 // Crear la aplicación Express
 const app = express();
@@ -21,13 +55,47 @@ app.use(cors());
 app.use(express.json());
 
 // Ruta de estado (health check)
-app.get('/api/health', (req, res) => {
-  res.status(200).json({
-    status: 'ok',
-    message: 'El servidor está funcionando correctamente',
-    version: '1.0.0',
-    timestamp: new Date().toISOString()
-  });
+app.get('/api/health', async (req, res) => {
+  try {
+    // Verificar la conexión a la base de datos
+    if (!isDbConnected) {
+      await checkDbConnection();
+    }
+    
+    // Si aún está conectado, obtener un timestamp desde la DB
+    if (isDbConnected) {
+      try {
+        const dbResult = await pool.query('SELECT NOW()');
+        return res.status(200).json({
+          status: 'ok',
+          message: 'El servidor está funcionando correctamente',
+          database: 'connected',
+          version: '1.0.0',
+          timestamp: dbResult.rows[0].now || new Date().toISOString()
+        });
+      } catch (error) {
+        console.error('Error al ejecutar consulta SQL:', error);
+        isDbConnected = false;
+      }
+    }
+    
+    // Si la DB no está conectada, devolver un estado que lo indique
+    return res.status(200).json({
+      status: 'warning',
+      message: 'El servidor está funcionando pero la base de datos no está conectada',
+      database: 'disconnected',
+      version: '1.0.0',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error en health check:', error);
+    return res.status(500).json({
+      status: 'error',
+      message: 'Error al verificar el estado del servidor',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Ruta principal

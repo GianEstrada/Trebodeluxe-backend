@@ -5,28 +5,30 @@ dotenv.config();
 
 // Configuración de la conexión a la base de datos
 const pool = new Pool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS,
-  database: process.env.DB_NAME,
-  port: process.env.DB_PORT,
+  connectionString: process.env.DATABASE_URL || 'postgresql://trebolux_usr:nP1vR4SmhzgRoEEoRrRuRjZIWpoSs1FR@dpg-d1rk123e5dus73bsib8g-a.ohio-postgres.render.com/trebolux_db',
   ssl: {
     rejectUnauthorized: false // Necesario para conexiones SSL a servicios como Render
   }
 });
 
-// Verificar la conexión
-pool.connect((err, client, release) => {
-  if (err) {
-    console.error('Error al conectar a la base de datos PostgreSQL:', err);
-  } else {
-    console.log('Conexión exitosa a la base de datos PostgreSQL');
-    release();
+// Función para verificar el estado de la conexión a la DB
+const checkConnection = async () => {
+  try {
+    const client = await pool.connect();
+    const result = await client.query('SELECT NOW()');
+    client.release();
+    console.log('Conexión exitosa a la base de datos PostgreSQL:', result.rows[0].now);
+    return true;
+  } catch (err) {
+    console.error('Error al conectar a la base de datos PostgreSQL:', err.message);
+    return false;
   }
-});
+};
 
-// Exportar la instancia del pool para ser utilizada en toda la aplicación
+// Exportar la instancia del pool y funciones relacionadas
 module.exports = {
   query: (text, params) => pool.query(text, params),
-  pool
+  pool,
+  checkConnection,
+  isConnected: () => isConnected
 };
