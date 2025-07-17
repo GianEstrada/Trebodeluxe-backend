@@ -3,6 +3,10 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
 
+// Importar módulos de autenticación
+const { AuthService, authenticateToken, requireAdmin, optionalAuth } = require('./auth');
+const Database = require('./database');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -613,6 +617,245 @@ app.use('*', (req, res) => {
   });
 });
 
+// ==========================================
+// RUTAS DE AUTENTICACIÓN
+// ==========================================
+
+// Inicializar servicio de autenticación
+const authService = new AuthService();
+
+// Registro de usuario
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const result = await authService.register(req.body);
+    
+    if (result.success) {
+      res.status(201).json({
+        success: true,
+        message: 'Usuario registrado exitosamente',
+        user: result.user,
+        tokens: result.tokens
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Error en registro:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error interno del servidor'
+    });
+  }
+});
+
+// Inicio de sesión
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const result = await authService.login(email, password);
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: 'Inicio de sesión exitoso',
+        user: result.user,
+        tokens: result.tokens
+      });
+    } else {
+      res.status(401).json({
+        success: false,
+        error: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Error en login:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error interno del servidor'
+    });
+  }
+});
+
+// Renovar token
+app.post('/api/auth/refresh', async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    
+    if (!refreshToken) {
+      return res.status(401).json({
+        success: false,
+        error: 'Refresh token requerido'
+      });
+    }
+    
+    const result = await authService.refreshToken(refreshToken);
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        tokens: result.tokens
+      });
+    } else {
+      res.status(401).json({
+        success: false,
+        error: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Error en refresh token:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error interno del servidor'
+    });
+  }
+});
+
+// Obtener perfil de usuario (requiere autenticación)
+app.get('/api/auth/profile', authenticateToken, async (req, res) => {
+  try {
+    const result = await authService.getUserProfile(req.user.id);
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        user: result.user
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        error: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Error obteniendo perfil:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error interno del servidor'
+    });
+  }
+});
+
+// Actualizar perfil de usuario (requiere autenticación)
+app.put('/api/auth/profile', authenticateToken, async (req, res) => {
+  try {
+    const result = await authService.updateUserProfile(req.user.id, req.body);
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: 'Perfil actualizado exitosamente',
+        user: result.user
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Error actualizando perfil:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error interno del servidor'
+    });
+  }
+});
+
+// Cambiar contraseña (requiere autenticación)
+app.put('/api/auth/change-password', authenticateToken, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const result = await authService.changePassword(req.user.id, currentPassword, newPassword);
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: result.message
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Error cambiando contraseña:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error interno del servidor'
+    });
+  }
+});
+
+// Verificar token (endpoint público para validar tokens)
+app.post('/api/auth/verify', (req, res) => {
+  try {
+    const { token } = req.body;
+    
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        error: 'Token requerido'
+      });
+    }
+    
+    const decoded = authService.verifyToken(token);
+    res.json({
+      success: true,
+      valid: true,
+      user: decoded
+    });
+  } catch (error) {
+    res.status(401).json({
+      success: false,
+      valid: false,
+      error: 'Token inválido'
+    });
+  }
+});
+
+// Cerrar sesión (invalidar tokens - opcional, cliente puede simplemente eliminar tokens)
+app.post('/api/auth/logout', authenticateToken, async (req, res) => {
+  try {
+    // En un sistema más complejo, aquí podrías invalidar tokens en la base de datos
+    // Por ahora, simplemente confirmamos el logout
+    res.json({
+      success: true,
+      message: 'Sesión cerrada exitosamente'
+    });
+  } catch (error) {
+    console.error('Error en logout:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error interno del servidor'
+    });
+  }
+});
+
+// ==========================================
+// RUTAS PROTEGIDAS - Ejemplo de uso del middleware
+// ==========================================
+
+// Ruta solo para administradores
+app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    // En una implementación real, obtendrías la lista de usuarios de la base de datos
+    res.json({
+      success: true,
+      message: 'Lista de usuarios (solo admin)',
+      users: [] // Implementar según necesidades
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Error interno del servidor'
+    });
+  }
+});
+
 // Middleware para manejo de errores
 app.use((err, req, res, next) => {
   console.error(err.stack);
@@ -628,23 +871,46 @@ app.listen(PORT, () => {
   console.log(`Servidor corriendo en puerto ${PORT}`);
   console.log(`API disponible en: http://localhost:${PORT}/api`);
   console.log(`Endpoints disponibles:`);
-  console.log(`  - GET  /api/products`);
-  console.log(`  - POST /api/products`);
-  console.log(`  - PUT  /api/products/:id`);
-  console.log(`  - DELETE /api/products/:id`);
-  console.log(`  - GET  /api/promotions`);
-  console.log(`  - POST /api/promotions`);
-  console.log(`  - PUT  /api/promotions/:id`);
-  console.log(`  - DELETE /api/promotions/:id`);
-  console.log(`  - GET  /api/orders`);
-  console.log(`  - PUT  /api/orders/:id/status`);
-  console.log(`  - GET  /api/header-texts`);
-  console.log(`  - PUT  /api/header-texts`);
-  console.log(`  - GET  /api/home-images`);
-  console.log(`  - PUT  /api/home-images`);
-  console.log(`  - POST /api/auth/login`);
-  console.log(`  - GET  /api/categories`);
-  console.log(`  - GET  /api/dashboard/stats`);
+  console.log(`  📦 PRODUCTOS:`);
+  console.log(`    - GET  /api/products`);
+  console.log(`    - POST /api/products`);
+  console.log(`    - PUT  /api/products/:id`);
+  console.log(`    - DELETE /api/products/:id`);
+  console.log(`  🎯 PROMOCIONES:`);
+  console.log(`    - GET  /api/promotions`);
+  console.log(`    - POST /api/promotions`);
+  console.log(`    - PUT  /api/promotions/:id`);
+  console.log(`    - DELETE /api/promotions/:id`);
+  console.log(`  📋 PEDIDOS:`);
+  console.log(`    - GET  /api/orders`);
+  console.log(`    - PUT  /api/orders/:id/status`);
+  console.log(`  🏠 CONTENIDO:`);
+  console.log(`    - GET  /api/header-texts`);
+  console.log(`    - PUT  /api/header-texts`);
+  console.log(`    - GET  /api/home-images`);
+  console.log(`    - PUT  /api/home-images`);
+  console.log(`  📚 CATEGORÍAS:`);
+  console.log(`    - GET  /api/categories`);
+  console.log(`  📊 DASHBOARD:`);
+  console.log(`    - GET  /api/dashboard/stats`);
+  console.log(`  🔐 AUTENTICACIÓN:`);
+  console.log(`    - POST /api/auth/register`);
+  console.log(`    - POST /api/auth/login`);
+  console.log(`    - POST /api/auth/refresh`);
+  console.log(`    - POST /api/auth/verify`);
+  console.log(`    - POST /api/auth/logout`);
+  console.log(`    - GET  /api/auth/profile`);
+  console.log(`    - PUT  /api/auth/profile`);
+  console.log(`    - PUT  /api/auth/change-password`);
+  console.log(`  👑 ADMIN:`);
+  console.log(`    - GET  /api/admin/users`);
+  console.log(`  🎯 HEALTH:`);
+  console.log(`    - GET  /health`);
+  console.log(`    - GET  /api/frontend-status`);
+  console.log(``);
+  console.log(`💡 Usuario admin por defecto:`);
+  console.log(`   Email: admin@treboluxe.com`);
+  console.log(`   Password: admin123`);
 });
 
 module.exports = app;
