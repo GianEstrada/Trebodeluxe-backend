@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico CORS/ERR_BLOCKED_BY_CLIENT</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #dc3545;
+            text-align: center;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+        }
+        .test-button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .solution {
+            background-color: #e2e3e5;
+            border-left: 4px solid #6c757d;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .code {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 3px;
+            padding: 10px;
+            font-family: monospace;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Diagnóstico ERR_BLOCKED_BY_CLIENT</h1>
+        
+        <div class="solution">
+            <h3>📋 Posibles Causas y Soluciones:</h3>
+            <ol>
+                <li><strong>Ad Blocker:</strong> Desactive ad blockers (uBlock Origin, AdBlock, etc.)</li>
+                <li><strong>Extensiones de Privacidad:</strong> Desactive Privacy Badger, Ghostery, etc.</li>
+                <li><strong>Antivirus:</strong> Algunos antivirus bloquean peticiones localhost</li>
+                <li><strong>Configuración del Navegador:</strong> Políticas estrictas de CORS</li>
+                <li><strong>Servidor Backend:</strong> No está respondiendo correctamente</li>
+            </ol>
+        </div>
+
+        <div class="test-section">
+            <h3>🌐 Prueba 1: Conectividad Básica</h3>
+            <button class="test-button" onclick="testBasicConnectivity()">Probar Conectividad</button>
+            <div id="connectivityResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔒 Prueba 2: CORS y Headers</h3>
+            <button class="test-button" onclick="testCORS()">Probar CORS</button>
+            <div id="corsResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🎯 Prueba 3: Métodos HTTP</h3>
+            <button class="test-button" onclick="testHTTPMethods()">Probar GET/POST</button>
+            <div id="httpResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔧 Prueba 4: Alternative Requests</h3>
+            <button class="test-button" onclick="testAlternativeMethods()">XMLHttpRequest</button>
+            <button class="test-button" onclick="testWithImage()">Image Request</button>
+            <button class="test-button" onclick="testWithScript()">Script Request</button>
+            <div id="alternativeResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🛠️ Prueba 5: Registro de Usuario (Directa)</h3>
+            <div>
+                <input type="text" id="testFirstName" placeholder="Nombre" value="Usuario">
+                <input type="text" id="testLastName" placeholder="Apellido" value="Prueba">
+                <input type="email" id="testEmail" placeholder="Email">
+                <input type="password" id="testPassword" placeholder="Password" value="test123">
+            </div>
+            <button class="test-button" onclick="testDirectRegister()">Registrar Usuario</button>
+            <div id="registerResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Estado del Sistema</h3>
+            <div id="systemInfo" class="result info">Recopilando información...</div>
+        </div>
+
+        <div class="solution">
+            <h3>🔧 Soluciones Recomendadas:</h3>
+            <div class="code">
+// Opción 1: Usar proxy en Next.js (next.config.js)
+module.exports = {
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://localhost:5000/api/:path*'
+      }
+    ]
+  }
+}
+
+// Opción 2: Usar variable de entorno para desarrollo
+const API_URL = process.env.NODE_ENV === 'development' 
+  ? 'http://localhost:5000' 
+  : 'https://tu-backend.onrender.com'
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000';
+        
+        // Generar email único
+        document.getElementById('testEmail').value = `test${Date.now()}@example.com`;
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = `result ${type}`;
+            element.textContent = message;
+        }
+
+        async function testBasicConnectivity() {
+            try {
+                showResult('connectivityResult', 'Probando conectividad...', 'info');
+                
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                
+                showResult('connectivityResult', 
+                    `✅ Conectividad exitosa!\n\nEstado: ${response.status}\nServidor: ${data.message || 'OK'}\nDB: ${data.database?.connected ? 'Conectado' : 'Desconectado'}`, 
+                    'success'
+                );
+            } catch (error) {
+                showResult('connectivityResult', 
+                    `❌ Error de conectividad:\n\n${error.message}\n\nPosibles causas:\n- Ad Blocker activo\n- Servidor backend no está corriendo\n- Configuración de red`, 
+                    'error'
+                );
+            }
+        }
+
+        async function testCORS() {
+            try {
+                showResult('corsResult', 'Probando CORS...', 'info');
+                
+                const response = await fetch(`${API_BASE}/health`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Test-Header': 'cors-test'
+                    }
+                });
+                
+                const corsHeaders = {
+                    'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
+                    'Access-Control-Allow-Methods': response.headers.get('Access-Control-Allow-Methods'),
+                    'Access-Control-Allow-Headers': response.headers.get('Access-Control-Allow-Headers')
+                };
+                
+                showResult('corsResult', 
+                    `✅ CORS configurado correctamente!\n\nHeaders CORS:\n${JSON.stringify(corsHeaders, null, 2)}`, 
+                    'success'
+                );
+            } catch (error) {
+                showResult('corsResult', 
+                    `❌ Error CORS:\n\n${error.message}`, 
+                    'error'
+                );
+            }
+        }
+
+        async function testHTTPMethods() {
+            try {
+                showResult('httpResult', 'Probando métodos HTTP...', 'info');
+                
+                // Probar GET
+                const getResponse = await fetch(`${API_BASE}/health`);
+                const getData = await getResponse.json();
+                
+                // Probar POST
+                const postResponse = await fetch(`${API_BASE}/api/auth/verify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: 'test-token' })
+                });
+                const postData = await postResponse.json();
+                
+                showResult('httpResult', 
+                    `✅ Métodos HTTP funcionando!\n\nGET /health: ${getResponse.status}\nPOST /api/auth/verify: ${postResponse.status}`, 
+                    'success'
+                );
+            } catch (error) {
+                showResult('httpResult', 
+                    `❌ Error en métodos HTTP:\n\n${error.message}`, 
+                    'error'
+                );
+            }
+        }
+
+        async function testAlternativeMethods() {
+            let results = '';
+            
+            // Probar XMLHttpRequest
+            try {
+                const xhr = new XMLHttpRequest();
+                xhr.open('GET', `${API_BASE}/health`, false);
+                xhr.send();
+                results += `XMLHttpRequest: ${xhr.status === 200 ? '✅ OK' : '❌ Error'}\n`;
+            } catch (error) {
+                results += `XMLHttpRequest: ❌ ${error.message}\n`;
+            }
+            
+            // Probar Image request
+            try {
+                const img = new Image();
+                img.onerror = () => {
+                    results += `Image Request: ❌ Error (normal para JSON)\n`;
+                };
+                img.onload = () => {
+                    results += `Image Request: ✅ OK\n`;
+                };
+                img.src = `${API_BASE}/health`;
+            } catch (error) {
+                results += `Image Request: ❌ ${error.message}\n`;
+            }
+            
+            showResult('alternativeResult', results, 'info');
+        }
+
+        async function testWithImage() {
+            // Esta prueba ayuda a determinar si el problema es específico de fetch()
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    showResult('alternativeResult', '✅ Imagen cargada - el servidor responde', 'success');
+                    resolve();
+                };
+                img.onerror = () => {
+                    showResult('alternativeResult', '❌ Imagen falló - problema de conectividad', 'error');
+                    reject();
+                };
+                img.src = `${API_BASE}/health`;
+            });
+        }
+
+        async function testWithScript() {
+            // JSONP like test
+            const script = document.createElement('script');
+            script.src = `${API_BASE}/health`;
+            script.onload = () => {
+                showResult('alternativeResult', '✅ Script cargado', 'success');
+            };
+            script.onerror = () => {
+                showResult('alternativeResult', '❌ Script falló', 'error');
+            };
+            document.head.appendChild(script);
+        }
+
+        async function testDirectRegister() {
+            try {
+                showResult('registerResult', 'Probando registro directo...', 'info');
+                
+                const userData = {
+                    firstName: document.getElementById('testFirstName').value,
+                    lastName: document.getElementById('testLastName').value,
+                    email: document.getElementById('testEmail').value,
+                    password: document.getElementById('testPassword').value,
+                    phone: '+34 123 456 789',
+                    city: 'Madrid',
+                    country: 'España'
+                };
+
+                console.log('Enviando datos de registro:', userData);
+
+                const response = await fetch(`${API_BASE}/api/auth/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(userData)
+                });
+
+                const result = await response.json();
+                console.log('Respuesta del servidor:', result);
+
+                if (response.ok && result.success) {
+                    showResult('registerResult', 
+                        `✅ Registro exitoso!\n\nUsuario: ${result.user.first_name} ${result.user.last_name}\nEmail: ${result.user.email}\nID: ${result.user.id}`, 
+                        'success'
+                    );
+                    // Generar nuevo email para siguiente prueba
+                    document.getElementById('testEmail').value = `test${Date.now()}@example.com`;
+                } else {
+                    showResult('registerResult', 
+                        `❌ Error en registro:\n\n${result.error || 'Error desconocido'}\nStatus: ${response.status}`, 
+                        'error'
+                    );
+                }
+            } catch (error) {
+                console.error('Error completo:', error);
+                showResult('registerResult', 
+                    `❌ Error de red en registro:\n\n${error.message}\n\nEste es el error original que está causando ERR_BLOCKED_BY_CLIENT`, 
+                    'error'
+                );
+            }
+        }
+
+        // Recopilar información del sistema
+        async function gatherSystemInfo() {
+            const info = {
+                userAgent: navigator.userAgent,
+                language: navigator.language,
+                cookieEnabled: navigator.cookieEnabled,
+                onLine: navigator.onLine,
+                platform: navigator.platform,
+                url: window.location.href,
+                referrer: document.referrer || 'None',
+                timestamp: new Date().toISOString()
+            };
+
+            let infoText = '📊 Información del Sistema:\n\n';
+            for (const [key, value] of Object.entries(info)) {
+                infoText += `${key}: ${value}\n`;
+            }
+
+            // Probar disponibilidad del servidor
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                infoText += `\n🌐 Servidor Backend:\n`;
+                infoText += `Status: ${response.status}\n`;
+                infoText += `URL: ${API_BASE}\n`;
+                infoText += `CORS Headers: ${response.headers.get('Access-Control-Allow-Origin') || 'None'}\n`;
+            } catch (error) {
+                infoText += `\n❌ Servidor Backend:\n`;
+                infoText += `Error: ${error.message}\n`;
+                infoText += `URL: ${API_BASE}\n`;
+            }
+
+            document.getElementById('systemInfo').textContent = infoText;
+        }
+
+        // Ejecutar al cargar la página
+        window.onload = function() {
+            gatherSystemInfo();
+        };
+    </script>
+</body>
+</html>
