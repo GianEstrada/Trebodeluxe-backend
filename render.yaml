@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: trebodeluxe-backend
+    env: node
+    region: ohio # o la región que prefieras
+    plan: free # o cualquier otro plan de render
+    branch: main # o la rama que uses para producción
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        sync: false # para que sea un secreto
+      - key: JWT_EXPIRES_IN
+        value: 24h
+      - key: DB_HOST
+        fromDatabase:
+          name: trebolux_db
+          property: host
+      - key: DB_USER
+        fromDatabase:
+          name: trebolux_db
+          property: user
+      - key: DB_PASS
+        fromDatabase:
+          name: trebolux_db
+          property: password
+      - key: DB_NAME
+        fromDatabase:
+          name: trebolux_db
+          property: database
+      - key: DB_PORT
+        value: 5432
+      - key: CORS_ORIGIN
+        value: https://trebodeluxe-front.onrender.com
+      - key: BCRYPT_SALT_ROUNDS
+        value: 10
