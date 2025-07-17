@@ -13,16 +13,27 @@ const { Pool } = require('pg');
 // Cargar variables de entorno
 dotenv.config();
 
+// Validar que tenemos la URL de conexión
+const DATABASE_URL = process.env.DATABASE_URL;
+if (!DATABASE_URL) {
+  console.error('ERROR: No se encontró la variable DATABASE_URL');
+  console.error('Variables de entorno disponibles:', Object.keys(process.env));
+  process.exit(1);
+}
+
+console.log('Intentando conectar a la base de datos con URL:', DATABASE_URL);
+
 // Configuración de la conexión a la base de datos
 const pool = new Pool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS,
-  database: process.env.DB_NAME,
-  port: process.env.DB_PORT,
+  connectionString: DATABASE_URL,
   ssl: {
     rejectUnauthorized: false // Necesario para conexiones SSL a servicios como Render
-  }
+  },
+  // Configuraciones adicionales para mejorar la estabilidad
+  max: 20, // máximo número de clientes en el pool
+  idleTimeoutMillis: 30000, // tiempo máximo que un cliente puede estar inactivo en el pool
+  connectionTimeoutMillis: 10000, // tiempo máximo para establecer una conexión
+  maxUses: 7500, // número máximo de consultas antes de cerrar una conexión
 });
 
 // Variables para seguir el estado de la conexión
@@ -43,15 +54,33 @@ const checkDbConnection = async () => {
   lastConnectionAttempt = now;
 
   try {
+    console.log('Intentando obtener una conexión del pool...');
     const client = await pool.connect();
-    // Verificar que realmente podemos hacer una consulta
-    await client.query('SELECT 1');
-    console.log('Conexión exitosa a la base de datos PostgreSQL');
-    isDbConnected = true;
-    client.release();
-    return true;
+    
+    try {
+      // Verificar que realmente podemos hacer una consulta
+      console.log('Conexión obtenida, verificando con una consulta simple...');
+      const result = await client.query('SELECT version()');
+      console.log('Conexión exitosa a PostgreSQL:', result.rows[0].version);
+      isDbConnected = true;
+      return true;
+    } catch (queryErr) {
+      console.error('Error al ejecutar consulta de prueba:', queryErr);
+      isDbConnected = false;
+      return false;
+    } finally {
+      console.log('Liberando conexión al pool...');
+      client.release();
+    }
   } catch (err) {
-    console.error('Error al conectar a la base de datos PostgreSQL:', err);
+    console.error('Error al conectar a la base de datos PostgreSQL:');
+    console.error('- Mensaje:', err.message);
+    console.error('- Código:', err.code);
+    console.error('- Detalle:', err.detail);
+    if (err.code === 'ECONNREFUSED') {
+      console.error('IMPORTANTE: El servidor de base de datos no está aceptando conexiones.');
+      console.error('Verifique que DATABASE_URL sea correcta y que el servidor esté activo.');
+    }
     isDbConnected = false;
     return false;
   } finally {
