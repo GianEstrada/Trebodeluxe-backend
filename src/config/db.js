@@ -7,8 +7,12 @@ dotenv.config();
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
   console.error('ERROR: DATABASE_URL no está definida en las variables de entorno');
-  process.exit(1);
+  console.error('Variables disponibles:', Object.keys(process.env));
+  throw new Error('DATABASE_URL no está definida');
 }
+
+console.log('Configurando pool de conexiones a la base de datos...');
+console.log('URL de la base de datos:', DATABASE_URL.replace(/:[^:]*@/, ':****@'));
 
 // Configuración de la conexión a la base de datos
 const pool = new Pool({
