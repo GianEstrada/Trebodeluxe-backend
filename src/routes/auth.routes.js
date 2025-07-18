@@ -1,6 +1,6 @@
 const express = require('express');
 const { check, validationResult } = require('express-validator');
-const UserController = require('../controllers/user.controller');
+const { registerUser, loginUser, getUserProfile } = require('../controllers/auth.controller');
 const authMiddleware = require('../middlewares/auth.middleware');
 
 const router = express.Router();
@@ -14,7 +14,8 @@ router.post(
     check('nombres', 'El nombre es obligatorio').not().isEmpty(),
     check('apellidos', 'Los apellidos son obligatorios').not().isEmpty(),
     check('correo', 'Por favor incluye un email válido').isEmail(),
-    check('contrasena', 'La contraseña debe tener al menos 6 caracteres').isLength({ min: 6 })
+    check('contrasena', 'La contraseña debe tener al menos 6 caracteres').isLength({ min: 6 }),
+    check('usuario', 'El nombre de usuario es obligatorio y debe tener al menos 3 caracteres').isLength({ min: 3 })
   ],
   async (req, res, next) => {
     try {
@@ -34,7 +35,7 @@ router.post(
         });
       }
 
-      await UserController.register(req, res);
+      await registerUser(req, res);
     } catch (error) {
       console.error('Error detallado en el registro:', {
         message: error.message,
@@ -53,15 +54,15 @@ router.post(
 router.post(
   '/login',
   [
-    check('correo', 'El correo es obligatorio').isEmail(),
+    check('usuario', 'El usuario o correo es obligatorio').not().isEmpty(),
     check('contrasena', 'La contraseña es obligatoria').exists()
   ],
-  UserController.login
+  loginUser
 );
 
 // @route   GET /api/auth/profile
 // @desc    Obtener perfil del usuario
 // @access  Private
-router.get('/profile', authMiddleware, UserController.getProfile);
+router.get('/profile', authMiddleware, getUserProfile);
 
 module.exports = router;

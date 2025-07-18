@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const UserModel = require('../models/user.model');
+const db = require('../config/db');
 
 const authMiddleware = async (req, res, next) => {
   try {
@@ -19,8 +19,13 @@ const authMiddleware = async (req, res, next) => {
       // Verificar el token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      // Buscar el usuario
-      const user = await UserModel.getById(decoded.id);
+      // Buscar el usuario en la base de datos
+      const result = await db.query(
+        'SELECT id_usuario, nombres, apellidos, correo, usuario FROM usuarios WHERE id_usuario = $1',
+        [decoded.id]
+      );
+
+      const user = result.rows[0];
       if (!user) {
         return res.status(401).json({
           success: false,
@@ -33,7 +38,8 @@ const authMiddleware = async (req, res, next) => {
         id_usuario: user.id_usuario,
         nombres: user.nombres,
         apellidos: user.apellidos,
-        correo: user.correo
+        correo: user.correo,
+        usuario: user.usuario
       };
 
       next();

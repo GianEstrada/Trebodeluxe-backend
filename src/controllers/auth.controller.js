@@ -12,27 +12,37 @@ const registerUser = async (req, res) => {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { nombres, apellidos, correo, contrasena } = req.body;
+  const { nombres, apellidos, correo, contrasena, usuario } = req.body;
 
   try {
-    // Verificar si el usuario ya existe
-    const userExists = await db.query(
+    // Verificar si el correo ya existe
+    const emailExists = await db.query(
       'SELECT * FROM usuarios WHERE correo = $1',
       [correo]
     );
 
-    if (userExists.rows.length > 0) {
-      return res.status(400).json({ message: 'El usuario ya existe' });
+    if (emailExists.rows.length > 0) {
+      return res.status(400).json({ message: 'El correo ya está registrado' });
+    }
+
+    // Verificar si el nombre de usuario ya existe
+    const usernameExists = await db.query(
+      'SELECT * FROM usuarios WHERE usuario = $1',
+      [usuario]
+    );
+
+    if (usernameExists.rows.length > 0) {
+      return res.status(400).json({ message: 'El nombre de usuario ya está en uso' });
     }
 
     // Encriptar contraseña
-    const salt = await bcrypt.genSalt(parseInt(process.env.BCRYPT_SALT_ROUNDS));
+    const salt = await bcrypt.genSalt(parseInt(process.env.BCRYPT_SALT_ROUNDS) || 10);
     const hashedPassword = await bcrypt.hash(contrasena, salt);
 
     // Crear el usuario
     const result = await db.query(
-      'INSERT INTO usuarios (nombres, apellidos, correo, contrasena) VALUES ($1, $2, $3, $4) RETURNING id_usuario, nombres, apellidos, correo',
-      [nombres, apellidos, correo, hashedPassword]
+      'INSERT INTO usuarios (nombres, apellidos, correo, contrasena, usuario) VALUES ($1, $2, $3, $4, $5) RETURNING id_usuario, nombres, apellidos, correo, usuario',
+      [nombres, apellidos, correo, hashedPassword, usuario]
     );
 
     const newUser = result.rows[0];
@@ -42,6 +52,7 @@ const registerUser = async (req, res) => {
       nombres: newUser.nombres,
       apellidos: newUser.apellidos,
       correo: newUser.correo,
+      usuario: newUser.usuario,
       token: generateToken(newUser.id_usuario)
     });
   } catch (error) {
@@ -59,26 +70,26 @@ const loginUser = async (req, res) => {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { correo, contrasena } = req.body;
+  const { usuario, contrasena } = req.body;
 
   try {
-    // Verificar si el usuario existe
+    // Verificar si el usuario existe (puede ser nombre de usuario o correo)
     const result = await db.query(
-      'SELECT * FROM usuarios WHERE correo = $1',
-      [correo]
+      'SELECT * FROM usuarios WHERE usuario = $1 OR correo = $1',
+      [usuario]
     );
 
     const user = result.rows[0];
 
     if (!user) {
-      return res.status(401).json({ message: 'Correo o contraseña incorrectos' });
+      return res.status(401).json({ message: 'Usuario o contraseña incorrectos' });
     }
 
     // Verificar si la contraseña coincide
     const isMatch = await bcrypt.compare(contrasena, user.contrasena);
 
     if (!isMatch) {
-      return res.status(401).json({ message: 'Correo o contraseña incorrectos' });
+      return res.status(401).json({ message: 'Usuario o contraseña incorrectos' });
     }
 
     res.json({
@@ -86,6 +97,7 @@ const loginUser = async (req, res) => {
       nombres: user.nombres,
       apellidos: user.apellidos,
       correo: user.correo,
+      usuario: user.usuario,
       token: generateToken(user.id_usuario)
     });
   } catch (error) {

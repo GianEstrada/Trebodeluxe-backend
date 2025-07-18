@@ -3,12 +3,21 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-// Validar la URL de la base de datos
-const DATABASE_URL = process.env.DATABASE_URL;
+// Validar la URL de la base de datos o construirla a partir de variables individuales
+let DATABASE_URL = process.env.DATABASE_URL;
+
 if (!DATABASE_URL) {
-  console.error('ERROR: DATABASE_URL no está definida en las variables de entorno');
-  console.error('Variables disponibles:', Object.keys(process.env));
-  throw new Error('DATABASE_URL no está definida');
+  // Intentar construir la URL a partir de variables individuales
+  const { DB_HOST, DB_USER, DB_PASS, DB_NAME, DB_PORT } = process.env;
+  
+  if (DB_HOST && DB_USER && DB_PASS && DB_NAME && DB_PORT) {
+    DATABASE_URL = `postgresql://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}`;
+    console.log('DATABASE_URL construida a partir de variables individuales');
+  } else {
+    console.error('ERROR: DATABASE_URL no está definida y no se pueden construir desde variables individuales');
+    console.error('Variables disponibles:', Object.keys(process.env));
+    throw new Error('DATABASE_URL no está definida');
+  }
 }
 
 console.log('Configurando pool de conexiones a la base de datos...');
@@ -75,16 +84,9 @@ const checkConnection = async () => {
   }
 };
 
-// Exportar el pool y la función de verificación
-module.exports = {
-  pool,
-  checkConnection
-};
-
 // Exportar la instancia del pool y funciones relacionadas
 module.exports = {
   query: (text, params) => pool.query(text, params),
   pool,
-  checkConnection,
-  isConnected: () => isConnected
+  checkConnection
 };
