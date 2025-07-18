@@ -35,7 +35,7 @@ const UserController = {
       if (exists) {
         return res.status(400).json({
           success: false,
-          message: 'El email o nombre de usuario ya está registrado'
+          message: 'El correo ya está registrado'
         });
       }
 
@@ -47,9 +47,14 @@ const UserController = {
         password: contrasena
       });
 
-      // Generar token JWT
+      // Generar token JWT con todos los datos del usuario
       const token = jwt.sign(
-        { id: user.id_usuario },
+        { 
+          id_usuario: user.id_usuario,
+          nombres: user.nombres,
+          apellidos: user.apellidos,
+          correo: user.correo
+        },
         process.env.JWT_SECRET,
         { expiresIn: '24h' }
       );
@@ -59,7 +64,7 @@ const UserController = {
         message: 'Usuario registrado exitosamente',
         token,
         user: {
-          id: user.id_usuario,
+          id_usuario: user.id_usuario,
           nombres: user.nombres,
           apellidos: user.apellidos,
           correo: user.correo
@@ -102,9 +107,14 @@ const UserController = {
         });
       }
 
-      // Generar token JWT
+      // Generar token JWT con todos los datos del usuario
       const token = jwt.sign(
-        { id: user.id_usuario },
+        { 
+          id_usuario: user.id_usuario,
+          nombres: user.nombres,
+          apellidos: user.apellidos,
+          correo: user.correo
+        },
         process.env.JWT_SECRET,
         { expiresIn: '24h' }
       );
@@ -113,7 +123,7 @@ const UserController = {
         success: true,
         token,
         user: {
-          id: user.id_usuario,
+          id_usuario: user.id_usuario,
           nombres: user.nombres,
           apellidos: user.apellidos,
           correo: user.correo
@@ -131,7 +141,8 @@ const UserController = {
   // Obtener perfil de usuario
   async getProfile(req, res) {
     try {
-      const userId = req.user.id; // Viene del middleware de autenticación
+      console.log('Obteniendo perfil para usuario:', req.user);
+      const userId = req.user.id_usuario;
       const user = await UserModel.getById(userId);
       
       if (!user) {
@@ -147,7 +158,10 @@ const UserController = {
       res.json({
         success: true,
         user: {
-          ...user,
+          id_usuario: user.id_usuario,
+          nombres: user.nombres,
+          apellidos: user.apellidos,
+          correo: user.correo,
           shipping_info: shippingInfo || null
         }
       });
