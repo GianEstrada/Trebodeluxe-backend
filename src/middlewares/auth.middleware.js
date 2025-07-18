@@ -30,8 +30,10 @@ const authMiddleware = async (req, res, next) => {
 
       // Agregar el usuario a la request
       req.user = {
-        id: user.id,
-        username: user.username
+        id_usuario: user.id_usuario,
+        nombres: user.nombres,
+        apellidos: user.apellidos,
+        correo: user.correo
       };
 
       next();

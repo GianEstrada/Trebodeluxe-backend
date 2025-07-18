@@ -52,17 +52,19 @@ const UserModel = {
     }
 
     return {
-      id: user.id,
-      username: user.username
+      id_usuario: user.id_usuario,
+      nombres: user.nombres,
+      apellidos: user.apellidos,
+      correo: user.correo
     };
   },
 
   // Obtener usuario por ID
   async getById(id) {
     const result = await pool.query(
-      `SELECT id, username, nombres, apellidos, email, fecha_registro 
+      `SELECT id_usuario, nombres, apellidos, correo, fecha_creacion 
        FROM usuarios 
-       WHERE id = $1`,
+       WHERE id_usuario = $1`,
       [id]
     );
     return result.rows[0];

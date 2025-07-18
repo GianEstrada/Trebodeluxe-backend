@@ -46,6 +46,7 @@ app.get('/api/health', async (req, res) => {
     
     if (dbStatus.connected) {
       return res.status(200).json({ 
+        success: true, 
         status: 'ok', 
         message: 'El servidor está funcionando correctamente',
         database: 'connected',
