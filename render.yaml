@@ -2,22 +2,24 @@ services:
   - type: web
     name: trebodeluxe-backend
     env: node
-    region: ohio # o la región que prefieras
-    plan: free # o cualquier otro plan de render
-    branch: main # o la rama que uses para producción
-    buildCommand: npm install
-    startCommand: node simple-server.js
+    region: ohio
+    plan: free
+    buildCommand: chmod +x ./build.sh && ./build.sh
+    startCommand: cd dist && node simple-server.js
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 10000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: trebolux_db
+          property: connectionString
       - key: JWT_SECRET
-        sync: false # para que sea un secreto
+        generateValue: true
       - key: JWT_EXPIRES_IN
         value: 24h
-      - key: DB_HOST
         fromDatabase:
           name: trebolux_db
           property: host

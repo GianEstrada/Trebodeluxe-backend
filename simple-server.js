@@ -8,20 +8,18 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const dotenv = require('dotenv');
-const { Pool } = require('pg');
+const path = require('path');
 
 // Cargar variables de entorno
 dotenv.config();
 
-// Validar que tenemos la URL de conexión
-const DATABASE_URL = process.env.DATABASE_URL;
-if (!DATABASE_URL) {
-  console.error('ERROR: No se encontró la variable DATABASE_URL');
-  console.error('Variables de entorno disponibles:', Object.keys(process.env));
-  process.exit(1);
-}
+// Importar rutas
+const authRoutes = require('./src/routes/auth.routes');
+const userRoutes = require('./src/routes/user.routes');
+const shippingRoutes = require('./src/routes/shipping.routes');
 
-console.log('Intentando conectar a la base de datos con URL:', DATABASE_URL);
+// Importar la configuración de la base de datos
+const db = require('./src/config/db');
 
 // Configuración de la conexión a la base de datos
 const pool = new Pool({
@@ -95,9 +93,20 @@ checkDbConnection();
 const app = express();
 
 // Middlewares
-app.use(helmet());
-app.use(cors());
-app.use(express.json());
+app.use(helmet()); // Seguridad HTTP
+app.use(cors({
+  origin: true, // Permite solicitudes de cualquier origen
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
+}));
+app.use(express.json()); // Para parsear JSON
+app.use(express.urlencoded({ extended: true })); // Para parsear formularios
+
+// Rutas de la API
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/shipping', shippingRoutes);
 
 // Ruta de estado (health check)
 app.get('/api/health', async (req, res) => {

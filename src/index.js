@@ -34,11 +34,6 @@ app.use(cors({
 app.use(express.json()); // Parsear cuerpo de solicitudes JSON
 app.use(express.urlencoded({ extended: true })); // Parsear cuerpo de solicitudes URL-encoded
 
-// Rutas de la API
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/shipping', shippingRoutes);
-
 // Ruta base
 app.get('/', (req, res) => {
   res.json({ message: 'API de Trebodeluxe Backend' });
