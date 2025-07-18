@@ -18,11 +18,31 @@ router.post(
     check('password', 'La contraseña debe tener al menos 6 caracteres').isLength({ min: 6 })
   ],
   async (req, res, next) => {
-    console.log('Cuerpo de la solicitud:', req.body); // Log request body
     try {
+      // Log detailed request information
+      console.log('=== Registro de Usuario ===');
+      console.log('Headers:', req.headers);
+      console.log('Body:', req.body);
+      console.log('Method:', req.method);
+      console.log('URL:', req.originalUrl);
+      
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        console.log('Errores de validación:', errors.array());
+        return res.status(400).json({
+          success: false,
+          errors: errors.array()
+        });
+      }
+
       await UserController.register(req, res);
     } catch (error) {
-      console.error('Error en el registro:', error); // Log any errors
+      console.error('Error detallado en el registro:', {
+        message: error.message,
+        stack: error.stack,
+        code: error.code,
+        detail: error.detail
+      });
       next(error);
     }
   }

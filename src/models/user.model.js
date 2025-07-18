@@ -4,11 +4,14 @@ const { pool } = require('../config/db');
 const UserModel = {
   // Crear un nuevo usuario
   async create({ username, nombres, apellidos, email, password }) {
+    console.log('Iniciando creación de usuario en la base de datos');
     const client = await pool.connect();
     try {
+      console.log('Conexión a la base de datos establecida');
       await client.query('BEGIN');
       
       // Encriptar la contraseña
+      console.log('Encriptando contraseña...');
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
       
