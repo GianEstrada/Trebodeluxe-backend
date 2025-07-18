@@ -7,8 +7,13 @@ CREATE TABLE IF NOT EXISTS usuarios (
     contrasena VARCHAR(255) NOT NULL,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     usuario VARCHAR(50) UNIQUE NOT NULL,
-    rol VARCHAR(20) DEFAULT 'user' CHECK (rol IN ('user', 'admin', 'moderator'))
+    rol INTEGER DEFAULT 0 CHECK (rol IN (0, 1, 2))
 );
+
+-- Comentarios para los roles:
+-- rol = 0: Usuario normal
+-- rol = 1: Administrador  
+-- rol = 2: Moderador
 
 -- Tabla de información de envío
 CREATE TABLE IF NOT EXISTS informacion_envio (
