@@ -47,15 +47,22 @@ const UserController = {
         password: contrasena
       });
 
+      // Generar token JWT
+      const token = jwt.sign(
+        { id: user.id_usuario },
+        process.env.JWT_SECRET,
+        { expiresIn: '24h' }
+      );
+
       res.status(201).json({
         success: true,
         message: 'Usuario registrado exitosamente',
+        token,
         user: {
-          id: user.id,
-          username: user.username,
-          email: user.email,
+          id: user.id_usuario,
           nombres: user.nombres,
-          apellidos: user.apellidos
+          apellidos: user.apellidos,
+          correo: user.correo
         }
       });
     } catch (error) {
@@ -78,16 +85,16 @@ const UserController = {
         });
       }
 
-      const { username, password } = req.body;
+      const { correo, contrasena } = req.body;
 
-      if (!username || !password) {
+      if (!correo || !contrasena) {
         return res.status(400).json({
           success: false,
-          message: 'Usuario y contraseña son requeridos'
+          message: 'Correo y contraseña son requeridos'
         });
       }
 
-      const user = await UserModel.verifyCredentials(username, password);
+      const user = await UserModel.verifyCredentials(correo, contrasena);
       if (!user) {
         return res.status(401).json({
           success: false,
@@ -97,7 +104,7 @@ const UserController = {
 
       // Generar token JWT
       const token = jwt.sign(
-        { id: user.id, username: user.username },
+        { id: user.id_usuario },
         process.env.JWT_SECRET,
         { expiresIn: '24h' }
       );
@@ -106,8 +113,10 @@ const UserController = {
         success: true,
         token,
         user: {
-          id: user.id,
-          username: user.username
+          id: user.id_usuario,
+          nombres: user.nombres,
+          apellidos: user.apellidos,
+          correo: user.correo
         }
       });
     } catch (error) {
