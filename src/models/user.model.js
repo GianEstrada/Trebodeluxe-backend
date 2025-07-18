@@ -17,10 +17,10 @@ const UserModel = {
       
       // Insertar el usuario
       const userResult = await client.query(
-        `INSERT INTO usuarios (username, nombres, apellidos, email, password) 
-         VALUES ($1, $2, $3, $4, $5) 
-         RETURNING id, username, nombres, apellidos, email, fecha_registro`,
-        [username, nombres, apellidos, email, hashedPassword]
+        `INSERT INTO usuarios (nombres, apellidos, correo, contrasena) 
+         VALUES ($1, $2, $3, $4) 
+         RETURNING id_usuario, nombres, apellidos, correo, fecha_creacion`,
+        [nombres, apellidos, email, hashedPassword]
       );
 
       await client.query('COMMIT');
@@ -34,10 +34,10 @@ const UserModel = {
   },
 
   // Verificar credenciales de usuario
-  async verifyCredentials(username, password) {
+  async verifyCredentials(correo, password) {
     const result = await pool.query(
-      'SELECT id, username, password FROM usuarios WHERE username = $1',
-      [username]
+      'SELECT id_usuario, correo, contrasena FROM usuarios WHERE correo = $1',
+      [correo]
     );
 
     if (result.rows.length === 0) {
@@ -45,7 +45,7 @@ const UserModel = {
     }
 
     const user = result.rows[0];
-    const isValid = await bcrypt.compare(password, user.password);
+    const isValid = await bcrypt.compare(password, user.contrasena);
 
     if (!isValid) {
       return null;
@@ -68,13 +68,13 @@ const UserModel = {
     return result.rows[0];
   },
 
-  // Verificar si existe un email o username
-  async checkExists(email, username) {
+  // Verificar si existe un correo
+  async checkExists(email) {
     const result = await pool.query(
       `SELECT COUNT(*) as count 
        FROM usuarios 
-       WHERE email = $1 OR username = $2`,
-      [email, username]
+       WHERE correo = $1`,
+      [email]
     );
     return result.rows[0].count > 0;
   }

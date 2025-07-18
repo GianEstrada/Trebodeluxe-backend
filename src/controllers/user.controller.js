@@ -21,7 +21,6 @@ const UserController = {
 
       console.log('Datos recibidos:', { ...req.body, password: '[REDACTED]' });
       const { nombres, apellidos, correo, contrasena } = req.body;
-      const username = correo.split('@')[0]; // Usar la parte antes del @ del correo como username
 
       // Validar campos requeridos
       if (!nombres || !apellidos || !correo || !contrasena) {
@@ -32,7 +31,7 @@ const UserController = {
       }
 
       // Verificar si el usuario ya existe
-      const exists = await UserModel.checkExists(correo, username);
+      const exists = await UserModel.checkExists(correo);
       if (exists) {
         return res.status(400).json({
           success: false,
@@ -42,7 +41,6 @@ const UserController = {
 
       // Crear el usuario
       const user = await UserModel.create({
-        username,
         nombres,
         apellidos,
         email: correo,
