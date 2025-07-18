@@ -1,5 +1,5 @@
 const express = require('express');
-const { check } = require('express-validator');
+const { check, validationResult } = require('express-validator');
 const UserController = require('../controllers/user.controller');
 const authMiddleware = require('../middlewares/auth.middleware');
 
@@ -11,11 +11,10 @@ const router = express.Router();
 router.post(
   '/register',
   [
-    check('username', 'El nombre de usuario es obligatorio').not().isEmpty(),
     check('nombres', 'El nombre es obligatorio').not().isEmpty(),
     check('apellidos', 'Los apellidos son obligatorios').not().isEmpty(),
-    check('email', 'Por favor incluye un email válido').isEmail(),
-    check('password', 'La contraseña debe tener al menos 6 caracteres').isLength({ min: 6 })
+    check('correo', 'Por favor incluye un email válido').isEmail(),
+    check('contrasena', 'La contraseña debe tener al menos 6 caracteres').isLength({ min: 6 })
   ],
   async (req, res, next) => {
     try {
