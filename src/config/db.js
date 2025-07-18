@@ -28,18 +28,28 @@ const checkConnection = async () => {
   let client;
   try {
     // Intentar obtener un cliente del pool
+    console.log('Intentando obtener una conexión del pool...');
     client = await pool.connect();
     
     // Intentar ejecutar una consulta simple
-    const result = await client.query('SELECT NOW()');
+    console.log('Conexión obtenida, verificando con una consulta simple...');
+    const result = await client.query('SELECT version()');
     
     // Validar el resultado
     if (!result || !result.rows || result.rows.length === 0) {
       throw new Error('No se recibió respuesta válida de la base de datos');
     }
 
-    console.log('Conexión exitosa a la base de datos PostgreSQL:', result.rows[0].now);
-    return true;
+    console.log('Conexión exitosa a PostgreSQL:', result.rows[0].version);
+    return {
+      connected: true,
+      version: result.rows[0].version,
+      poolStatus: {
+        totalCount: pool.totalCount,
+        idleCount: pool.idleCount,
+        waitingCount: pool.waitingCount
+      }
+    };
   } catch (err) {
     console.error('Error al conectar a la base de datos PostgreSQL:', {
       message: err.message,

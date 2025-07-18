@@ -41,13 +41,18 @@ app.get('/', (req, res) => {
 
 app.get('/api/health', async (req, res) => {
   try {
-    const isDbConnected = await db.checkConnection();
+    const dbStatus = await db.checkConnection();
     
-    if (isDbConnected) {
+    if (dbStatus.connected) {
       return res.status(200).json({ 
         status: 'ok', 
         message: 'El servidor está funcionando correctamente',
-        database: 'connected'
+        database: 'connected',
+        databaseInfo: {
+          version: dbStatus.version,
+          pool: dbStatus.poolStatus
+        },
+        timestamp: new Date().toISOString()
       });
     } else {
       return res.status(500).json({ 
