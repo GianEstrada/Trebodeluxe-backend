@@ -1,44 +1,54 @@
 const jwt = require('jsonwebtoken');
-const db = require('../config/db');
+const UserModel = require('../models/user.model');
 
-// Middleware para proteger rutas que requieren autenticación
-const protect = async (req, res, next) => {
-  let token;
+const authMiddleware = async (req, res, next) => {
+  try {
+    // Verificar si el token está presente en los headers
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        message: 'No autorizado - Token no proporcionado'
+      });
+    }
 
-  // Verificar si el token está presente en los headers
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    // Obtener el token del header
+    const token = authHeader.split(' ')[1];
+
     try {
-      // Obtener el token del header
-      token = req.headers.authorization.split(' ')[1];
-
       // Verificar el token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      // Obtener los datos del usuario sin la contraseña
-      const result = await db.query(
-        'SELECT id_usuario, nombres, apellidos, correo FROM usuarios WHERE id_usuario = $1',
-        [decoded.id]
-      );
-
-      if (result.rows.length === 0) {
-        res.status(401);
-        throw new Error('Token no válido - usuario no encontrado');
+      // Buscar el usuario
+      const user = await UserModel.getById(decoded.id);
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: 'No autorizado - Usuario no encontrado'
+        });
       }
 
       // Agregar el usuario a la request
-      req.user = result.rows[0];
+      req.user = {
+        id: user.id,
+        username: user.username
+      };
+
       next();
     } catch (error) {
-      console.error('Error de autenticación:', error);
-      res.status(401);
-      throw new Error('No autorizado, token fallido');
+      console.error('Error al verificar token:', error);
+      return res.status(401).json({
+        success: false,
+        message: 'No autorizado - Token inválido'
+      });
     }
-  }
-
-  if (!token) {
-    res.status(401);
-    throw new Error('No autorizado, no hay token');
+  } catch (error) {
+    console.error('Error en middleware de autenticación:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
   }
 };
 
-module.exports = { protect };
+module.exports = authMiddleware;
