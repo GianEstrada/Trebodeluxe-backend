@@ -147,6 +147,87 @@ const UserController = {
         message: 'Error al obtener perfil de usuario'
       });
     }
+  },
+
+  // Actualizar perfil de usuario
+  async updateUserProfile(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          errors: errors.array()
+        });
+      }
+
+      const userId = req.user.id;
+      const { nombres, apellidos, correo, contrasena } = req.body;
+
+      // Verificar si el usuario existe
+      const user = await UserModel.getById(userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'Usuario no encontrado'
+        });
+      }
+
+      // Actualizar usuario
+      const updatedUser = await UserModel.update(userId, {
+        nombres,
+        apellidos,
+        email: correo,
+        password: contrasena // Se encriptará en el modelo si está presente
+      });
+
+      res.json({
+        success: true,
+        message: 'Perfil actualizado exitosamente',
+        user: {
+          id: updatedUser.id,
+          username: updatedUser.username,
+          email: updatedUser.email,
+          nombres: updatedUser.nombres,
+          apellidos: updatedUser.apellidos
+        }
+      });
+    } catch (error) {
+      console.error('Error al actualizar perfil:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al actualizar perfil de usuario'
+      });
+    }
+  },
+
+  // Eliminar usuario
+  async deleteUser(req, res) {
+    try {
+      const userId = req.user.id;
+      
+      // Verificar si el usuario existe
+      const user = await UserModel.getById(userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'Usuario no encontrado'
+        });
+      }
+
+      // Eliminar usuario
+      await UserModel.delete(userId);
+
+      res.json({
+        success: true,
+        message: 'Cuenta eliminada exitosamente'
+      });
+    } catch (error) {
+      console.error('Error al eliminar cuenta:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al eliminar cuenta de usuario'
+      });
+    }
   }
 };
 
