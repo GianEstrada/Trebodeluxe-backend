@@ -17,7 +17,15 @@ router.post(
     check('email', 'Por favor incluye un email válido').isEmail(),
     check('password', 'La contraseña debe tener al menos 6 caracteres').isLength({ min: 6 })
   ],
-  UserController.register
+  async (req, res, next) => {
+    console.log('Cuerpo de la solicitud:', req.body); // Log request body
+    try {
+      await UserController.register(req, res);
+    } catch (error) {
+      console.error('Error en el registro:', error); // Log any errors
+      next(error);
+    }
+  }
 );
 
 // @route   POST /api/auth/login

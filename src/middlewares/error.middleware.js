@@ -9,12 +9,21 @@ const notFound = (req, res, next) => {
 const errorHandler = (err, req, res, next) => {
   const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
   
-  console.error('Error:', err.message);
-  console.error('Stack:', err.stack);
+  console.error('Error detallado:', {
+    message: err.message,
+    stack: err.stack,
+    path: req.path,
+    method: req.method,
+    body: req.body,
+    params: req.params,
+    query: req.query
+  });
   
   res.status(statusCode).json({
+    success: false,
     message: err.message,
-    stack: process.env.NODE_ENV === 'production' ? '🥞' : err.stack,
+    errors: err.errors || undefined,
+    stack: process.env.NODE_ENV === 'production' ? undefined : err.stack,
   });
 };
 

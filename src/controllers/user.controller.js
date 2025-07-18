@@ -9,14 +9,17 @@ const UserController = {
   // Registro de usuario
   async register(req, res) {
     try {
+      console.log('Iniciando registro de usuario');
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
+        console.log('Errores de validación:', errors.array());
         return res.status(400).json({
           success: false,
           errors: errors.array()
         });
       }
 
+      console.log('Datos recibidos:', { ...req.body, password: '[REDACTED]' });
       const { username, nombres, apellidos, email, password } = req.body;
 
       // Validar campos requeridos
