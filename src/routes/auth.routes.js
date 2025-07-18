@@ -1,7 +1,7 @@
 const express = require('express');
 const { check } = require('express-validator');
-const { registerUser, loginUser, getUserProfile } = require('../controllers/auth.controller');
-const { protect } = require('../middlewares/auth.middleware');
+const UserController = require('../controllers/user.controller');
+const authMiddleware = require('../middlewares/auth.middleware');
 
 const router = express.Router();
 
@@ -11,12 +11,13 @@ const router = express.Router();
 router.post(
   '/register',
   [
+    check('username', 'El nombre de usuario es obligatorio').not().isEmpty(),
     check('nombres', 'El nombre es obligatorio').not().isEmpty(),
     check('apellidos', 'Los apellidos son obligatorios').not().isEmpty(),
-    check('correo', 'Por favor incluye un correo válido').isEmail(),
-    check('contrasena', 'La contraseña debe tener al menos 6 caracteres').isLength({ min: 6 })
+    check('email', 'Por favor incluye un email válido').isEmail(),
+    check('password', 'La contraseña debe tener al menos 6 caracteres').isLength({ min: 6 })
   ],
-  registerUser
+  UserController.register
 );
 
 // @route   POST /api/auth/login
@@ -25,15 +26,15 @@ router.post(
 router.post(
   '/login',
   [
-    check('correo', 'Por favor incluye un correo válido').isEmail(),
-    check('contrasena', 'La contraseña es obligatoria').exists()
+    check('username', 'El nombre de usuario es obligatorio').not().isEmpty(),
+    check('password', 'La contraseña es obligatoria').exists()
   ],
-  loginUser
+  UserController.login
 );
 
 // @route   GET /api/auth/profile
 // @desc    Obtener perfil del usuario
 // @access  Private
-router.get('/profile', protect, getUserProfile);
+router.get('/profile', authMiddleware, UserController.getProfile);
 
 module.exports = router;
