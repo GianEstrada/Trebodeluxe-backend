@@ -17,7 +17,8 @@ const authMiddleware = async (req, res, next) => {
 
     try {
       // Verificar el token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const secret = process.env.JWT_SECRET || 'trebodeluxe_default_secret_key_CHANGE_IN_PRODUCTION';
+      const decoded = jwt.verify(token, secret);
 
       // Buscar el usuario en la base de datos
       const result = await db.query(
