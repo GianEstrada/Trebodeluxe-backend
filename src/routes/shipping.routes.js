@@ -6,12 +6,12 @@ const {
   updateShippingInfo,
   deleteShippingInfo
 } = require('../controllers/shipping.controller');
-const { protect } = require('../middlewares/auth.middleware');
+const authMiddleware = require('../middlewares/auth.middleware');
 
 const router = express.Router();
 
 // Todas las rutas necesitan autenticación
-router.use(protect);
+router.use(authMiddleware);
 
 // @route   GET /api/shipping
 // @desc    Obtener información de envío del usuario
