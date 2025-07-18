@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS usuarios (
     correo VARCHAR(100) UNIQUE NOT NULL,
     contrasena VARCHAR(255) NOT NULL,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    usuario VARCHAR(50) UNIQUE NOT NULL
+    usuario VARCHAR(50) UNIQUE NOT NULL,
+    rol VARCHAR(20) DEFAULT 'user' CHECK (rol IN ('user', 'admin', 'moderator'))
 );
 
 -- Tabla de información de envío

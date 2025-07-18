@@ -1,6 +1,6 @@
 const express = require('express');
 const { check, validationResult } = require('express-validator');
-const { registerUser, loginUser, getUserProfile } = require('../controllers/auth.controller');
+const { registerUser, loginUser, getUserProfile, logoutUser } = require('../controllers/auth.controller');
 const authMiddleware = require('../middlewares/auth.middleware');
 
 const router = express.Router();
@@ -64,5 +64,10 @@ router.post(
 // @desc    Obtener perfil del usuario
 // @access  Private
 router.get('/profile', authMiddleware, getUserProfile);
+
+// @route   POST /api/auth/logout
+// @desc    Cerrar sesión del usuario
+// @access  Private
+router.post('/logout', authMiddleware, logoutUser);
 
 module.exports = router;
