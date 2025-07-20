@@ -311,6 +311,215 @@ const ProductModel = {
     
     const result = await db.query(query);
     return result.rows;
+  },
+
+  // Obtener productos recientes (agregados recientemente)
+  async getRecent(limit = 12) {
+    const query = `
+      SELECT 
+        p.id_producto,
+        p.nombre as producto_nombre,
+        p.descripcion,
+        p.categoria,
+        p.marca,
+        p.fecha_creacion,
+        st.nombre as sistema_talla_nombre,
+        MIN(v.precio) as precio_minimo,
+        MAX(v.precio_original) as precio_original_max,
+        CASE WHEN COUNT(s.id_stock) > 0 AND SUM(s.cantidad) > 0 THEN true ELSE false END as tiene_stock,
+        JSON_AGG(
+          DISTINCT jsonb_build_object(
+            'id_variante', v.id_variante,
+            'nombre', v.nombre,
+            'precio', v.precio,
+            'precio_original', v.precio_original,
+            'activo', v.activo,
+            'imagenes', COALESCE(v_images.imagenes, '[]'::json)
+          )
+        ) as variantes,
+        JSON_AGG(
+          DISTINCT jsonb_build_object(
+            'id_talla', t.id_talla,
+            'nombre', t.nombre_talla,
+            'orden', t.orden
+          ) ORDER BY t.orden
+        ) FILTER (WHERE t.id_talla IS NOT NULL) as tallas_disponibles,
+        JSON_AGG(
+          DISTINCT jsonb_build_object(
+            'id_stock', s.id_stock,
+            'id_variante', s.id_variante,
+            'id_talla', s.id_talla,
+            'cantidad', s.cantidad,
+            'nombre_talla', t.nombre_talla
+          )
+        ) FILTER (WHERE s.id_stock IS NOT NULL) as stock
+      FROM productos p
+      LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
+      LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+      LEFT JOIN stock s ON p.id_producto = s.id_producto AND v.id_variante = s.id_variante
+      LEFT JOIN tallas t ON s.id_talla = t.id_talla
+      LEFT JOIN LATERAL (
+        SELECT JSON_AGG(
+          jsonb_build_object(
+            'id_imagen', img.id_imagen,
+            'url', img.url,
+            'public_id', img.public_id,
+            'orden', img.orden
+          ) ORDER BY img.orden
+        ) as imagenes
+        FROM imagenes_variante img
+        WHERE img.id_variante = v.id_variante
+      ) v_images ON true
+      WHERE p.activo = true
+      GROUP BY p.id_producto, p.nombre, p.descripcion, p.categoria, p.marca, p.fecha_creacion, st.nombre
+      ORDER BY p.fecha_creacion DESC
+      LIMIT $1
+    `;
+    
+    const result = await db.query(query, [limit]);
+    return result.rows;
+  },
+
+  // Obtener productos recientes por categoría
+  async getRecentByCategory(limit = 6) {
+    const query = `
+      WITH recent_by_category AS (
+        SELECT 
+          p.categoria,
+          p.id_producto,
+          p.nombre as producto_nombre,
+          p.descripcion,
+          p.marca,
+          p.fecha_creacion,
+          st.nombre as sistema_talla_nombre,
+          MIN(v.precio) as precio_minimo,
+          MAX(v.precio_original) as precio_original_max,
+          CASE WHEN COUNT(s.id_stock) > 0 AND SUM(s.cantidad) > 0 THEN true ELSE false END as tiene_stock,
+          JSON_AGG(
+            DISTINCT jsonb_build_object(
+              'id_variante', v.id_variante,
+              'nombre', v.nombre,
+              'precio', v.precio,
+              'precio_original', v.precio_original,
+              'activo', v.activo,
+              'imagenes', COALESCE(v_images.imagenes, '[]'::json)
+            )
+          ) as variantes,
+          JSON_AGG(
+            DISTINCT jsonb_build_object(
+              'id_talla', t.id_talla,
+              'nombre', t.nombre_talla,
+              'orden', t.orden
+            ) ORDER BY t.orden
+          ) FILTER (WHERE t.id_talla IS NOT NULL) as tallas_disponibles,
+          JSON_AGG(
+            DISTINCT jsonb_build_object(
+              'id_stock', s.id_stock,
+              'id_variante', s.id_variante,
+              'id_talla', s.id_talla,
+              'cantidad', s.cantidad,
+              'nombre_talla', t.nombre_talla
+            )
+          ) FILTER (WHERE s.id_stock IS NOT NULL) as stock,
+          ROW_NUMBER() OVER (PARTITION BY p.categoria ORDER BY p.fecha_creacion DESC) as rn
+        FROM productos p
+        LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
+        LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+        LEFT JOIN stock s ON p.id_producto = s.id_producto AND v.id_variante = s.id_variante
+        LEFT JOIN tallas t ON s.id_talla = t.id_talla
+        LEFT JOIN LATERAL (
+          SELECT JSON_AGG(
+            jsonb_build_object(
+              'id_imagen', img.id_imagen,
+              'url', img.url,
+              'public_id', img.public_id,
+              'orden', img.orden
+            ) ORDER BY img.orden
+          ) as imagenes
+          FROM imagenes_variante img
+          WHERE img.id_variante = v.id_variante
+        ) v_images ON true
+        WHERE p.activo = true
+        GROUP BY p.id_producto, p.nombre, p.descripcion, p.categoria, p.marca, p.fecha_creacion, st.nombre
+      )
+      SELECT * FROM recent_by_category 
+      WHERE rn <= $1
+      ORDER BY categoria, fecha_creacion DESC
+    `;
+    
+    const result = await db.query(query, [limit]);
+    return result.rows;
+  },
+
+  // Obtener productos con mejores promociones (mayor diferencia entre precio original y actual)
+  async getBestPromotions(limit = 12) {
+    const query = `
+      SELECT 
+        p.id_producto,
+        p.nombre as producto_nombre,
+        p.descripcion,
+        p.categoria,
+        p.marca,
+        p.fecha_creacion,
+        st.nombre as sistema_talla_nombre,
+        MIN(v.precio) as precio_minimo,
+        MAX(v.precio_original) as precio_original_max,
+        CASE WHEN COUNT(s.id_stock) > 0 AND SUM(s.cantidad) > 0 THEN true ELSE false END as tiene_stock,
+        JSON_AGG(
+          DISTINCT jsonb_build_object(
+            'id_variante', v.id_variante,
+            'nombre', v.nombre,
+            'precio', v.precio,
+            'precio_original', v.precio_original,
+            'activo', v.activo,
+            'imagenes', COALESCE(v_images.imagenes, '[]'::json)
+          )
+        ) as variantes,
+        JSON_AGG(
+          DISTINCT jsonb_build_object(
+            'id_talla', t.id_talla,
+            'nombre', t.nombre_talla,
+            'orden', t.orden
+          ) ORDER BY t.orden
+        ) FILTER (WHERE t.id_talla IS NOT NULL) as tallas_disponibles,
+        JSON_AGG(
+          DISTINCT jsonb_build_object(
+            'id_stock', s.id_stock,
+            'id_variante', s.id_variante,
+            'id_talla', s.id_talla,
+            'cantidad', s.cantidad,
+            'nombre_talla', t.nombre_talla
+          )
+        ) FILTER (WHERE s.id_stock IS NOT NULL) as stock,
+        AVG((v.precio_original - v.precio) / v.precio_original * 100) as descuento_promedio
+      FROM productos p
+      LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
+      LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+      LEFT JOIN stock s ON p.id_producto = s.id_producto AND v.id_variante = s.id_variante
+      LEFT JOIN tallas t ON s.id_talla = t.id_talla
+      LEFT JOIN LATERAL (
+        SELECT JSON_AGG(
+          jsonb_build_object(
+            'id_imagen', img.id_imagen,
+            'url', img.url,
+            'public_id', img.public_id,
+            'orden', img.orden
+          ) ORDER BY img.orden
+        ) as imagenes
+        FROM imagenes_variante img
+        WHERE img.id_variante = v.id_variante
+      ) v_images ON true
+      WHERE p.activo = true 
+        AND v.precio_original IS NOT NULL 
+        AND v.precio_original > v.precio
+      GROUP BY p.id_producto, p.nombre, p.descripcion, p.categoria, p.marca, p.fecha_creacion, st.nombre
+      HAVING AVG((v.precio_original - v.precio) / v.precio_original * 100) > 15
+      ORDER BY descuento_promedio DESC
+      LIMIT $1
+    `;
+    
+    const result = await db.query(query, [limit]);
+    return result.rows;
   }
 };
 

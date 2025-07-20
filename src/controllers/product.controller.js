@@ -332,6 +332,82 @@ const ProductController = {
         error: error.message
       });
     }
+  },
+
+  // Obtener productos recientes (agregados recientemente)
+  async getRecentProducts(req, res) {
+    try {
+      const { limit = 12 } = req.query;
+      
+      const products = await ProductModel.getRecent(parseInt(limit));
+      
+      res.json({
+        success: true,
+        products: products,
+        total: products.length
+      });
+    } catch (error) {
+      console.error('Error al obtener productos recientes:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener productos recientes',
+        error: error.message
+      });
+    }
+  },
+
+  // Obtener productos recientes por categoría
+  async getRecentByCategory(req, res) {
+    try {
+      const { limit = 6 } = req.query;
+      
+      const products = await ProductModel.getRecentByCategory(parseInt(limit));
+      
+      // Agrupar por categoría
+      const productsByCategory = {};
+      products.forEach(product => {
+        if (!productsByCategory[product.categoria]) {
+          productsByCategory[product.categoria] = [];
+        }
+        productsByCategory[product.categoria].push(product);
+      });
+      
+      res.json({
+        success: true,
+        productsByCategory: productsByCategory,
+        products: products,
+        total: products.length
+      });
+    } catch (error) {
+      console.error('Error al obtener productos recientes por categoría:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener productos recientes por categoría',
+        error: error.message
+      });
+    }
+  },
+
+  // Obtener mejores promociones
+  async getBestPromotions(req, res) {
+    try {
+      const { limit = 12 } = req.query;
+      
+      const products = await ProductModel.getBestPromotions(parseInt(limit));
+      
+      res.json({
+        success: true,
+        products: products,
+        total: products.length
+      });
+    } catch (error) {
+      console.error('Error al obtener mejores promociones:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener mejores promociones',
+        error: error.message
+      });
+    }
   }
 };
 

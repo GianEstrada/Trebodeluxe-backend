@@ -17,11 +17,29 @@ router.get('/', ProductController.getProducts);
 // @access  Public
 router.get('/featured', ProductController.getFeaturedProducts);
 
+// @route   GET /api/products/recent
+// @desc    Obtener productos agregados recientemente
+// @query   limit (default: 12)
+// @access  Public
+router.get('/recent', ProductController.getRecentProducts);
+
+// @route   GET /api/products/recent-by-category
+// @desc    Obtener productos recientes agrupados por categoría
+// @query   limit (default: 6)
+// @access  Public
+router.get('/recent-by-category', ProductController.getRecentByCategory);
+
 // @route   GET /api/products/promotions
 // @desc    Obtener productos en promoción
 // @query   limit (default: 12)
 // @access  Public
 router.get('/promotions', ProductController.getPromotionalProducts);
+
+// @route   GET /api/products/best-promotions
+// @desc    Obtener mejores promociones (mayor descuento)
+// @query   limit (default: 12)
+// @access  Public
+router.get('/best-promotions', ProductController.getBestPromotions);
 
 // @route   GET /api/products/categories
 // @desc    Obtener todas las categorías disponibles

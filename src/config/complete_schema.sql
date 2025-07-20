@@ -139,38 +139,109 @@ INSERT INTO tallas (id_sistema_talla, nombre_talla, orden) VALUES
 (3, '12', 7)
 ON CONFLICT DO NOTHING;
 
--- Insertar productos de ejemplo
-INSERT INTO productos (nombre, descripcion, categoria, marca, id_sistema_talla) VALUES 
-('Camiseta Básica', 'Camiseta básica de algodón 100%', 'Camisetas', 'Treboluxe', 1),
-('Polo Clásico', 'Polo de manga corta estilo clásico', 'Polos', 'Treboluxe', 1),
-('Pantalón Chino', 'Pantalón casual de algodón', 'Pantalones', 'Treboluxe', 1),
-('Zapatos Deportivos', 'Zapatos deportivos cómodos', 'Calzado', 'Treboluxe', 2)
+-- Insertar productos de ejemplo con fechas recientes
+INSERT INTO productos (nombre, descripcion, categoria, marca, id_sistema_talla, fecha_creacion) VALUES 
+-- Productos más recientes (hace 1 día)
+('Camiseta Premium Sport', 'Camiseta deportiva de alta calidad con tecnología dry-fit', 'Camisetas', 'Treboluxe', 1, NOW() - INTERVAL '1 day'),
+('Polo Elegante Business', 'Polo profesional para ocasiones formales', 'Polos', 'Treboluxe', 1, NOW() - INTERVAL '1 day'),
+('Hoodie Urban Style', 'Sudadera con capucha estilo urbano', 'Sudaderas', 'Treboluxe', 1, NOW() - INTERVAL '1 day'),
+('Zapatillas Running Pro', 'Zapatillas profesionales para running', 'Calzado', 'SportLine', 2, NOW() - INTERVAL '1 day'),
+
+-- Productos recientes (hace 3 días)
+('Camiseta Básica', 'Camiseta básica de algodón 100%', 'Camisetas', 'Treboluxe', 1, NOW() - INTERVAL '3 days'),
+('Polo Clásico', 'Polo de manga corta estilo clásico', 'Polos', 'Treboluxe', 1, NOW() - INTERVAL '3 days'),
+('Jeans Slim Fit', 'Jeans de corte ajustado moderno', 'Pantalones', 'DenimCo', 1, NOW() - INTERVAL '3 days'),
+('Zapatos Casuales', 'Zapatos casuales cómodos para el día a día', 'Calzado', 'ComfortWalk', 2, NOW() - INTERVAL '3 days'),
+
+-- Productos hace 1 semana
+('Camisa Oxford', 'Camisa formal de algodón oxford', 'Camisas', 'FormalWear', 1, NOW() - INTERVAL '7 days'),
+('Pantalón Chino', 'Pantalón casual de algodón', 'Pantalones', 'CasualFit', 1, NOW() - INTERVAL '7 days'),
+('Gorra Baseball', 'Gorra deportiva ajustable', 'Accesorios', 'SportCap', 1, NOW() - INTERVAL '7 days'),
+('Zapatos Deportivos', 'Zapatos deportivos multiuso', 'Calzado', 'ActiveWear', 2, NOW() - INTERVAL '7 days'),
+
+-- Productos hace 2 semanas (para promociones)
+('Chaqueta Denim', 'Chaqueta de mezclilla clásica', 'Chaquetas', 'VintageStyle', 1, NOW() - INTERVAL '14 days'),
+('Shorts Deportivos', 'Shorts cómodos para actividades deportivas', 'Shorts', 'ActiveFit', 1, NOW() - INTERVAL '14 days'),
+('Reloj Digital', 'Reloj deportivo con funciones smart', 'Accesorios', 'TechTime', 1, NOW() - INTERVAL '14 days'),
+('Mochila Urban', 'Mochila urbana con múltiples compartimentos', 'Accesorios', 'CityBag', 1, NOW() - INTERVAL '14 days')
 ON CONFLICT DO NOTHING;
 
--- Insertar variantes de ejemplo
+-- Insertar variantes de ejemplo con precios promocionales
 INSERT INTO variantes (id_producto, nombre, precio, precio_original) VALUES 
-(1, 'Azul', 29.99, 39.99),
-(1, 'Blanco', 29.99, 39.99),
-(1, 'Negro', 29.99, 39.99),
-(2, 'Azul Marino', 49.99, 59.99),
-(2, 'Blanco', 49.99, 59.99),
-(3, 'Beige', 59.99, 69.99),
-(3, 'Negro', 59.99, 69.99),
-(4, 'Blanco', 89.99, 99.99),
-(4, 'Negro', 89.99, 99.99)
+-- Productos más recientes (id_producto 1-4)
+(1, 'Azul Eléctrico', 34.99, 44.99),
+(1, 'Negro Mate', 34.99, 44.99),
+(1, 'Blanco Pure', 34.99, 44.99),
+(2, 'Azul Navy', 54.99, 69.99),
+(2, 'Gris Carbón', 54.99, 69.99),
+(3, 'Negro', 79.99, 99.99),
+(3, 'Gris Melange', 79.99, 99.99),
+(4, 'Blanco/Azul', 119.99, 139.99),
+(4, 'Negro/Rojo', 119.99, 139.99),
+
+-- Productos recientes (id_producto 5-8)
+(5, 'Azul', 29.99, 39.99),
+(5, 'Blanco', 29.99, 39.99),
+(5, 'Negro', 29.99, 39.99),
+(6, 'Azul Marino', 49.99, 59.99),
+(6, 'Blanco', 49.99, 59.99),
+(7, 'Azul Clásico', 89.99, 109.99),
+(7, 'Negro', 89.99, 109.99),
+(8, 'Marrón', 79.99, 94.99),
+(8, 'Negro', 79.99, 94.99),
+
+-- Productos hace 1 semana (id_producto 9-12)
+(9, 'Blanco', 69.99, 84.99),
+(9, 'Azul Cielo', 69.99, 84.99),
+(10, 'Beige', 59.99, 69.99),
+(10, 'Negro', 59.99, 69.99),
+(11, 'Negro', 24.99, 29.99),
+(11, 'Azul', 24.99, 29.99),
+(12, 'Blanco', 89.99, 99.99),
+(12, 'Negro', 89.99, 99.99),
+
+-- Productos promocionales (id_producto 13-16) - Mayor descuento
+(13, 'Azul Vintage', 49.99, 89.99),
+(13, 'Negro Clásico', 49.99, 89.99),
+(14, 'Azul', 19.99, 34.99),
+(14, 'Negro', 19.99, 34.99),
+(14, 'Gris', 19.99, 34.99),
+(15, 'Negro', 89.99, 159.99),
+(15, 'Plateado', 89.99, 159.99),
+(16, 'Negro', 39.99, 69.99),
+(16, 'Azul', 39.99, 69.99)
 ON CONFLICT DO NOTHING;
 
--- Insertar imágenes de ejemplo (usando las existentes)
+-- Insertar imágenes de ejemplo (usando las existentes) para todas las variantes
 INSERT INTO imagenes_variante (id_variante, url, public_id, orden) VALUES 
+-- Variantes 1-27
 (1, '/look-polo-2-1@2x.png', 'look-polo-2-1', 1),
 (2, '/797e7904b64e13508ab322be3107e368-1@2x.png', '797e7904b64e13508ab322be3107e368-1', 1),
-(3, '/look-polo-2-1@2x.png', 'look-polo-2-1', 1),
-(4, '/797e7904b64e13508ab322be3107e368-1@2x.png', '797e7904b64e13508ab322be3107e368-1', 1),
-(5, '/look-polo-2-1@2x.png', 'look-polo-2-1', 1),
-(6, '/797e7904b64e13508ab322be3107e368-1@2x.png', '797e7904b64e13508ab322be3107e368-1', 1),
+(3, '/sin-ttulo1-2@2x.png', 'sin-ttulo1-2', 1),
+(4, '/look-polo-2-1@2x.png', 'look-polo-2-1', 1),
+(5, '/797e7904b64e13508ab322be3107e368-1@2x.png', '797e7904b64e13508ab322be3107e368-1', 1),
+(6, '/sin-ttulo1-2@2x.png', 'sin-ttulo1-2', 1),
 (7, '/look-polo-2-1@2x.png', 'look-polo-2-1', 1),
 (8, '/797e7904b64e13508ab322be3107e368-1@2x.png', '797e7904b64e13508ab322be3107e368-1', 1),
-(9, '/look-polo-2-1@2x.png', 'look-polo-2-1', 1)
+(9, '/sin-ttulo1-2@2x.png', 'sin-ttulo1-2', 1),
+(10, '/look-polo-2-1@2x.png', 'look-polo-2-1', 1),
+(11, '/797e7904b64e13508ab322be3107e368-1@2x.png', '797e7904b64e13508ab322be3107e368-1', 1),
+(12, '/sin-ttulo1-2@2x.png', 'sin-ttulo1-2', 1),
+(13, '/look-polo-2-1@2x.png', 'look-polo-2-1', 1),
+(14, '/797e7904b64e13508ab322be3107e368-1@2x.png', '797e7904b64e13508ab322be3107e368-1', 1),
+(15, '/sin-ttulo1-2@2x.png', 'sin-ttulo1-2', 1),
+(16, '/look-polo-2-1@2x.png', 'look-polo-2-1', 1),
+(17, '/797e7904b64e13508ab322be3107e368-1@2x.png', '797e7904b64e13508ab322be3107e368-1', 1),
+(18, '/sin-ttulo1-2@2x.png', 'sin-ttulo1-2', 1),
+(19, '/look-polo-2-1@2x.png', 'look-polo-2-1', 1),
+(20, '/797e7904b64e13508ab322be3107e368-1@2x.png', '797e7904b64e13508ab322be3107e368-1', 1),
+(21, '/sin-ttulo1-2@2x.png', 'sin-ttulo1-2', 1),
+(22, '/look-polo-2-1@2x.png', 'look-polo-2-1', 1),
+(23, '/797e7904b64e13508ab322be3107e368-1@2x.png', '797e7904b64e13508ab322be3107e368-1', 1),
+(24, '/sin-ttulo1-2@2x.png', 'sin-ttulo1-2', 1),
+(25, '/look-polo-2-1@2x.png', 'look-polo-2-1', 1),
+(26, '/797e7904b64e13508ab322be3107e368-1@2x.png', '797e7904b64e13508ab322be3107e368-1', 1),
+(27, '/sin-ttulo1-2@2x.png', 'sin-ttulo1-2', 1)
 ON CONFLICT DO NOTHING;
 
 -- Insertar stock de ejemplo
