@@ -14,6 +14,8 @@ const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const shippingRoutes = require('./routes/shipping.routes');
 const productRoutes = require('./routes/product.routes');
+const promotionRoutes = require('./routes/promotion.routes');
+const sizeRoutes = require('./routes/size.routes');
 
 // Importar middlewares
 const { notFound, errorHandler } = require('./middlewares/error.middleware');
@@ -80,6 +82,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/shipping', shippingRoutes);
 app.use('/api/products', productRoutes);
+app.use('/api/promotions', promotionRoutes);
+app.use('/api/sizes', sizeRoutes);
 
 // Middlewares de manejo de errores
 app.use(notFound);

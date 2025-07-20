@@ -1,526 +1,628 @@
 const db = require('../config/db');
 
-const ProductModel = {
-  // Obtener todos los productos con sus variantes, imágenes y stock
-  async getAll() {
-    const query = `
-      SELECT DISTINCT
-        p.id_producto,
-        p.nombre as producto_nombre,
-        p.descripcion,
-        p.categoria,
-        p.marca,
-        p.activo,
-        st.nombre as sistema_talla_nombre,
-        -- Obtener la variante con menor precio
-        MIN(v.precio) as precio_minimo,
-        -- Obtener la primera imagen disponible
-        (SELECT iv.url 
-         FROM variantes vf 
-         JOIN imagenes_variante iv ON vf.id_variante = iv.id_variante 
-         WHERE vf.id_producto = p.id_producto 
-         AND iv.orden = 1 
-         LIMIT 1) as imagen_principal,
-        -- Verificar si hay stock disponible
-        CASE 
-          WHEN EXISTS(
-            SELECT 1 FROM stock s 
-            JOIN variantes v2 ON s.id_variante = v2.id_variante 
-            WHERE v2.id_producto = p.id_producto AND s.cantidad > 0
-          ) THEN true 
-          ELSE false 
-        END as tiene_stock
-      FROM productos p
-      LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
-      LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
-      WHERE p.activo = true
-      GROUP BY p.id_producto, p.nombre, p.descripcion, p.categoria, p.marca, p.activo, st.nombre
-      ORDER BY p.fecha_creacion DESC
-    `;
-    
-    const result = await db.query(query);
-    return result.rows;
-  },
-
-  // Obtener producto por ID con todas sus variantes, imágenes y stock
-  async getById(id) {
-    const productQuery = `
-      SELECT 
-        p.*,
-        st.nombre as sistema_talla_nombre
-      FROM productos p
-      LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
-      WHERE p.id_producto = $1 AND p.activo = true
-    `;
-    
-    const variantesQuery = `
-      SELECT 
-        v.*,
-        array_agg(
-          json_build_object(
-            'id_imagen', iv.id_imagen,
-            'url', iv.url,
-            'public_id', iv.public_id,
-            'orden', iv.orden
-          ) ORDER BY iv.orden
-        ) as imagenes
-      FROM variantes v
-      LEFT JOIN imagenes_variante iv ON v.id_variante = iv.id_variante
-      WHERE v.id_producto = $1 AND v.activo = true
-      GROUP BY v.id_variante
-      ORDER BY v.fecha_creacion
-    `;
-    
-    const tallasQuery = `
-      SELECT DISTINCT
-        t.id_talla,
-        t.nombre_talla,
-        t.orden
-      FROM tallas t
-      JOIN sistemas_talla st ON t.id_sistema_talla = st.id_sistema_talla
-      JOIN productos p ON p.id_sistema_talla = st.id_sistema_talla
-      WHERE p.id_producto = $1
-      ORDER BY t.orden
-    `;
-    
-    const stockQuery = `
-      SELECT 
-        s.*,
-        t.nombre_talla,
-        v.nombre as variante_nombre
-      FROM stock s
-      JOIN tallas t ON s.id_talla = t.id_talla
-      JOIN variantes v ON s.id_variante = v.id_variante
-      WHERE s.id_producto = $1
-    `;
-
-    const [productResult, variantesResult, tallasResult, stockResult] = await Promise.all([
-      db.query(productQuery, [id]),
-      db.query(variantesQuery, [id]),
-      db.query(tallasQuery, [id]),
-      db.query(stockQuery, [id])
-    ]);
-
-    if (productResult.rows.length === 0) {
-      return null;
-    }
-
-    const product = productResult.rows[0];
-    product.variantes = variantesResult.rows;
-    product.tallas_disponibles = tallasResult.rows;
-    product.stock = stockResult.rows;
-
-    return product;
-  },
-
-  // Obtener productos por categoría
-  async getByCategory(categoria) {
-    const query = `
-      SELECT DISTINCT
-        p.id_producto,
-        p.nombre as producto_nombre,
-        p.descripcion,
-        p.categoria,
-        p.marca,
-        p.activo,
-        MIN(v.precio) as precio_minimo,
-        (SELECT iv.url 
-         FROM variantes vf 
-         JOIN imagenes_variante iv ON vf.id_variante = iv.id_variante 
-         WHERE vf.id_producto = p.id_producto 
-         AND iv.orden = 1 
-         LIMIT 1) as imagen_principal,
-        CASE 
-          WHEN EXISTS(
-            SELECT 1 FROM stock s 
-            JOIN variantes v2 ON s.id_variante = v2.id_variante 
-            WHERE v2.id_producto = p.id_producto AND s.cantidad > 0
-          ) THEN true 
-          ELSE false 
-        END as tiene_stock
-      FROM productos p
-      LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
-      WHERE p.activo = true AND LOWER(p.categoria) = LOWER($1)
-      GROUP BY p.id_producto, p.nombre, p.descripcion, p.categoria, p.marca, p.activo
-      ORDER BY p.fecha_creacion DESC
-    `;
-    
-    const result = await db.query(query, [categoria]);
-    return result.rows;
-  },
-
-  // Buscar productos por nombre, descripción, categoría o marca
-  async search(searchTerm) {
-    const query = `
-      SELECT DISTINCT
-        p.id_producto,
-        p.nombre as producto_nombre,
-        p.descripcion,
-        p.categoria,
-        p.marca,
-        p.activo,
-        MIN(v.precio) as precio_minimo,
-        (SELECT iv.url 
-         FROM variantes vf 
-         JOIN imagenes_variante iv ON vf.id_variante = iv.id_variante 
-         WHERE vf.id_producto = p.id_producto 
-         AND iv.orden = 1 
-         LIMIT 1) as imagen_principal,
-        CASE 
-          WHEN EXISTS(
-            SELECT 1 FROM stock s 
-            JOIN variantes v2 ON s.id_variante = v2.id_variante 
-            WHERE v2.id_producto = p.id_producto AND s.cantidad > 0
-          ) THEN true 
-          ELSE false 
-        END as tiene_stock
-      FROM productos p
-      LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
-      WHERE p.activo = true 
-      AND (
-        LOWER(p.nombre) LIKE LOWER($1) OR 
-        LOWER(p.descripcion) LIKE LOWER($1) OR 
-        LOWER(p.categoria) LIKE LOWER($1) OR 
-        LOWER(p.marca) LIKE LOWER($1) OR
-        LOWER(v.nombre) LIKE LOWER($1)
-      )
-      GROUP BY p.id_producto, p.nombre, p.descripcion, p.categoria, p.marca, p.activo
-      ORDER BY p.fecha_creacion DESC
-    `;
-    
-    const searchPattern = `%${searchTerm}%`;
-    const result = await db.query(query, [searchPattern]);
-    return result.rows;
-  },
-
-  // Obtener stock específico por producto, variante y talla
-  async getStock(idProducto, idVariante, idTalla) {
-    const query = `
-      SELECT cantidad 
-      FROM stock 
-      WHERE id_producto = $1 AND id_variante = $2 AND id_talla = $3
-    `;
-    
-    const result = await db.query(query, [idProducto, idVariante, idTalla]);
-    return result.rows.length > 0 ? result.rows[0].cantidad : 0;
-  },
-
-  // Crear producto nuevo (solo para admin)
-  async create(productData) {
-    const { nombre, descripcion, categoria, marca, id_sistema_talla } = productData;
-    
-    const query = `
-      INSERT INTO productos (nombre, descripcion, categoria, marca, id_sistema_talla)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING *
-    `;
-    
-    const result = await db.query(query, [nombre, descripcion, categoria, marca, id_sistema_talla]);
-    return result.rows[0];
-  },
-
-  // Crear variante de producto (solo para admin)
-  async createVariante(varianteData) {
-    const { id_producto, nombre, precio, precio_original } = varianteData;
-    
-    const query = `
-      INSERT INTO variantes (id_producto, nombre, precio, precio_original)
-      VALUES ($1, $2, $3, $4)
-      RETURNING *
-    `;
-    
-    const result = await db.query(query, [id_producto, nombre, precio, precio_original]);
-    return result.rows[0];
-  },
-
-  // Agregar imagen a variante (solo para admin)
-  async addImageToVariant(imageData) {
-    const { id_variante, url, public_id, orden } = imageData;
-    
-    const query = `
-      INSERT INTO imagenes_variante (id_variante, url, public_id, orden)
-      VALUES ($1, $2, $3, $4)
-      RETURNING *
-    `;
-    
-    const result = await db.query(query, [id_variante, url, public_id, orden]);
-    return result.rows[0];
-  },
-
-  // Actualizar stock (solo para admin)
-  async updateStock(stockData) {
-    const { id_producto, id_variante, id_talla, cantidad } = stockData;
-    
-    const query = `
-      INSERT INTO stock (id_producto, id_variante, id_talla, cantidad)
-      VALUES ($1, $2, $3, $4)
-      ON CONFLICT (id_producto, id_variante, id_talla)
-      DO UPDATE SET 
-        cantidad = $4,
-        fecha_actualizacion = CURRENT_TIMESTAMP
-      RETURNING *
-    `;
-    
-    const result = await db.query(query, [id_producto, id_variante, id_talla, cantidad]);
-    return result.rows[0];
-  },
-
-  // Obtener todas las categorías disponibles
-  async getCategories() {
-    const query = `
-      SELECT DISTINCT categoria 
-      FROM productos 
-      WHERE activo = true AND categoria IS NOT NULL
-      ORDER BY categoria
-    `;
-    
-    const result = await db.query(query);
-    return result.rows.map(row => row.categoria);
-  },
-
-  // Obtener todas las marcas disponibles
-  async getBrands() {
-    const query = `
-      SELECT DISTINCT marca 
-      FROM productos 
-      WHERE activo = true AND marca IS NOT NULL
-      ORDER BY marca
-    `;
-    
-    const result = await db.query(query);
-    return result.rows.map(row => row.marca);
-  },
-
-  // Obtener sistemas de tallas
-  async getSizeSystems() {
-    const query = `
-      SELECT 
-        st.*,
-        array_agg(
-          json_build_object(
-            'id_talla', t.id_talla,
-            'nombre_talla', t.nombre_talla,
-            'orden', t.orden
-          ) ORDER BY t.orden
-        ) as tallas
-      FROM sistemas_talla st
-      LEFT JOIN tallas t ON st.id_sistema_talla = t.id_sistema_talla
-      GROUP BY st.id_sistema_talla
-      ORDER BY st.nombre
-    `;
-    
-    const result = await db.query(query);
-    return result.rows;
-  },
-
-  // Obtener productos recientes (agregados recientemente)
-  async getRecent(limit = 12) {
-    const query = `
-      SELECT 
-        p.id_producto,
-        p.nombre as producto_nombre,
-        p.descripcion,
-        p.categoria,
-        p.marca,
-        p.fecha_creacion,
-        st.nombre as sistema_talla_nombre,
-        MIN(v.precio) as precio_minimo,
-        MAX(v.precio_original) as precio_original_max,
-        CASE WHEN COUNT(s.id_stock) > 0 AND SUM(s.cantidad) > 0 THEN true ELSE false END as tiene_stock,
-        JSON_AGG(
-          DISTINCT jsonb_build_object(
-            'id_variante', v.id_variante,
-            'nombre', v.nombre,
-            'precio', v.precio,
-            'precio_original', v.precio_original,
-            'activo', v.activo,
-            'imagenes', COALESCE(v_images.imagenes, '[]'::json)
-          )
-        ) as variantes,
-        JSON_AGG(
-          DISTINCT jsonb_build_object(
-            'id_talla', t.id_talla,
-            'nombre', t.nombre_talla,
-            'orden', t.orden
-          ) ORDER BY t.orden
-        ) FILTER (WHERE t.id_talla IS NOT NULL) as tallas_disponibles,
-        JSON_AGG(
-          DISTINCT jsonb_build_object(
-            'id_stock', s.id_stock,
-            'id_variante', s.id_variante,
-            'id_talla', s.id_talla,
-            'cantidad', s.cantidad,
-            'nombre_talla', t.nombre_talla
-          )
-        ) FILTER (WHERE s.id_stock IS NOT NULL) as stock
-      FROM productos p
-      LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
-      LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
-      LEFT JOIN stock s ON p.id_producto = s.id_producto AND v.id_variante = s.id_variante
-      LEFT JOIN tallas t ON s.id_talla = t.id_talla
-      LEFT JOIN LATERAL (
-        SELECT JSON_AGG(
-          jsonb_build_object(
-            'id_imagen', img.id_imagen,
-            'url', img.url,
-            'public_id', img.public_id,
-            'orden', img.orden
-          ) ORDER BY img.orden
-        ) as imagenes
-        FROM imagenes_variante img
-        WHERE img.id_variante = v.id_variante
-      ) v_images ON true
-      WHERE p.activo = true
-      GROUP BY p.id_producto, p.nombre, p.descripcion, p.categoria, p.marca, p.fecha_creacion, st.nombre
-      ORDER BY p.fecha_creacion DESC
-      LIMIT $1
-    `;
-    
-    const result = await db.query(query, [limit]);
-    return result.rows;
-  },
-
-  // Obtener productos recientes por categoría
-  async getRecentByCategory(limit = 6) {
-    const query = `
-      WITH recent_by_category AS (
+class ProductModel {
+  // Obtener todos los productos con variantes completas
+  static async getAll() {
+    try {
+      const query = `
         SELECT 
-          p.categoria,
-          p.id_producto,
-          p.nombre as producto_nombre,
-          p.descripcion,
-          p.marca,
-          p.fecha_creacion,
+          p.*,
           st.nombre as sistema_talla_nombre,
-          MIN(v.precio) as precio_minimo,
-          MAX(v.precio_original) as precio_original_max,
-          CASE WHEN COUNT(s.id_stock) > 0 AND SUM(s.cantidad) > 0 THEN true ELSE false END as tiene_stock,
-          JSON_AGG(
-            DISTINCT jsonb_build_object(
+          json_agg(
+            json_build_object(
               'id_variante', v.id_variante,
               'nombre', v.nombre,
               'precio', v.precio,
               'precio_original', v.precio_original,
+              'descuento_porcentaje', 
+              CASE 
+                WHEN v.precio_original IS NOT NULL AND v.precio_original > v.precio 
+                THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
+                ELSE NULL
+              END,
               'activo', v.activo,
-              'imagenes', COALESCE(v_images.imagenes, '[]'::json)
-            )
-          ) as variantes,
-          JSON_AGG(
-            DISTINCT jsonb_build_object(
-              'id_talla', t.id_talla,
-              'nombre', t.nombre_talla,
-              'orden', t.orden
-            ) ORDER BY t.orden
-          ) FILTER (WHERE t.id_talla IS NOT NULL) as tallas_disponibles,
-          JSON_AGG(
-            DISTINCT jsonb_build_object(
-              'id_stock', s.id_stock,
-              'id_variante', s.id_variante,
-              'id_talla', s.id_talla,
-              'cantidad', s.cantidad,
-              'nombre_talla', t.nombre_talla
-            )
-          ) FILTER (WHERE s.id_stock IS NOT NULL) as stock,
-          ROW_NUMBER() OVER (PARTITION BY p.categoria ORDER BY p.fecha_creacion DESC) as rn
+              'imagenes', COALESCE(img.imagenes, '[]'::json),
+              'stock_disponible', COALESCE(stock_info.stock_total, 0),
+              'tallas_disponibles', COALESCE(stock_info.tallas, '[]'::json)
+            ) ORDER BY v.id_variante
+          ) FILTER (WHERE v.id_variante IS NOT NULL) as variantes
         FROM productos p
         LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
         LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
-        LEFT JOIN stock s ON p.id_producto = s.id_producto AND v.id_variante = s.id_variante
-        LEFT JOIN tallas t ON s.id_talla = t.id_talla
-        LEFT JOIN LATERAL (
-          SELECT JSON_AGG(
-            jsonb_build_object(
-              'id_imagen', img.id_imagen,
-              'url', img.url,
-              'public_id', img.public_id,
-              'orden', img.orden
-            ) ORDER BY img.orden
-          ) as imagenes
-          FROM imagenes_variante img
-          WHERE img.id_variante = v.id_variante
-        ) v_images ON true
+        LEFT JOIN (
+          SELECT 
+            id_variante,
+            json_agg(
+              json_build_object(
+                'id_imagen', id_imagen,
+                'url', url,
+                'public_id', public_id,
+                'orden', orden
+              ) ORDER BY orden
+            ) as imagenes
+          FROM imagenes_variante
+          GROUP BY id_variante
+        ) img ON v.id_variante = img.id_variante
+        LEFT JOIN (
+          SELECT 
+            s.id_variante,
+            SUM(s.cantidad) as stock_total,
+            json_agg(
+              DISTINCT json_build_object(
+                'id_talla', t.id_talla,
+                'nombre_talla', t.nombre_talla,
+                'orden', t.orden,
+                'cantidad', s.cantidad
+              ) ORDER BY json_build_object(
+                'id_talla', t.id_talla,
+                'nombre_talla', t.nombre_talla,
+                'orden', t.orden,
+                'cantidad', s.cantidad
+              )->>'orden'
+            ) FILTER (WHERE s.cantidad > 0) as tallas
+          FROM stock s
+          INNER JOIN tallas t ON s.id_talla = t.id_talla
+          GROUP BY s.id_variante
+        ) stock_info ON v.id_variante = stock_info.id_variante
         WHERE p.activo = true
-        GROUP BY p.id_producto, p.nombre, p.descripcion, p.categoria, p.marca, p.fecha_creacion, st.nombre
-      )
-      SELECT * FROM recent_by_category 
-      WHERE rn <= $1
-      ORDER BY categoria, fecha_creacion DESC
-    `;
-    
-    const result = await db.query(query, [limit]);
-    return result.rows;
-  },
-
-  // Obtener productos con mejores promociones (mayor diferencia entre precio original y actual)
-  async getBestPromotions(limit = 12) {
-    const query = `
-      SELECT 
-        p.id_producto,
-        p.nombre as producto_nombre,
-        p.descripcion,
-        p.categoria,
-        p.marca,
-        p.fecha_creacion,
-        st.nombre as sistema_talla_nombre,
-        MIN(v.precio) as precio_minimo,
-        MAX(v.precio_original) as precio_original_max,
-        CASE WHEN COUNT(s.id_stock) > 0 AND SUM(s.cantidad) > 0 THEN true ELSE false END as tiene_stock,
-        JSON_AGG(
-          DISTINCT jsonb_build_object(
-            'id_variante', v.id_variante,
-            'nombre', v.nombre,
-            'precio', v.precio,
-            'precio_original', v.precio_original,
-            'activo', v.activo,
-            'imagenes', COALESCE(v_images.imagenes, '[]'::json)
-          )
-        ) as variantes,
-        JSON_AGG(
-          DISTINCT jsonb_build_object(
-            'id_talla', t.id_talla,
-            'nombre', t.nombre_talla,
-            'orden', t.orden
-          ) ORDER BY t.orden
-        ) FILTER (WHERE t.id_talla IS NOT NULL) as tallas_disponibles,
-        JSON_AGG(
-          DISTINCT jsonb_build_object(
-            'id_stock', s.id_stock,
-            'id_variante', s.id_variante,
-            'id_talla', s.id_talla,
-            'cantidad', s.cantidad,
-            'nombre_talla', t.nombre_talla
-          )
-        ) FILTER (WHERE s.id_stock IS NOT NULL) as stock,
-        AVG((v.precio_original - v.precio) / v.precio_original * 100) as descuento_promedio
-      FROM productos p
-      LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
-      LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
-      LEFT JOIN stock s ON p.id_producto = s.id_producto AND v.id_variante = s.id_variante
-      LEFT JOIN tallas t ON s.id_talla = t.id_talla
-      LEFT JOIN LATERAL (
-        SELECT JSON_AGG(
-          jsonb_build_object(
-            'id_imagen', img.id_imagen,
-            'url', img.url,
-            'public_id', img.public_id,
-            'orden', img.orden
-          ) ORDER BY img.orden
-        ) as imagenes
-        FROM imagenes_variante img
-        WHERE img.id_variante = v.id_variante
-      ) v_images ON true
-      WHERE p.activo = true 
-        AND v.precio_original IS NOT NULL 
-        AND v.precio_original > v.precio
-      GROUP BY p.id_producto, p.nombre, p.descripcion, p.categoria, p.marca, p.fecha_creacion, st.nombre
-      HAVING AVG((v.precio_original - v.precio) / v.precio_original * 100) > 15
-      ORDER BY descuento_promedio DESC
-      LIMIT $1
-    `;
-    
-    const result = await db.query(query, [limit]);
-    return result.rows;
+        GROUP BY p.id_producto, st.nombre
+        ORDER BY p.fecha_creacion DESC
+      `;
+      
+      const result = await db.query(query);
+      return result.rows;
+    } catch (error) {
+      console.error('Error en getAll productos:', error);
+      throw error;
+    }
   }
-};
+
+  // Obtener todos los productos para administradores (incluye inactivos)
+  static async getAllForAdmin() {
+    try {
+      const query = `
+        SELECT 
+          p.*,
+          st.nombre as sistema_talla_nombre,
+          COUNT(v.id_variante) as total_variantes,
+          COUNT(CASE WHEN v.activo = true THEN 1 END) as variantes_activas,
+          COALESCE(SUM(stock_total.stock), 0) as stock_total_producto
+        FROM productos p
+        LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
+        LEFT JOIN variantes v ON p.id_producto = v.id_producto
+        LEFT JOIN (
+          SELECT 
+            s.id_variante,
+            SUM(s.cantidad) as stock
+          FROM stock s
+          GROUP BY s.id_variante
+        ) stock_total ON v.id_variante = stock_total.id_variante
+        GROUP BY p.id_producto, st.nombre
+        ORDER BY p.fecha_creacion DESC
+      `;
+      
+      const result = await db.query(query);
+      return result.rows;
+    } catch (error) {
+      console.error('Error en getAllForAdmin productos:', error);
+      throw error;
+    }
+  }
+
+  // Obtener un producto por ID con toda su información
+  static async getById(id) {
+    try {
+      const query = `
+        SELECT 
+          p.*,
+          st.nombre as sistema_talla_nombre,
+          json_agg(
+            json_build_object(
+              'id_variante', v.id_variante,
+              'nombre', v.nombre,
+              'precio', v.precio,
+              'precio_original', v.precio_original,
+              'descuento_porcentaje', 
+              CASE 
+                WHEN v.precio_original IS NOT NULL AND v.precio_original > v.precio 
+                THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
+                ELSE NULL
+              END,
+              'activo', v.activo,
+              'imagenes', COALESCE(img.imagenes, '[]'::json),
+              'stock_disponible', COALESCE(stock_info.stock_total, 0),
+              'tallas_disponibles', COALESCE(stock_info.tallas, '[]'::json)
+            ) ORDER BY v.id_variante
+          ) FILTER (WHERE v.id_variante IS NOT NULL) as variantes
+        FROM productos p
+        LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
+        LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+        LEFT JOIN (
+          SELECT 
+            id_variante,
+            json_agg(
+              json_build_object(
+                'id_imagen', id_imagen,
+                'url', url,
+                'public_id', public_id,
+                'orden', orden
+              ) ORDER BY orden
+            ) as imagenes
+          FROM imagenes_variante
+          GROUP BY id_variante
+        ) img ON v.id_variante = img.id_variante
+        LEFT JOIN (
+          SELECT 
+            s.id_variante,
+            SUM(s.cantidad) as stock_total,
+            json_agg(
+              DISTINCT json_build_object(
+                'id_talla', t.id_talla,
+                'nombre_talla', t.nombre_talla,
+                'orden', t.orden,
+                'cantidad', s.cantidad
+              ) ORDER BY json_build_object(
+                'id_talla', t.id_talla,
+                'nombre_talla', t.nombre_talla,
+                'orden', t.orden,
+                'cantidad', s.cantidad
+              )->>'orden'
+            ) FILTER (WHERE s.cantidad > 0) as tallas
+          FROM stock s
+          INNER JOIN tallas t ON s.id_talla = t.id_talla
+          GROUP BY s.id_variante
+        ) stock_info ON v.id_variante = stock_info.id_variante
+        WHERE p.id_producto = $1 AND p.activo = true
+        GROUP BY p.id_producto, st.nombre
+      `;
+      
+      const result = await db.query(query, [id]);
+      return result.rows[0] || null;
+    } catch (error) {
+      console.error('Error en getById producto:', error);
+      throw error;
+    }
+  }
+
+  // Obtener productos recientes
+  static async getRecent(limit = 6) {
+    try {
+      const query = `
+        SELECT 
+          p.*,
+          json_agg(
+            json_build_object(
+              'id_variante', v.id_variante,
+              'nombre', v.nombre,
+              'precio', v.precio,
+              'precio_original', v.precio_original,
+              'descuento_porcentaje', 
+              CASE 
+                WHEN v.precio_original IS NOT NULL AND v.precio_original > v.precio 
+                THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
+                ELSE NULL
+              END,
+              'imagenes', COALESCE(img.imagenes, '[]'::json)
+            ) ORDER BY v.id_variante
+          ) FILTER (WHERE v.id_variante IS NOT NULL) as variantes
+        FROM productos p
+        LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+        LEFT JOIN (
+          SELECT 
+            id_variante,
+            json_agg(
+              json_build_object(
+                'id_imagen', id_imagen,
+                'url', url,
+                'public_id', public_id,
+                'orden', orden
+              ) ORDER BY orden
+            ) as imagenes
+          FROM imagenes_variante
+          GROUP BY id_variante
+        ) img ON v.id_variante = img.id_variante
+        WHERE p.activo = true
+        GROUP BY p.id_producto
+        ORDER BY p.fecha_creacion DESC
+        LIMIT $1
+      `;
+      
+      const result = await db.query(query, [limit]);
+      return result.rows;
+    } catch (error) {
+      console.error('Error en getRecent productos:', error);
+      throw error;
+    }
+  }
+
+  // Obtener productos recientes por categoría
+  static async getRecentByCategory(limit = 4) {
+    try {
+      const query = `
+        SELECT 
+          categoria,
+          json_agg(
+            json_build_object(
+              'id_producto', p.id_producto,
+              'nombre', p.nombre,
+              'descripcion', p.descripcion,
+              'marca', p.marca,
+              'categoria', p.categoria,
+              'fecha_creacion', p.fecha_creacion,
+              'variantes', productos_variantes.variantes
+            ) ORDER BY p.fecha_creacion DESC
+          ) as productos
+        FROM productos p
+        INNER JOIN (
+          SELECT 
+            p.id_producto,
+            json_agg(
+              json_build_object(
+                'id_variante', v.id_variante,
+                'nombre', v.nombre,
+                'precio', v.precio,
+                'precio_original', v.precio_original,
+                'descuento_porcentaje', 
+                CASE 
+                  WHEN v.precio_original IS NOT NULL AND v.precio_original > v.precio 
+                  THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
+                  ELSE NULL
+                END,
+                'imagenes', COALESCE(img.imagenes, '[]'::json)
+              ) ORDER BY v.id_variante
+            ) FILTER (WHERE v.id_variante IS NOT NULL) as variantes
+          FROM productos p
+          LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+          LEFT JOIN (
+            SELECT 
+              id_variante,
+              json_agg(
+                json_build_object(
+                  'id_imagen', id_imagen,
+                  'url', url,
+                  'public_id', public_id,
+                  'orden', orden
+                ) ORDER BY orden
+              ) as imagenes
+            FROM imagenes_variante
+            GROUP BY id_variante
+          ) img ON v.id_variante = img.id_variante
+          WHERE p.activo = true
+          GROUP BY p.id_producto
+        ) productos_variantes ON p.id_producto = productos_variantes.id_producto
+        WHERE p.activo = true 
+          AND p.categoria IS NOT NULL
+        GROUP BY categoria
+        ORDER BY categoria
+      `;
+      
+      const result = await db.query(query);
+      
+      // Limitar productos por categoría
+      const limitedResult = result.rows.map(category => ({
+        ...category,
+        productos: category.productos.slice(0, limit)
+      }));
+      
+      return limitedResult;
+    } catch (error) {
+      console.error('Error en getRecentByCategory productos:', error);
+      throw error;
+    }
+  }
+
+  // Obtener productos con mejores promociones
+  static async getBestPromotions(limit = 6) {
+    try {
+      const query = `
+        SELECT 
+          p.*,
+          json_agg(
+            json_build_object(
+              'id_variante', v.id_variante,
+              'nombre', v.nombre,
+              'precio', v.precio,
+              'precio_original', v.precio_original,
+              'descuento_porcentaje', 
+              CASE 
+                WHEN v.precio_original IS NOT NULL AND v.precio_original > v.precio 
+                THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
+                ELSE NULL
+              END,
+              'imagenes', COALESCE(img.imagenes, '[]'::json)
+            ) ORDER BY v.id_variante
+          ) FILTER (WHERE v.id_variante IS NOT NULL) as variantes
+        FROM productos p
+        LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+        LEFT JOIN (
+          SELECT 
+            id_variante,
+            json_agg(
+              json_build_object(
+                'id_imagen', id_imagen,
+                'url', url,
+                'public_id', public_id,
+                'orden', orden
+              ) ORDER BY orden
+            ) as imagenes
+          FROM imagenes_variante
+          GROUP BY id_variante
+        ) img ON v.id_variante = img.id_variante
+        WHERE p.activo = true
+          AND EXISTS (
+            SELECT 1 FROM variantes v2 
+            WHERE v2.id_producto = p.id_producto 
+              AND v2.precio_original IS NOT NULL 
+              AND v2.precio_original > v2.precio
+              AND v2.activo = true
+          )
+        GROUP BY p.id_producto
+        ORDER BY (
+          SELECT MAX(
+            CASE 
+              WHEN v3.precio_original IS NOT NULL AND v3.precio_original > v3.precio 
+              THEN ROUND(((v3.precio_original - v3.precio) / v3.precio_original * 100)::numeric, 2)
+              ELSE 0
+            END
+          )
+          FROM variantes v3 
+          WHERE v3.id_producto = p.id_producto AND v3.activo = true
+        ) DESC
+        LIMIT $1
+      `;
+      
+      const result = await db.query(query, [limit]);
+      return result.rows;
+    } catch (error) {
+      console.error('Error en getBestPromotions productos:', error);
+      throw error;
+    }
+  }
+
+  // Crear un nuevo producto
+  static async create(productData) {
+    const client = await db.getClient();
+    
+    try {
+      await client.query('BEGIN');
+      
+      // Insertar el producto
+      const productQuery = `
+        INSERT INTO productos (nombre, descripcion, categoria, marca, id_sistema_talla, activo)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING *
+      `;
+      
+      const productResult = await client.query(productQuery, [
+        productData.nombre,
+        productData.descripcion || null,
+        productData.categoria || null,
+        productData.marca || null,
+        productData.id_sistema_talla || null,
+        productData.activo !== false
+      ]);
+      
+      const productId = productResult.rows[0].id_producto;
+      
+      // Insertar variantes si se proporcionan
+      if (productData.variantes && productData.variantes.length > 0) {
+        for (const variant of productData.variantes) {
+          const variantQuery = `
+            INSERT INTO variantes (id_producto, nombre, precio, precio_original, activo)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING *
+          `;
+          
+          const variantResult = await client.query(variantQuery, [
+            productId,
+            variant.nombre || null,
+            variant.precio,
+            variant.precio_original || null,
+            variant.activo !== false
+          ]);
+          
+          const variantId = variantResult.rows[0].id_variante;
+          
+          // Insertar imágenes de la variante si se proporcionan
+          if (variant.imagenes && variant.imagenes.length > 0) {
+            for (let i = 0; i < variant.imagenes.length; i++) {
+              const imagen = variant.imagenes[i];
+              await client.query(
+                'INSERT INTO imagenes_variante (id_variante, url, public_id, orden) VALUES ($1, $2, $3, $4)',
+                [variantId, imagen.url, imagen.public_id, i + 1]
+              );
+            }
+          }
+        }
+      }
+      
+      await client.query('COMMIT');
+      return productResult.rows[0];
+      
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Error en create producto:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Actualizar un producto
+  static async update(id, productData) {
+    try {
+      const query = `
+        UPDATE productos 
+        SET nombre = $1, descripcion = $2, categoria = $3, marca = $4, 
+            id_sistema_talla = $5, activo = $6
+        WHERE id_producto = $7
+        RETURNING *
+      `;
+      
+      const result = await db.query(query, [
+        productData.nombre,
+        productData.descripcion || null,
+        productData.categoria || null,
+        productData.marca || null,
+        productData.id_sistema_talla || null,
+        productData.activo !== false,
+        id
+      ]);
+      
+      if (result.rows.length === 0) {
+        throw new Error('Producto no encontrado');
+      }
+      
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error en update producto:', error);
+      throw error;
+    }
+  }
+
+  // Eliminar un producto (marcarlo como inactivo)
+  static async delete(id) {
+    try {
+      const query = 'UPDATE productos SET activo = false WHERE id_producto = $1 RETURNING *';
+      const result = await db.query(query, [id]);
+      
+      if (result.rows.length === 0) {
+        throw new Error('Producto no encontrado');
+      }
+      
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error en delete producto:', error);
+      throw error;
+    }
+  }
+
+  // Obtener productos por categoría
+  static async getByCategory(categoria, limit, offset) {
+    try {
+      const query = `
+        SELECT 
+          p.*,
+          json_agg(
+            json_build_object(
+              'id_variante', v.id_variante,
+              'nombre', v.nombre,
+              'precio', v.precio,
+              'precio_original', v.precio_original,
+              'descuento_porcentaje', 
+              CASE 
+                WHEN v.precio_original IS NOT NULL AND v.precio_original > v.precio 
+                THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
+                ELSE NULL
+              END,
+              'imagenes', COALESCE(img.imagenes, '[]'::json)
+            ) ORDER BY v.id_variante
+          ) FILTER (WHERE v.id_variante IS NOT NULL) as variantes
+        FROM productos p
+        LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+        LEFT JOIN (
+          SELECT 
+            id_variante,
+            json_agg(
+              json_build_object(
+                'id_imagen', id_imagen,
+                'url', url,
+                'public_id', public_id,
+                'orden', orden
+              ) ORDER BY orden
+            ) as imagenes
+          FROM imagenes_variante
+          GROUP BY id_variante
+        ) img ON v.id_variante = img.id_variante
+        WHERE p.activo = true AND p.categoria = $1
+        GROUP BY p.id_producto
+        ORDER BY p.fecha_creacion DESC
+        LIMIT $2 OFFSET $3
+      `;
+      
+      const result = await db.query(query, [categoria, limit || 20, offset || 0]);
+      return result.rows;
+    } catch (error) {
+      console.error('Error en getByCategory productos:', error);
+      throw error;
+    }
+  }
+
+  // Obtener todas las categorías disponibles
+  static async getCategories() {
+    try {
+      const query = `
+        SELECT DISTINCT categoria, COUNT(*) as total_productos
+        FROM productos 
+        WHERE activo = true AND categoria IS NOT NULL
+        GROUP BY categoria
+        ORDER BY categoria
+      `;
+      
+      const result = await db.query(query);
+      return result.rows;
+    } catch (error) {
+      console.error('Error en getCategories:', error);
+      throw error;
+    }
+  }
+
+  // Buscar productos
+  static async search(searchTerm, limit, offset) {
+    try {
+      const query = `
+        SELECT 
+          p.*,
+          json_agg(
+            json_build_object(
+              'id_variante', v.id_variante,
+              'nombre', v.nombre,
+              'precio', v.precio,
+              'precio_original', v.precio_original,
+              'descuento_porcentaje', 
+              CASE 
+                WHEN v.precio_original IS NOT NULL AND v.precio_original > v.precio 
+                THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
+                ELSE NULL
+              END,
+              'imagenes', COALESCE(img.imagenes, '[]'::json)
+            ) ORDER BY v.id_variante
+          ) FILTER (WHERE v.id_variante IS NOT NULL) as variantes
+        FROM productos p
+        LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+        LEFT JOIN (
+          SELECT 
+            id_variante,
+            json_agg(
+              json_build_object(
+                'id_imagen', id_imagen,
+                'url', url,
+                'public_id', public_id,
+                'orden', orden
+              ) ORDER BY orden
+            ) as imagenes
+          FROM imagenes_variante
+          GROUP BY id_variante
+        ) img ON v.id_variante = img.id_variante
+        WHERE p.activo = true 
+          AND (
+            p.nombre ILIKE $1 OR 
+            p.descripcion ILIKE $1 OR 
+            p.categoria ILIKE $1 OR 
+            p.marca ILIKE $1
+          )
+        GROUP BY p.id_producto
+        ORDER BY p.fecha_creacion DESC
+        LIMIT $2 OFFSET $3
+      `;
+      
+      const result = await db.query(query, [`%${searchTerm}%`, limit || 20, offset || 0]);
+      return result.rows;
+    } catch (error) {
+      console.error('Error en search productos:', error);
+      throw error;
+    }
+  }
+}
 
 module.exports = ProductModel;

@@ -1,9 +1,349 @@
-const { validationResult } = require('express-validator');
+// controllers/product.controller.js - Controlador para productos
+
 const ProductModel = require('../models/product.model');
 
-const ProductController = {
+class ProductController {
   // Obtener todos los productos
-  async getProducts(req, res) {
+  static async getAllProducts(req, res) {
+    try {
+      const products = await ProductModel.getAll();
+      
+      res.status(200).json({
+        success: true,
+        message: 'Productos obtenidos exitosamente',
+        products: products
+      });
+    } catch (error) {
+      console.error('Error en getAllProducts:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+
+  // Obtener todos los productos para administradores (con más detalles)
+  static async getAllProductsForAdmin(req, res) {
+    try {
+      const products = await ProductModel.getAllForAdmin();
+      
+      res.status(200).json({
+        success: true,
+        message: 'Productos para admin obtenidos exitosamente',
+        products: products
+      });
+    } catch (error) {
+      console.error('Error en getAllProductsForAdmin:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+
+  // Obtener un producto por ID
+  static async getProductById(req, res) {
+    try {
+      const { id } = req.params;
+      const product = await ProductModel.getById(id);
+      
+      if (!product) {
+        return res.status(404).json({
+          success: false,
+          message: 'Producto no encontrado'
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Producto obtenido exitosamente',
+        product: product
+      });
+    } catch (error) {
+      console.error('Error en getProductById:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+
+  // Obtener productos recientes
+  static async getRecentProducts(req, res) {
+    try {
+      const limit = parseInt(req.query.limit) || 6;
+      const products = await ProductModel.getRecent(limit);
+      
+      res.status(200).json({
+        success: true,
+        message: 'Productos recientes obtenidos exitosamente',
+        products: products
+      });
+    } catch (error) {
+      console.error('Error en getRecentProducts:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+
+  // Obtener productos recientes por categoría
+  static async getRecentByCategory(req, res) {
+    try {
+      const limit = parseInt(req.query.limit) || 4;
+      const productsByCategory = await ProductModel.getRecentByCategory(limit);
+      
+      res.status(200).json({
+        success: true,
+        message: 'Productos recientes por categoría obtenidos exitosamente',
+        productsByCategory: productsByCategory
+      });
+    } catch (error) {
+      console.error('Error en getRecentByCategory:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+
+  // Obtener productos con mejores promociones
+  static async getBestPromotions(req, res) {
+    try {
+      const limit = parseInt(req.query.limit) || 6;
+      const products = await ProductModel.getBestPromotions(limit);
+      
+      res.status(200).json({
+        success: true,
+        message: 'Productos con mejores promociones obtenidos exitosamente',
+        products: products
+      });
+    } catch (error) {
+      console.error('Error en getBestPromotions:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+
+  // Crear un nuevo producto
+  static async createProduct(req, res) {
+    try {
+      const {
+        nombre,
+        descripcion,
+        categoria,
+        marca,
+        id_sistema_talla,
+        activo,
+        variantes
+      } = req.body;
+
+      // Validaciones básicas
+      if (!nombre) {
+        return res.status(400).json({
+          success: false,
+          message: 'El nombre del producto es requerido'
+        });
+      }
+
+      // Validar variantes si se proporcionan
+      if (variantes && variantes.length > 0) {
+        for (const variant of variantes) {
+          if (!variant.precio || variant.precio <= 0) {
+            return res.status(400).json({
+              success: false,
+              message: 'Todas las variantes deben tener un precio válido'
+            });
+          }
+        }
+      }
+
+      const productData = {
+        nombre,
+        descripcion,
+        categoria,
+        marca,
+        id_sistema_talla,
+        activo,
+        variantes
+      };
+
+      const newProduct = await ProductModel.create(productData);
+
+      res.status(201).json({
+        success: true,
+        message: 'Producto creado exitosamente',
+        product: newProduct
+      });
+    } catch (error) {
+      console.error('Error en createProduct:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+
+  // Actualizar un producto
+  static async updateProduct(req, res) {
+    try {
+      const { id } = req.params;
+      const productData = req.body;
+
+      const updatedProduct = await ProductModel.update(id, productData);
+
+      res.status(200).json({
+        success: true,
+        message: 'Producto actualizado exitosamente',
+        product: updatedProduct
+      });
+    } catch (error) {
+      console.error('Error en updateProduct:', error);
+      
+      if (error.message === 'Producto no encontrado') {
+        return res.status(404).json({
+          success: false,
+          message: 'Producto no encontrado'
+        });
+      }
+      
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+
+  // Eliminar un producto (marcar como inactivo)
+  static async deleteProduct(req, res) {
+    try {
+      const { id } = req.params;
+
+      const deletedProduct = await ProductModel.delete(id);
+
+      res.status(200).json({
+        success: true,
+        message: 'Producto eliminado exitosamente',
+        product: deletedProduct
+      });
+    } catch (error) {
+      console.error('Error en deleteProduct:', error);
+      
+      if (error.message === 'Producto no encontrado') {
+        return res.status(404).json({
+          success: false,
+          message: 'Producto no encontrado'
+        });
+      }
+      
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+
+  // Obtener productos por categoría
+  static async getProductsByCategory(req, res) {
+    try {
+      const { categoria } = req.params;
+      const limit = parseInt(req.query.limit) || 20;
+      const offset = parseInt(req.query.offset) || 0;
+
+      const products = await ProductModel.getByCategory(categoria, limit, offset);
+
+      res.status(200).json({
+        success: true,
+        message: `Productos de la categoría "${categoria}" obtenidos exitosamente`,
+        products: products,
+        pagination: {
+          limit,
+          offset,
+          total: products.length
+        }
+      });
+    } catch (error) {
+      console.error('Error en getProductsByCategory:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+
+  // Obtener todas las categorías
+  static async getCategories(req, res) {
+    try {
+      const categories = await ProductModel.getCategories();
+
+      res.status(200).json({
+        success: true,
+        message: 'Categorías obtenidas exitosamente',
+        categories: categories
+      });
+    } catch (error) {
+      console.error('Error en getCategories:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+
+  // Buscar productos
+  static async searchProducts(req, res) {
+    try {
+      const { q } = req.query;
+      
+      if (!q || q.trim().length < 2) {
+        return res.status(400).json({
+          success: false,
+          message: 'El término de búsqueda debe tener al menos 2 caracteres'
+        });
+      }
+
+      const limit = parseInt(req.query.limit) || 20;
+      const offset = parseInt(req.query.offset) || 0;
+
+      const products = await ProductModel.search(q.trim(), limit, offset);
+
+      res.status(200).json({
+        success: true,
+        message: `Resultados de búsqueda para "${q}"`,
+        products: products,
+        search_term: q.trim(),
+        pagination: {
+          limit,
+          offset,
+          total: products.length
+        }
+      });
+    } catch (error) {
+      console.error('Error en searchProducts:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+
+  // Método compatible con el controlador anterior (para no romper rutas existentes)
+  static async getProducts(req, res) {
     try {
       const { categoria, busqueda, marca } = req.query;
       let products;
@@ -23,7 +363,7 @@ const ProductController = {
         );
       }
 
-      res.json({
+      res.status(200).json({
         success: true,
         products: products,
         total: products.length
@@ -36,379 +376,7 @@ const ProductController = {
         error: error.message
       });
     }
-  },
-
-  // Obtener producto por ID
-  async getProductById(req, res) {
-    try {
-      const { id } = req.params;
-      
-      if (!id || isNaN(id)) {
-        return res.status(400).json({
-          success: false,
-          message: 'ID de producto inválido'
-        });
-      }
-
-      const product = await ProductModel.getById(parseInt(id));
-      
-      if (!product) {
-        return res.status(404).json({
-          success: false,
-          message: 'Producto no encontrado'
-        });
-      }
-
-      res.json({
-        success: true,
-        product: product
-      });
-    } catch (error) {
-      console.error('Error al obtener producto por ID:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error al obtener producto',
-        error: error.message
-      });
-    }
-  },
-
-  // Obtener categorías disponibles
-  async getCategories(req, res) {
-    try {
-      const categories = await ProductModel.getCategories();
-      
-      res.json({
-        success: true,
-        categories: categories
-      });
-    } catch (error) {
-      console.error('Error al obtener categorías:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error al obtener categorías',
-        error: error.message
-      });
-    }
-  },
-
-  // Obtener marcas disponibles
-  async getBrands(req, res) {
-    try {
-      const brands = await ProductModel.getBrands();
-      
-      res.json({
-        success: true,
-        brands: brands
-      });
-    } catch (error) {
-      console.error('Error al obtener marcas:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error al obtener marcas',
-        error: error.message
-      });
-    }
-  },
-
-  // Obtener sistemas de tallas
-  async getSizeSystems(req, res) {
-    try {
-      const sizeSystems = await ProductModel.getSizeSystems();
-      
-      res.json({
-        success: true,
-        sizeSystems: sizeSystems
-      });
-    } catch (error) {
-      console.error('Error al obtener sistemas de tallas:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error al obtener sistemas de tallas',
-        error: error.message
-      });
-    }
-  },
-
-  // Verificar stock de un producto específico
-  async checkStock(req, res) {
-    try {
-      const { idProducto, idVariante, idTalla } = req.params;
-      
-      if (!idProducto || !idVariante || !idTalla) {
-        return res.status(400).json({
-          success: false,
-          message: 'Parámetros requeridos: idProducto, idVariante, idTalla'
-        });
-      }
-
-      const stock = await ProductModel.getStock(
-        parseInt(idProducto), 
-        parseInt(idVariante), 
-        parseInt(idTalla)
-      );
-      
-      res.json({
-        success: true,
-        stock: stock,
-        disponible: stock > 0
-      });
-    } catch (error) {
-      console.error('Error al verificar stock:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error al verificar stock',
-        error: error.message
-      });
-    }
-  },
-
-  // Crear producto nuevo (solo admin)
-  async createProduct(req, res) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          errors: errors.array()
-        });
-      }
-
-      const productData = req.body;
-      const newProduct = await ProductModel.create(productData);
-      
-      res.status(201).json({
-        success: true,
-        message: 'Producto creado exitosamente',
-        product: newProduct
-      });
-    } catch (error) {
-      console.error('Error al crear producto:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error al crear producto',
-        error: error.message
-      });
-    }
-  },
-
-  // Crear variante de producto (solo admin)
-  async createVariant(req, res) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          errors: errors.array()
-        });
-      }
-
-      const varianteData = req.body;
-      const newVariante = await ProductModel.createVariante(varianteData);
-      
-      res.status(201).json({
-        success: true,
-        message: 'Variante creada exitosamente',
-        variante: newVariante
-      });
-    } catch (error) {
-      console.error('Error al crear variante:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error al crear variante',
-        error: error.message
-      });
-    }
-  },
-
-  // Agregar imagen a variante (solo admin)
-  async addImageToVariant(req, res) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          errors: errors.array()
-        });
-      }
-
-      const imageData = req.body;
-      const newImage = await ProductModel.addImageToVariant(imageData);
-      
-      res.status(201).json({
-        success: true,
-        message: 'Imagen agregada exitosamente',
-        image: newImage
-      });
-    } catch (error) {
-      console.error('Error al agregar imagen:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error al agregar imagen',
-        error: error.message
-      });
-    }
-  },
-
-  // Actualizar stock (solo admin)
-  async updateStock(req, res) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          errors: errors.array()
-        });
-      }
-
-      const stockData = req.body;
-      const updatedStock = await ProductModel.updateStock(stockData);
-      
-      res.json({
-        success: true,
-        message: 'Stock actualizado exitosamente',
-        stock: updatedStock
-      });
-    } catch (error) {
-      console.error('Error al actualizar stock:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error al actualizar stock',
-        error: error.message
-      });
-    }
-  },
-
-  // Obtener productos destacados/populares
-  async getFeaturedProducts(req, res) {
-    try {
-      const { limit = 8 } = req.query;
-      let products = await ProductModel.getAll();
-      
-      // Filtrar productos con stock y ordenar por algún criterio
-      products = products
-        .filter(product => product.tiene_stock)
-        .sort((a, b) => new Date(b.fecha_creacion) - new Date(a.fecha_creacion))
-        .slice(0, parseInt(limit));
-      
-      res.json({
-        success: true,
-        products: products,
-        total: products.length
-      });
-    } catch (error) {
-      console.error('Error al obtener productos destacados:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error al obtener productos destacados',
-        error: error.message
-      });
-    }
-  },
-
-  // Obtener productos en promoción (con descuento)
-  async getPromotionalProducts(req, res) {
-    try {
-      const { limit = 12 } = req.query;
-      let products = await ProductModel.getAll();
-      
-      // Filtrar productos que tienen precio_original mayor al precio actual
-      products = products.filter(product => {
-        // Aquí necesitaríamos una consulta más específica para obtener precio_original
-        // Por ahora simulamos que hay promociones
-        return product.tiene_stock;
-      }).slice(0, parseInt(limit));
-      
-      res.json({
-        success: true,
-        products: products,
-        total: products.length
-      });
-    } catch (error) {
-      console.error('Error al obtener productos en promoción:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error al obtener productos en promoción',
-        error: error.message
-      });
-    }
-  },
-
-  // Obtener productos recientes (agregados recientemente)
-  async getRecentProducts(req, res) {
-    try {
-      const { limit = 12 } = req.query;
-      
-      const products = await ProductModel.getRecent(parseInt(limit));
-      
-      res.json({
-        success: true,
-        products: products,
-        total: products.length
-      });
-    } catch (error) {
-      console.error('Error al obtener productos recientes:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error al obtener productos recientes',
-        error: error.message
-      });
-    }
-  },
-
-  // Obtener productos recientes por categoría
-  async getRecentByCategory(req, res) {
-    try {
-      const { limit = 6 } = req.query;
-      
-      const products = await ProductModel.getRecentByCategory(parseInt(limit));
-      
-      // Agrupar por categoría
-      const productsByCategory = {};
-      products.forEach(product => {
-        if (!productsByCategory[product.categoria]) {
-          productsByCategory[product.categoria] = [];
-        }
-        productsByCategory[product.categoria].push(product);
-      });
-      
-      res.json({
-        success: true,
-        productsByCategory: productsByCategory,
-        products: products,
-        total: products.length
-      });
-    } catch (error) {
-      console.error('Error al obtener productos recientes por categoría:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error al obtener productos recientes por categoría',
-        error: error.message
-      });
-    }
-  },
-
-  // Obtener mejores promociones
-  async getBestPromotions(req, res) {
-    try {
-      const { limit = 12 } = req.query;
-      
-      const products = await ProductModel.getBestPromotions(parseInt(limit));
-      
-      res.json({
-        success: true,
-        products: products,
-        total: products.length
-      });
-    } catch (error) {
-      console.error('Error al obtener mejores promociones:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error al obtener mejores promociones',
-        error: error.message
-      });
-    }
   }
-};
+}
 
 module.exports = ProductController;

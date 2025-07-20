@@ -1,15 +1,30 @@
 const express = require('express');
-const { check } = require('express-validator');
 const ProductController = require('../controllers/product.controller');
 const authMiddleware = require('../middlewares/auth.middleware');
 
 const router = express.Router();
 
-// @route   GET /api/products
-// @desc    Obtener todos los productos (con filtros opcionales)
-// @query   categoria, busqueda, marca, limit
-// @access  Public
-router.get('/', ProductController.getProducts);
+// Rutas públicas
+router.get('/', ProductController.getProducts); // Compatibilidad con frontend existente
+router.get('/all', ProductController.getAllProducts);
+router.get('/recent', ProductController.getRecentProducts);
+router.get('/recent-by-category', ProductController.getRecentByCategory);
+router.get('/best-promotions', ProductController.getBestPromotions);
+router.get('/categories', ProductController.getCategories);
+router.get('/search', ProductController.searchProducts);
+router.get('/category/:categoria', ProductController.getProductsByCategory);
+router.get('/:id', ProductController.getProductById);
+
+// Rutas protegidas (solo admin)
+router.use(authMiddleware.verifyToken);
+router.use(authMiddleware.requireAdmin);
+
+router.get('/admin', ProductController.getAllProductsForAdmin);
+router.post('/', ProductController.createProduct);
+router.put('/:id', ProductController.updateProduct);
+router.delete('/:id', ProductController.deleteProduct);
+
+module.exports = router;
 
 // @route   GET /api/products/featured
 // @desc    Obtener productos destacados
