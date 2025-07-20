@@ -107,6 +107,7 @@ try {
   app.use('/api/auth', authRoutes);
   app.use('/api/users', userRoutes);
   app.use('/api/shipping', shippingRoutes);
+  app.use('/api/products', require('./src/routes/product.routes'));
 
   // Middleware para rutas no encontradas
   app.use((req, res) => {

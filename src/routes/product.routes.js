@@ -1,0 +1,112 @@
+const express = require('express');
+const { check } = require('express-validator');
+const ProductController = require('../controllers/product.controller');
+const authMiddleware = require('../middlewares/auth.middleware');
+
+const router = express.Router();
+
+// @route   GET /api/products
+// @desc    Obtener todos los productos (con filtros opcionales)
+// @query   categoria, busqueda, marca, limit
+// @access  Public
+router.get('/', ProductController.getProducts);
+
+// @route   GET /api/products/featured
+// @desc    Obtener productos destacados
+// @query   limit (default: 8)
+// @access  Public
+router.get('/featured', ProductController.getFeaturedProducts);
+
+// @route   GET /api/products/promotions
+// @desc    Obtener productos en promoción
+// @query   limit (default: 12)
+// @access  Public
+router.get('/promotions', ProductController.getPromotionalProducts);
+
+// @route   GET /api/products/categories
+// @desc    Obtener todas las categorías disponibles
+// @access  Public
+router.get('/categories', ProductController.getCategories);
+
+// @route   GET /api/products/brands
+// @desc    Obtener todas las marcas disponibles
+// @access  Public
+router.get('/brands', ProductController.getBrands);
+
+// @route   GET /api/products/size-systems
+// @desc    Obtener sistemas de tallas
+// @access  Public
+router.get('/size-systems', ProductController.getSizeSystems);
+
+// @route   GET /api/products/:id
+// @desc    Obtener producto por ID con variantes, imágenes y stock
+// @access  Public
+router.get('/:id', ProductController.getProductById);
+
+// @route   GET /api/products/stock/:idProducto/:idVariante/:idTalla
+// @desc    Verificar stock específico
+// @access  Public
+router.get('/stock/:idProducto/:idVariante/:idTalla', ProductController.checkStock);
+
+// === RUTAS PARA ADMINISTRADORES ===
+
+// @route   POST /api/products
+// @desc    Crear nuevo producto
+// @access  Private (Admin only)
+router.post(
+  '/',
+  authMiddleware,
+  [
+    check('nombre', 'El nombre del producto es obligatorio').not().isEmpty(),
+    check('categoria', 'La categoría es obligatoria').not().isEmpty(),
+    check('marca', 'La marca es obligatoria').not().isEmpty(),
+    check('id_sistema_talla', 'El sistema de tallas debe ser un número').optional().isNumeric()
+  ],
+  ProductController.createProduct
+);
+
+// @route   POST /api/products/variants
+// @desc    Crear nueva variante de producto
+// @access  Private (Admin only)
+router.post(
+  '/variants',
+  authMiddleware,
+  [
+    check('id_producto', 'El ID del producto es obligatorio y debe ser un número').isNumeric(),
+    check('nombre', 'El nombre de la variante es obligatorio').not().isEmpty(),
+    check('precio', 'El precio es obligatorio y debe ser un número').isNumeric()
+  ],
+  ProductController.createVariant
+);
+
+// @route   POST /api/products/images
+// @desc    Agregar imagen a variante
+// @access  Private (Admin only)
+router.post(
+  '/images',
+  authMiddleware,
+  [
+    check('id_variante', 'El ID de la variante es obligatorio y debe ser un número').isNumeric(),
+    check('url', 'La URL de la imagen es obligatoria').isURL(),
+    check('public_id', 'El public_id es obligatorio').not().isEmpty(),
+    check('orden', 'El orden debe ser un número').isNumeric()
+  ],
+  ProductController.addImageToVariant
+);
+
+// @route   PUT /api/products/stock
+// @desc    Actualizar stock de producto
+// @access  Private (Admin only)
+router.put(
+  '/stock',
+  authMiddleware,
+  [
+    check('id_producto', 'El ID del producto es obligatorio y debe ser un número').isNumeric(),
+    check('id_variante', 'El ID de la variante es obligatorio y debe ser un número').isNumeric(),
+    check('id_talla', 'El ID de la talla es obligatorio y debe ser un número').isNumeric(),
+    check('cantidad', 'La cantidad debe ser un número no negativo').isNumeric().custom(value => value >= 0)
+  ],
+  ProductController.updateStock
+);
+
+module.exports = router;
