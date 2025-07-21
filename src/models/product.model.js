@@ -48,12 +48,17 @@ class ProductModel {
             s.id_variante,
             SUM(s.cantidad) as stock_total,
             json_agg(
-              json_build_object(
+              DISTINCT json_build_object(
                 'id_talla', t.id_talla,
                 'nombre_talla', t.nombre_talla,
                 'orden', t.orden,
                 'cantidad', s.cantidad
-              ) ORDER BY t.orden
+              ) ORDER BY json_build_object(
+                'id_talla', t.id_talla,
+                'nombre_talla', t.nombre_talla,
+                'orden', t.orden,
+                'cantidad', s.cantidad
+              )->>'orden'
             ) FILTER (WHERE s.cantidad > 0) as tallas
           FROM stock s
           INNER JOIN tallas t ON s.id_talla = t.id_talla
@@ -68,38 +73,6 @@ class ProductModel {
       return result.rows;
     } catch (error) {
       console.error('Error en getAll productos:', error);
-      throw error;
-    }
-  }
-
-  // Obtener todos los productos para administradores (incluye inactivos)
-  static async getAllForAdmin() {
-    try {
-      const query = `
-        SELECT 
-          p.*,
-          st.nombre as sistema_talla_nombre,
-          COUNT(v.id_variante) as total_variantes,
-          COUNT(CASE WHEN v.activo = true THEN 1 END) as variantes_activas,
-          COALESCE(SUM(stock_total.stock), 0) as stock_total_producto
-        FROM productos p
-        LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
-        LEFT JOIN variantes v ON p.id_producto = v.id_producto
-        LEFT JOIN (
-          SELECT 
-            s.id_variante,
-            SUM(s.cantidad) as stock
-          FROM stock s
-          GROUP BY s.id_variante
-        ) stock_total ON v.id_variante = stock_total.id_variante
-        GROUP BY p.id_producto, st.nombre
-        ORDER BY p.fecha_creacion DESC
-      `;
-      
-      const result = await db.query(query);
-      return result.rows;
-    } catch (error) {
-      console.error('Error en getAllForAdmin productos:', error);
       throw error;
     }
   }
@@ -558,25 +531,6 @@ class ProductModel {
       return result.rows;
     } catch (error) {
       console.error('Error en getCategories:', error);
-      throw error;
-    }
-  }
-
-  // Obtener todas las marcas disponibles
-  static async getBrands() {
-    try {
-      const query = `
-        SELECT DISTINCT marca, COUNT(*) as total_productos
-        FROM productos 
-        WHERE activo = true AND marca IS NOT NULL
-        GROUP BY marca
-        ORDER BY marca
-      `;
-      
-      const result = await db.query(query);
-      return result.rows;
-    } catch (error) {
-      console.error('Error en getBrands:', error);
       throw error;
     }
   }

@@ -29,7 +29,6 @@ class SizeModel {
       throw error;
     }
   }
-
   // Obtener un sistema de tallas específico con sus tallas
   static async getSystemById(id) {
     try {

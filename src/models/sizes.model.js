@@ -1,5 +1,6 @@
 const db = require('../config/db');
 
+
 const SizesModel = {
   async getAllSystems() {
     const result = await db.query('SELECT * FROM sistemas_talla WHERE activo = true ORDER BY nombre_sistema');
