@@ -63,8 +63,8 @@ const verifyToken = async (req, res, next) => {
 
 const requireAdmin = async (req, res, next) => {
   try {
-    // Verificar que el usuario tenga rol de admin (rol = 1)
-    if (!req.user || req.user.rol !== 1) {
+    // Verificar que el usuario tenga rol de admin (rol = 'admin')
+    if (!req.user || req.user.rol !== 'admin') {
       return res.status(403).json({
         success: false,
         message: 'Acceso denegado - Se requieren permisos de administrador'
