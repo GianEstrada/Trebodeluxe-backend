@@ -491,6 +491,175 @@ class ProductController {
       });
     }
   }
+
+  // Obtener productos para admin con búsqueda y filtros
+  static async getProductsForAdmin(req, res) {
+    try {
+      const {
+        search = '',
+        categoria = '',
+        marca = '',
+        activo = '',
+        limit = 20,
+        offset = 0,
+        sortBy = 'fecha_creacion',
+        sortOrder = 'DESC'
+      } = req.query;
+
+      const products = await ProductModel.getProductsForAdmin({
+        search,
+        categoria,
+        marca,
+        activo: activo !== '' ? activo === 'true' : null,
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        sortBy,
+        sortOrder
+      });
+
+      res.json({
+        success: true,
+        message: 'Productos para admin obtenidos exitosamente',
+        data: products
+      });
+
+    } catch (error) {
+      console.error('Error en getProductsForAdmin:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener productos para admin',
+        error: error.message
+      });
+    }
+  }
+
+  // Obtener marcas disponibles
+  static async getBrands(req, res) {
+    try {
+      const brands = await ProductModel.getBrands();
+
+      res.json({
+        success: true,
+        message: 'Marcas obtenidas exitosamente',
+        data: brands
+      });
+
+    } catch (error) {
+      console.error('Error en getBrands:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener marcas',
+        error: error.message
+      });
+    }
+  }
+
+  // Crear producto con variante inicial
+  static async createProductWithVariant(req, res) {
+    try {
+      const {
+        // Datos del producto
+        nombre,
+        descripcion,
+        categoria,
+        marca,
+        id_sistema_talla,
+        // Datos de la variante
+        nombre_variante,
+        precio,
+        precio_original
+      } = req.body;
+
+      const product = await ProductModel.createWithVariant({
+        producto: {
+          nombre,
+          descripcion,
+          categoria,
+          marca,
+          id_sistema_talla: id_sistema_talla ? parseInt(id_sistema_talla) : null
+        },
+        variante: {
+          nombre: nombre_variante,
+          precio: parseFloat(precio),
+          precio_original: precio_original ? parseFloat(precio_original) : null
+        }
+      });
+
+      res.status(201).json({
+        success: true,
+        message: 'Producto creado exitosamente',
+        data: product
+      });
+
+    } catch (error) {
+      console.error('Error en createProductWithVariant:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al crear producto',
+        error: error.message
+      });
+    }
+  }
+
+  // Actualizar producto
+  static async updateProductDetails(req, res) {
+    try {
+      const { id } = req.params;
+      const updateData = req.body;
+
+      const product = await ProductModel.updateProduct(parseInt(id), updateData);
+
+      if (!product) {
+        return res.status(404).json({
+          success: false,
+          message: 'Producto no encontrado'
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Producto actualizado exitosamente',
+        data: product
+      });
+
+    } catch (error) {
+      console.error('Error en updateProductDetails:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al actualizar producto',
+        error: error.message
+      });
+    }
+  }
+
+  // Eliminar producto
+  static async deleteProductById(req, res) {
+    try {
+      const { id } = req.params;
+
+      const result = await ProductModel.deleteProduct(parseInt(id));
+
+      if (!result) {
+        return res.status(404).json({
+          success: false,
+          message: 'Producto no encontrado'
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Producto eliminado exitosamente'
+      });
+
+    } catch (error) {
+      console.error('Error en deleteProductById:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al eliminar producto',
+        error: error.message
+      });
+    }
+  }
 }
 
 module.exports = ProductController;

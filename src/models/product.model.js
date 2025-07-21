@@ -768,6 +768,295 @@ class ProductModel {
       throw error;
     }
   }
+
+  // Obtener productos para admin con búsqueda y filtros
+  static async getProductsForAdmin(filters) {
+    try {
+      const {
+        search = '',
+        categoria = '',
+        marca = '',
+        activo = null,
+        limit = 20,
+        offset = 0,
+        sortBy = 'fecha_creacion',
+        sortOrder = 'DESC'
+      } = filters;
+
+      let whereConditions = [];
+      let params = [];
+      let paramIndex = 1;
+
+      // Filtros de búsqueda
+      if (search) {
+        whereConditions.push(`(
+          LOWER(p.nombre) LIKE LOWER($${paramIndex}) OR 
+          LOWER(p.descripcion) LIKE LOWER($${paramIndex}) OR 
+          LOWER(p.marca) LIKE LOWER($${paramIndex})
+        )`);
+        params.push(`%${search}%`);
+        paramIndex++;
+      }
+
+      if (categoria) {
+        whereConditions.push(`p.categoria = $${paramIndex}`);
+        params.push(categoria);
+        paramIndex++;
+      }
+
+      if (marca) {
+        whereConditions.push(`p.marca = $${paramIndex}`);
+        params.push(marca);
+        paramIndex++;
+      }
+
+      if (activo !== null) {
+        whereConditions.push(`p.activo = $${paramIndex}`);
+        params.push(activo);
+        paramIndex++;
+      }
+
+      const whereClause = whereConditions.length > 0 ? 
+        `WHERE ${whereConditions.join(' AND ')}` : '';
+
+      // Validar sortBy para evitar inyección SQL
+      const validSortFields = ['nombre', 'categoria', 'marca', 'fecha_creacion', 'activo'];
+      const validSortOrder = ['ASC', 'DESC'];
+      
+      if (!validSortFields.includes(sortBy)) sortBy = 'fecha_creacion';
+      if (!validSortOrder.includes(sortOrder.toUpperCase())) sortOrder = 'DESC';
+
+      const query = `
+        SELECT 
+          p.id_producto,
+          p.nombre,
+          p.descripcion,
+          p.categoria,
+          p.marca,
+          p.activo,
+          p.fecha_creacion,
+          st.nombre as sistema_talla,
+          COUNT(DISTINCT v.id_variante) as total_variantes,
+          COUNT(DISTINCT v.id_variante) FILTER (WHERE v.activo = true) as variantes_activas,
+          COALESCE(SUM(stock_info.stock_total), 0) as stock_total,
+          MIN(v.precio) as precio_minimo,
+          MAX(v.precio) as precio_maximo,
+          iv.url as imagen_principal,
+          iv.public_id as imagen_public_id
+        FROM productos p
+        LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
+        LEFT JOIN variantes v ON p.id_producto = v.id_producto
+        LEFT JOIN (
+          SELECT 
+            id_variante,
+            SUM(cantidad) as stock_total
+          FROM stock
+          GROUP BY id_variante
+        ) stock_info ON v.id_variante = stock_info.id_variante
+        LEFT JOIN imagenes_variante iv ON v.id_variante = iv.id_variante AND iv.orden = 1
+        ${whereClause}
+        GROUP BY p.id_producto, st.nombre, iv.url, iv.public_id
+        ORDER BY p.${sortBy} ${sortOrder}
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      `;
+
+      params.push(limit, offset);
+
+      // Query para contar total de resultados
+      const countQuery = `
+        SELECT COUNT(DISTINCT p.id_producto) as total
+        FROM productos p
+        LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
+        LEFT JOIN variantes v ON p.id_producto = v.id_producto
+        ${whereClause}
+      `;
+
+      const countParams = params.slice(0, -2); // Remover limit y offset
+
+      const [productsResult, countResult] = await Promise.all([
+        db.query(query, params),
+        db.query(countQuery, countParams)
+      ]);
+
+      return {
+        products: productsResult.rows,
+        total: parseInt(countResult.rows[0].total),
+        limit,
+        offset,
+        hasMore: offset + limit < parseInt(countResult.rows[0].total)
+      };
+
+    } catch (error) {
+      console.error('Error en getProductsForAdmin:', error);
+      throw error;
+    }
+  }
+
+  // Obtener marcas disponibles
+  static async getBrands() {
+    try {
+      const query = `
+        SELECT 
+          p.marca,
+          COUNT(DISTINCT p.id_producto) as total_productos
+        FROM productos p
+        WHERE p.activo = true AND p.marca IS NOT NULL
+        GROUP BY p.marca
+        HAVING COUNT(DISTINCT p.id_producto) > 0
+        ORDER BY p.marca ASC
+      `;
+
+      const result = await db.query(query);
+      return result.rows;
+
+    } catch (error) {
+      console.error('Error en getBrands:', error);
+      throw error;
+    }
+  }
+
+  // Crear producto con variante inicial
+  static async createWithVariant(data) {
+    const client = await db.getClient();
+    
+    try {
+      await client.query('BEGIN');
+
+      const { producto, variante } = data;
+
+      // Crear producto
+      const productQuery = `
+        INSERT INTO productos (nombre, descripcion, categoria, marca, id_sistema_talla, activo)
+        VALUES ($1, $2, $3, $4, $5, true)
+        RETURNING *
+      `;
+
+      const productResult = await client.query(productQuery, [
+        producto.nombre,
+        producto.descripcion,
+        producto.categoria,
+        producto.marca,
+        producto.id_sistema_talla
+      ]);
+
+      const newProduct = productResult.rows[0];
+
+      // Crear variante inicial
+      const variantQuery = `
+        INSERT INTO variantes (id_producto, nombre, precio, precio_original, activo)
+        VALUES ($1, $2, $3, $4, true)
+        RETURNING *
+      `;
+
+      const variantResult = await client.query(variantQuery, [
+        newProduct.id_producto,
+        variante.nombre,
+        variante.precio,
+        variante.precio_original
+      ]);
+
+      const newVariant = variantResult.rows[0];
+
+      await client.query('COMMIT');
+
+      return {
+        ...newProduct,
+        variante_inicial: newVariant
+      };
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Error en createWithVariant:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Actualizar producto
+  static async updateProduct(id, updateData) {
+    try {
+      const {
+        nombre,
+        descripcion,
+        categoria,
+        marca,
+        id_sistema_talla,
+        activo
+      } = updateData;
+
+      const query = `
+        UPDATE productos 
+        SET 
+          nombre = COALESCE($2, nombre),
+          descripcion = COALESCE($3, descripcion),
+          categoria = COALESCE($4, categoria),
+          marca = COALESCE($5, marca),
+          id_sistema_talla = COALESCE($6, id_sistema_talla),
+          activo = COALESCE($7, activo)
+        WHERE id_producto = $1
+        RETURNING *
+      `;
+
+      const result = await db.query(query, [
+        id,
+        nombre,
+        descripcion,
+        categoria,
+        marca,
+        id_sistema_talla,
+        activo
+      ]);
+
+      return result.rows[0];
+
+    } catch (error) {
+      console.error('Error en updateProduct:', error);
+      throw error;
+    }
+  }
+
+  // Eliminar producto
+  static async deleteProduct(id) {
+    const client = await db.getClient();
+    
+    try {
+      await client.query('BEGIN');
+
+      // Primero eliminar imágenes de las variantes
+      const imagesQuery = `
+        SELECT iv.public_id 
+        FROM imagenes_variante iv
+        JOIN variantes v ON iv.id_variante = v.id_variante
+        WHERE v.id_producto = $1
+      `;
+      const imagesResult = await client.query(imagesQuery, [id]);
+
+      // Eliminar producto (esto eliminará en cascada variantes, stock, imágenes)
+      const deleteQuery = `
+        DELETE FROM productos 
+        WHERE id_producto = $1 
+        RETURNING *
+      `;
+
+      const result = await client.query(deleteQuery, [id]);
+
+      await client.query('COMMIT');
+
+      // Retornar también las imágenes que se deben eliminar de Cloudinary
+      return {
+        deletedProduct: result.rows[0],
+        imagesToDelete: imagesResult.rows.map(row => row.public_id)
+      };
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Error en deleteProduct:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
 }
 
 module.exports = ProductModel;
