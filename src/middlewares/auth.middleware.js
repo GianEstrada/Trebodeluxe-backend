@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 
-const authMiddleware = async (req, res, next) => {
+const verifyToken = async (req, res, next) => {
   try {
     // Verificar si el token está presente en los headers
     const authHeader = req.headers.authorization;
@@ -22,7 +22,7 @@ const authMiddleware = async (req, res, next) => {
 
       // Buscar el usuario en la base de datos
       const result = await db.query(
-        'SELECT id_usuario, nombres, apellidos, correo, usuario FROM usuarios WHERE id_usuario = $1',
+        'SELECT id_usuario, nombres, apellidos, correo, usuario, rol FROM usuarios WHERE id_usuario = $1',
         [decoded.id]
       );
 
@@ -40,7 +40,8 @@ const authMiddleware = async (req, res, next) => {
         nombres: user.nombres,
         apellidos: user.apellidos,
         correo: user.correo,
-        usuario: user.usuario
+        usuario: user.usuario,
+        rol: user.rol
       };
 
       next();
@@ -60,4 +61,27 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
-module.exports = authMiddleware;
+const requireAdmin = async (req, res, next) => {
+  try {
+    // Verificar que el usuario tenga rol de admin (rol = 'admin')
+    if (!req.user || req.user.rol !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado - Se requieren permisos de administrador'
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error('Error en middleware requireAdmin:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+};
+
+module.exports = {
+  verifyToken,
+  requireAdmin
+};

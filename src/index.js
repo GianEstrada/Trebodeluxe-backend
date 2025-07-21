@@ -7,12 +7,18 @@ const path = require('path');
 const db = require('./config/db');
 
 // Cargar variables de entorno
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
+if (!process.env.DATABASE_URL) {
+  dotenv.config(); // Fallback para producción
+}
 
 // Importar rutas
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const shippingRoutes = require('./routes/shipping.routes');
+const productRoutes = require('./routes/product.routes');
+const promotionRoutes = require('./routes/promotion.routes');
+const sizesRoutes = require('./routes/sizes.routes');
 
 // Importar middlewares
 const { notFound, errorHandler } = require('./middlewares/error.middleware');
@@ -75,9 +81,21 @@ app.get('/api/health', async (req, res) => {
 });
 
 // Rutas de la API
+console.log('Registrando rutas de la API...');
 app.use('/api/auth', authRoutes);
+console.log('✅ Rutas auth registradas');
 app.use('/api/users', userRoutes);
+console.log('✅ Rutas users registradas');
 app.use('/api/shipping', shippingRoutes);
+console.log('✅ Rutas shipping registradas');
+app.use('/api/products', productRoutes);
+console.log('✅ Rutas products registradas');
+app.use('/api/promotions', promotionRoutes);
+console.log('✅ Rutas promotions registradas');
+console.log('Registrando rutas /api/sizes...');
+app.use('/api/sizes', sizesRoutes);
+console.log('✅ Rutas sizes registradas');
+console.log('Todas las rutas de la API han sido registradas.');
 
 // Middlewares de manejo de errores
 app.use(notFound);
@@ -86,7 +104,18 @@ app.use(errorHandler);
 // Iniciar servidor
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`Servidor ejecutándose en modo ${process.env.NODE_ENV} en el puerto ${PORT}`);
+  console.log(`🚀 Servidor ejecutándose en modo ${process.env.NODE_ENV} en el puerto ${PORT}`);
+  console.log(`⏰ Timestamp: ${new Date().toISOString()}`);
+  console.log(`📋 Commit actual esperado: 07fbd7f - Add test route for sizes`);
+  console.log(`\n🛣️  Rutas disponibles:`);
+  console.log(`- GET  /api/health`);
+  console.log(`- POST /api/auth/register`);
+  console.log(`- POST /api/auth/login`);
+  console.log(`- GET  /api/auth/profile (protegida)`);
+  console.log(`- GET  /api/sizes/test (nuevo)`);
+  console.log(`- GET  /api/sizes/systems (nuevo)`);
+  console.log(`- GET  /api/sizes (nuevo)`);
+  console.log(`\n⚠️  Si no ves los logs de configuración de sizes arriba, hay un problema de deploy.`);
 });
 
 module.exports = app;

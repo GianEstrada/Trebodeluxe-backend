@@ -11,7 +11,7 @@ const authMiddleware = require('../middlewares/auth.middleware');
 const router = express.Router();
 
 // Todas las rutas necesitan autenticación
-router.use(authMiddleware);
+router.use(authMiddleware.verifyToken);
 
 // @route   GET /api/shipping
 // @desc    Obtener información de envío del usuario

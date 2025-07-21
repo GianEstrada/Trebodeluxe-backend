@@ -10,7 +10,7 @@ const router = express.Router();
 // @access  Private
 router.put(
   '/profile',
-  authMiddleware,
+  authMiddleware.verifyToken,
   [
     check('nombres', 'El nombre es obligatorio').not().isEmpty(),
     check('apellidos', 'Los apellidos son obligatorios').not().isEmpty(),
@@ -24,6 +24,6 @@ router.put(
 // @route   DELETE /api/users
 // @desc    Eliminar cuenta de usuario
 // @access  Private
-router.delete('/', authMiddleware, UserController.deleteUser);
+router.delete('/', authMiddleware.verifyToken, UserController.deleteUser);
 
 module.exports = router;
