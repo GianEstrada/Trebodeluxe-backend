@@ -581,6 +581,31 @@ class ProductModel {
       throw error;
     }
   }
+
+  // Obtener todos los productos con detalles para administradores
+  static async getAllForAdmin() {
+    try {
+      const query = `
+        SELECT 
+          p.id_producto, 
+          p.nombre, 
+          p.descripcion, 
+          p.categoria, 
+          p.marca, 
+          p.activo, 
+          p.fecha_creacion, 
+          st.nombre as sistema_talla
+        FROM productos p
+        LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
+        ORDER BY p.fecha_creacion DESC
+      `;
+      const result = await db.query(query);
+      return result.rows;
+    } catch (error) {
+      console.error('Error en getAllForAdmin:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = ProductModel;
