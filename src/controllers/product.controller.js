@@ -47,6 +47,15 @@ class ProductController {
   static async getProductById(req, res) {
     try {
       const { id } = req.params;
+
+      // Validar que el ID sea un número entero
+      if (isNaN(parseInt(id, 10))) {
+        return res.status(400).json({
+          success: false,
+          message: 'El ID del producto debe ser un número entero válido'
+        });
+      }
+
       const product = await ProductModel.getById(id);
       
       if (!product) {
