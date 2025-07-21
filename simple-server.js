@@ -4,6 +4,8 @@
  * Versión simplificada del servidor para el despliegue en Render.com
  */
 
+console.log("🚀 Starting simple-server.js - Version:", new Date().toISOString());
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -41,6 +43,7 @@ try {
   const authRoutes = require('./src/routes/auth.routes');
   const userRoutes = require('./src/routes/user.routes');
   const shippingRoutes = require('./src/routes/shipping.routes');
+  const sizesRoutes = require('./src/routes/sizes.routes');
   
   // Crear la aplicación Express
   console.log('Creando aplicación Express...');
@@ -107,6 +110,7 @@ try {
   app.use('/api/auth', authRoutes);
   app.use('/api/users', userRoutes);
   app.use('/api/shipping', shippingRoutes);
+  app.use('/api/sizes', sizesRoutes);
   app.use('/api/products', require('./src/routes/product.routes'));
 
   // Middleware para rutas no encontradas
@@ -141,6 +145,7 @@ try {
     - POST /api/auth/register
     - POST /api/auth/login
     - GET  /api/auth/profile (protegida)
+    - GET  /api/sizes
     `);
   });
 
