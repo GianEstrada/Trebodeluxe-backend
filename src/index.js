@@ -7,12 +7,18 @@ const path = require('path');
 const db = require('./config/db');
 
 // Cargar variables de entorno
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
+if (!process.env.DATABASE_URL) {
+  dotenv.config(); // Fallback para producción
+}
 
 // Importar rutas
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const shippingRoutes = require('./routes/shipping.routes');
+const productRoutes = require('./routes/product.routes');
+const promotionRoutes = require('./routes/promotion.routes');
+const sizesRoutes = require('./routes/sizes.routes');
 
 // Importar middlewares
 const { notFound, errorHandler } = require('./middlewares/error.middleware');
@@ -78,6 +84,10 @@ app.get('/api/health', async (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/shipping', shippingRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/promotions', promotionRoutes);
+console.log('Registrando rutas /api/sizes...');
+app.use('/api/sizes', sizesRoutes);
 
 // Middlewares de manejo de errores
 app.use(notFound);
