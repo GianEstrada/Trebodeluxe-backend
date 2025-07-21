@@ -567,6 +567,25 @@ class ProductModel {
     }
   }
 
+  // Obtener todas las marcas disponibles
+  static async getBrands() {
+    try {
+      const query = `
+        SELECT DISTINCT marca, COUNT(*) as total_productos
+        FROM productos 
+        WHERE activo = true AND marca IS NOT NULL
+        GROUP BY marca
+        ORDER BY marca
+      `;
+      
+      const result = await db.query(query);
+      return result.rows;
+    } catch (error) {
+      console.error('Error en getBrands:', error);
+      throw error;
+    }
+  }
+
   // Buscar productos
   static async search(searchTerm, limit, offset) {
     try {

@@ -7,7 +7,10 @@ const path = require('path');
 const db = require('./config/db');
 
 // Cargar variables de entorno
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
+if (!process.env.DATABASE_URL) {
+  dotenv.config(); // Fallback para producción
+}
 
 // Importar rutas
 const authRoutes = require('./routes/auth.routes');

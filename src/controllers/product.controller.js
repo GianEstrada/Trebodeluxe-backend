@@ -304,6 +304,26 @@ class ProductController {
     }
   }
 
+  // Obtener todas las marcas
+  static async getBrands(req, res) {
+    try {
+      const brands = await ProductModel.getBrands();
+
+      res.status(200).json({
+        success: true,
+        message: 'Marcas obtenidas exitosamente',
+        brands: brands
+      });
+    } catch (error) {
+      console.error('Error en getBrands:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+
   // Buscar productos
   static async searchProducts(req, res) {
     try {
