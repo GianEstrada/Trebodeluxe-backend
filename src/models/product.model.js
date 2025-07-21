@@ -48,7 +48,7 @@ class ProductModel {
             s.id_variante,
             SUM(s.cantidad) as stock_total,
             json_agg(
-              DISTINCT json_build_object(
+              json_build_object(
                 'id_talla', t.id_talla,
                 'nombre_talla', t.nombre_talla,
                 'orden', t.orden,
@@ -119,7 +119,7 @@ class ProductModel {
             s.id_variante,
             SUM(s.cantidad) as stock_total,
             json_agg(
-              DISTINCT json_build_object(
+              json_build_object(
                 'id_talla', t.id_talla,
                 'nombre_talla', t.nombre_talla,
                 'orden', t.orden,
