@@ -4,33 +4,17 @@ const authMiddleware = require('../middlewares/auth.middleware');
 
 const router = express.Router();
 
-// Rutas públicas
-router.get('/', ProductController.getProducts); // Compatibilidad con frontend existente
-router.get('/all', ProductController.getAllProducts);
-router.get('/recent', ProductController.getRecentProducts);
-router.get('/recent-by-category', ProductController.getRecentByCategory);
-router.get('/best-promotions', ProductController.getBestPromotions);
-router.get('/categories', ProductController.getCategories);
-router.get('/search', ProductController.searchProducts);
-router.get('/category/:categoria', ProductController.getProductsByCategory);
-router.get('/:id', ProductController.getProductById);
+// === RUTAS PÚBLICAS ===
 
-// Rutas protegidas (solo admin)
-router.use(authMiddleware.verifyToken);
-router.use(authMiddleware.requireAdmin);
-
-router.get('/admin', ProductController.getAllProductsForAdmin);
-router.post('/', ProductController.createProduct);
-router.put('/:id', ProductController.updateProduct);
-router.delete('/:id', ProductController.deleteProduct);
-
-module.exports = router;
-
-// @route   GET /api/products/featured
-// @desc    Obtener productos destacados
-// @query   limit (default: 8)
+// @route   GET /api/products
+// @desc    Obtener todos los productos (con paginación)
 // @access  Public
-router.get('/featured', ProductController.getFeaturedProducts);
+router.get('/', ProductController.getProducts); // Compatibilidad con frontend existente
+
+// @route   GET /api/products/all
+// @desc    Obtener todos los productos sin paginación
+// @access  Public
+router.get('/all', ProductController.getAllProducts);
 
 // @route   GET /api/products/recent
 // @desc    Obtener productos agregados recientemente
@@ -43,12 +27,6 @@ router.get('/recent', ProductController.getRecentProducts);
 // @query   limit (default: 6)
 // @access  Public
 router.get('/recent-by-category', ProductController.getRecentByCategory);
-
-// @route   GET /api/products/promotions
-// @desc    Obtener productos en promoción
-// @query   limit (default: 12)
-// @access  Public
-router.get('/promotions', ProductController.getPromotionalProducts);
 
 // @route   GET /api/products/best-promotions
 // @desc    Obtener mejores promociones (mayor descuento)
@@ -66,80 +44,42 @@ router.get('/categories', ProductController.getCategories);
 // @access  Public
 router.get('/brands', ProductController.getBrands);
 
-// @route   GET /api/products/size-systems
-// @desc    Obtener sistemas de tallas
+// @route   GET /api/products/search
+// @desc    Buscar productos
+// @query   query, categoria, marca, limit, offset
 // @access  Public
-router.get('/size-systems', ProductController.getSizeSystems);
+router.get('/search', ProductController.searchProducts);
+
+// @route   GET /api/products/category/:categoria
+// @desc    Obtener productos por categoría
+// @access  Public
+router.get('/category/:categoria', ProductController.getProductsByCategory);
 
 // @route   GET /api/products/:id
 // @desc    Obtener producto por ID con variantes, imágenes y stock
 // @access  Public
 router.get('/:id', ProductController.getProductById);
 
-// @route   GET /api/products/stock/:idProducto/:idVariante/:idTalla
-// @desc    Verificar stock específico
-// @access  Public
-router.get('/stock/:idProducto/:idVariante/:idTalla', ProductController.checkStock);
-
 // === RUTAS PARA ADMINISTRADORES ===
+
+// @route   GET /api/products/admin
+// @desc    Obtener todos los productos para administradores
+// @access  Private (Admin only)
+router.get('/admin', authMiddleware.verifyToken, authMiddleware.requireAdmin, ProductController.getAllProductsForAdmin);
 
 // @route   POST /api/products
 // @desc    Crear nuevo producto
 // @access  Private (Admin only)
-router.post(
-  '/',
-  authMiddleware,
-  [
-    check('nombre', 'El nombre del producto es obligatorio').not().isEmpty(),
-    check('categoria', 'La categoría es obligatoria').not().isEmpty(),
-    check('marca', 'La marca es obligatoria').not().isEmpty(),
-    check('id_sistema_talla', 'El sistema de tallas debe ser un número').optional().isNumeric()
-  ],
-  ProductController.createProduct
-);
+router.post('/', authMiddleware.verifyToken, authMiddleware.requireAdmin, ProductController.createProduct);
 
-// @route   POST /api/products/variants
-// @desc    Crear nueva variante de producto
+// @route   PUT /api/products/:id
+// @desc    Actualizar producto
 // @access  Private (Admin only)
-router.post(
-  '/variants',
-  authMiddleware,
-  [
-    check('id_producto', 'El ID del producto es obligatorio y debe ser un número').isNumeric(),
-    check('nombre', 'El nombre de la variante es obligatorio').not().isEmpty(),
-    check('precio', 'El precio es obligatorio y debe ser un número').isNumeric()
-  ],
-  ProductController.createVariant
-);
+router.put('/:id', authMiddleware.verifyToken, authMiddleware.requireAdmin, ProductController.updateProduct);
 
-// @route   POST /api/products/images
-// @desc    Agregar imagen a variante
+// @route   DELETE /api/products/:id
+// @desc    Eliminar producto
 // @access  Private (Admin only)
-router.post(
-  '/images',
-  authMiddleware,
-  [
-    check('id_variante', 'El ID de la variante es obligatorio y debe ser un número').isNumeric(),
-    check('url', 'La URL de la imagen es obligatoria').isURL(),
-    check('public_id', 'El public_id es obligatorio').not().isEmpty(),
-    check('orden', 'El orden debe ser un número').isNumeric()
-  ],
-  ProductController.addImageToVariant
-);
-
-// @route   PUT /api/products/stock
-// @desc    Actualizar stock de producto
-// @access  Private (Admin only)
-router.put(
-  '/stock',
-  authMiddleware,
-  [
-    check('id_producto', 'El ID del producto es obligatorio y debe ser un número').isNumeric(),
-    check('id_variante', 'El ID de la variante es obligatorio y debe ser un número').isNumeric(),
-    check('id_talla', 'El ID de la talla es obligatorio y debe ser un número').isNumeric(),
-    check('cantidad', 'La cantidad debe ser un número no negativo').isNumeric().custom(value => value >= 0)
-  ],
-  ProductController.updateStock
-);
+router.delete('/:id', authMiddleware.verifyToken, authMiddleware.requireAdmin, ProductController.deleteProduct);
 
 module.exports = router;

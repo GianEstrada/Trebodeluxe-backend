@@ -63,11 +63,11 @@ router.post(
 // @route   GET /api/auth/profile
 // @desc    Obtener perfil del usuario
 // @access  Private
-router.get('/profile', authMiddleware, getUserProfile);
+router.get('/profile', authMiddleware.verifyToken, getUserProfile);
 
 // @route   POST /api/auth/logout
 // @desc    Cerrar sesión del usuario
 // @access  Private
-router.post('/logout', authMiddleware, logoutUser);
+router.post('/logout', authMiddleware.verifyToken, logoutUser);
 
 module.exports = router;
