@@ -39,6 +39,15 @@ const SizesModel = {
       [id_sistema_talla, nombre_talla, orden]
     );
     return result.rows[0];
+  },
+  async deleteSize(id) {
+    try {
+      const result = await db.query('DELETE FROM tallas WHERE id = $1 RETURNING *', [id]);
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error en deleteSize:', error);
+      throw error;
+    }
   }
 };
 

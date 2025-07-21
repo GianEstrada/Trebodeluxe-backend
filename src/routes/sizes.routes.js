@@ -39,6 +39,10 @@ try {
   router.post('/', authMiddleware.verifyToken, authMiddleware.requireAdmin, SizesController.createSize);
   console.log('✅ Ruta POST / configurada');
 
+  // Eliminar una talla por ID
+  router.delete('/:id', authMiddleware.verifyToken, authMiddleware.requireAdmin, SizesController.deleteSize);
+  console.log('✅ Ruta DELETE /:id configurada');
+
   console.log('🎉 TODAS LAS RUTAS DE SIZES CONFIGURADAS CORRECTAMENTE');
 } catch (error) {
   console.error('❌ ERROR AL CONFIGURAR RUTAS SIZES:', error);

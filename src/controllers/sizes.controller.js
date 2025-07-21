@@ -34,6 +34,19 @@ const SizesController = {
     } catch (error) {
       res.status(500).json({ success: false, message: 'Error al crear talla', error: error.message });
     }
+  },
+  async deleteSize(req, res) {
+    try {
+      const { id } = req.params;
+      const deletedSize = await SizesModel.deleteSize(id);
+      if (deletedSize) {
+        res.json({ success: true, message: 'Talla eliminada correctamente', size: deletedSize });
+      } else {
+        res.status(404).json({ success: false, message: 'Talla no encontrada' });
+      }
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Error al eliminar talla', error: error.message });
+    }
   }
 };
 
