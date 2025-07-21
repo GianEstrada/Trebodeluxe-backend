@@ -50,6 +50,13 @@ router.get('/brands', ProductController.getBrands);
 // @access  Public
 router.get('/search', ProductController.searchProducts);
 
+// === RUTAS PARA ADMINISTRADORES ===
+
+// @route   GET /api/products/admin
+// @desc    Obtener todos los productos para administradores
+// @access  Private (Admin only)
+router.get('/admin', authMiddleware.verifyToken, authMiddleware.requireAdmin, ProductController.getAllProductsForAdmin);
+
 // @route   GET /api/products/category/:categoria
 // @desc    Obtener productos por categoría
 // @access  Public
@@ -59,13 +66,6 @@ router.get('/category/:categoria', ProductController.getProductsByCategory);
 // @desc    Obtener producto por ID con variantes, imágenes y stock
 // @access  Public
 router.get('/:id', ProductController.getProductById);
-
-// === RUTAS PARA ADMINISTRADORES ===
-
-// @route   GET /api/products/admin
-// @desc    Obtener todos los productos para administradores
-// @access  Private (Admin only)
-router.get('/admin', authMiddleware.verifyToken, authMiddleware.requireAdmin, ProductController.getAllProductsForAdmin);
 
 // @route   POST /api/products
 // @desc    Crear nuevo producto
