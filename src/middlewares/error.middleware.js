@@ -1,6 +1,7 @@
 // Middleware para manejar rutas no encontradas
 const notFound = (req, res, next) => {
-  const error = new Error(`Ruta no encontrada - ${req.originalUrl}`);
+  console.log(`❌ Ruta no encontrada: ${req.method} ${req.originalUrl}`);
+  const error = new Error(`Ruta no encontrada: ${req.method} ${req.originalUrl}`);
   res.status(404);
   next(error);
 };

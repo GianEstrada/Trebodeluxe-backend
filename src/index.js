@@ -81,13 +81,21 @@ app.get('/api/health', async (req, res) => {
 });
 
 // Rutas de la API
+console.log('Registrando rutas de la API...');
 app.use('/api/auth', authRoutes);
+console.log('✅ Rutas auth registradas');
 app.use('/api/users', userRoutes);
+console.log('✅ Rutas users registradas');
 app.use('/api/shipping', shippingRoutes);
+console.log('✅ Rutas shipping registradas');
 app.use('/api/products', productRoutes);
+console.log('✅ Rutas products registradas');
 app.use('/api/promotions', promotionRoutes);
+console.log('✅ Rutas promotions registradas');
 console.log('Registrando rutas /api/sizes...');
 app.use('/api/sizes', sizesRoutes);
+console.log('✅ Rutas sizes registradas');
+console.log('Todas las rutas de la API han sido registradas.');
 
 // Middlewares de manejo de errores
 app.use(notFound);
