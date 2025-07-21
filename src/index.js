@@ -104,7 +104,18 @@ app.use(errorHandler);
 // Iniciar servidor
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`Servidor ejecutándose en modo ${process.env.NODE_ENV} en el puerto ${PORT}`);
+  console.log(`🚀 Servidor ejecutándose en modo ${process.env.NODE_ENV} en el puerto ${PORT}`);
+  console.log(`⏰ Timestamp: ${new Date().toISOString()}`);
+  console.log(`📋 Commit actual esperado: 07fbd7f - Add test route for sizes`);
+  console.log(`\n🛣️  Rutas disponibles:`);
+  console.log(`- GET  /api/health`);
+  console.log(`- POST /api/auth/register`);
+  console.log(`- POST /api/auth/login`);
+  console.log(`- GET  /api/auth/profile (protegida)`);
+  console.log(`- GET  /api/sizes/test (nuevo)`);
+  console.log(`- GET  /api/sizes/systems (nuevo)`);
+  console.log(`- GET  /api/sizes (nuevo)`);
+  console.log(`\n⚠️  Si no ves los logs de configuración de sizes arriba, hay un problema de deploy.`);
 });
 
 module.exports = app;
