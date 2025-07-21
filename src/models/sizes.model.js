@@ -42,7 +42,7 @@ const SizesModel = {
   },
   async deleteSize(id) {
     try {
-      const result = await db.query('DELETE FROM tallas WHERE id = $1 RETURNING *', [id]);
+      const result = await db.query('DELETE FROM tallas WHERE id_talla = $1 RETURNING *', [id]);
       return result.rows[0];
     } catch (error) {
       console.error('Error en deleteSize:', error);
