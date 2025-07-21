@@ -94,8 +94,15 @@ console.log('✅ Rutas products registradas');
 app.use('/api/promotions', promotionRoutes);
 console.log('✅ Rutas promotions registradas');
 console.log('Importando y registrando rutas de sizes...');
-app.use('/api/sizes', sizesRoutes);
-console.log('Rutas de sizes registradas exitosamente.');
+try {
+  console.log('Intentando importar sizes.routes.js...');
+  const sizesRoutes = require('./routes/sizes.routes');
+  console.log('✅ sizes.routes.js importado correctamente.');
+  app.use('/api/sizes', sizesRoutes);
+  console.log('✅ Rutas de sizes registradas exitosamente.');
+} catch (error) {
+  console.error('❌ Error al importar sizes.routes.js:', error);
+}
 console.log('Todas las rutas de la API han sido registradas.');
 
 // Listar archivos en el directorio routes
