@@ -7,6 +7,8 @@ const path = require('path');
 const db = require('./config/db');
 const fs = require('fs');
 
+console.log("🚀 Starting server from the latest index.js - Version:", new Date().toISOString());
+
 // Cargar variables de entorno
 dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
 if (!process.env.DATABASE_URL) {
