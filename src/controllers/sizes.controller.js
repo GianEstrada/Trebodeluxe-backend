@@ -2,6 +2,7 @@ const SizesModel = require('../models/sizes.model');
 
 const SizesController = {
   async getAllSystems(req, res) {
+    console.log('SizesController.getAllSystems llamado');
     try {
       const systems = await SizesModel.getAllSystems();
       res.json({ success: true, size_systems: systems });
@@ -10,6 +11,7 @@ const SizesController = {
     }
   },
   async getAllSizes(req, res) {
+    console.log('SizesController.getAllSizes llamado');
     try {
       const sizes = await SizesModel.getAllSizes();
       res.json({ success: true, sizes });

@@ -86,6 +86,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/shipping', shippingRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/promotions', promotionRoutes);
+console.log('Registrando rutas /api/sizes...');
 app.use('/api/sizes', sizesRoutes);
 
 // Middlewares de manejo de errores
