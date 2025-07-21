@@ -5,6 +5,7 @@ const morgan = require('morgan');
 const dotenv = require('dotenv');
 const path = require('path');
 const db = require('./config/db');
+const fs = require('fs');
 
 // Cargar variables de entorno
 dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
@@ -96,6 +97,10 @@ console.log('Importando y registrando rutas de sizes...');
 app.use('/api/sizes', sizesRoutes);
 console.log('Rutas de sizes registradas exitosamente.');
 console.log('Todas las rutas de la API han sido registradas.');
+
+// Listar archivos en el directorio routes
+const routesPath = path.join(__dirname, 'routes');
+console.log('Archivos en el directorio routes:', fs.readdirSync(routesPath));
 
 // Middlewares de manejo de errores
 app.use(notFound);

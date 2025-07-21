@@ -39,6 +39,9 @@ try {
   router.post('/', authMiddleware.verifyToken, authMiddleware.requireAdmin, SizesController.createSize);
   console.log('✅ Ruta POST / configurada');
 
+  // Error intencional para verificar ejecución
+  throw new Error('Error intencional en sizes.routes.js para verificar ejecución.');
+
   console.log('🎉 TODAS LAS RUTAS DE SIZES CONFIGURADAS CORRECTAMENTE');
 } catch (error) {
   console.error('❌ ERROR AL CONFIGURAR RUTAS SIZES:', error);
