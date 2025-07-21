@@ -92,9 +92,9 @@ app.use('/api/products', productRoutes);
 console.log('✅ Rutas products registradas');
 app.use('/api/promotions', promotionRoutes);
 console.log('✅ Rutas promotions registradas');
-console.log('Registrando rutas /api/sizes...');
+console.log('Importando y registrando rutas de sizes...');
 app.use('/api/sizes', sizesRoutes);
-console.log('✅ Rutas sizes registradas');
+console.log('Rutas de sizes registradas exitosamente.');
 console.log('Todas las rutas de la API han sido registradas.');
 
 // Middlewares de manejo de errores
