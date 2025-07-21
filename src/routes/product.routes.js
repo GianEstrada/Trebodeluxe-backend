@@ -50,6 +50,18 @@ router.get('/brands', ProductController.getBrands);
 // @access  Public
 router.get('/search', ProductController.searchProducts);
 
+// @route   GET /api/products/catalog
+// @desc    Obtener productos para catálogo con paginación e imágenes
+// @query   limit, offset, categoria, sortBy, sortOrder
+// @access  Public
+router.get('/catalog', ProductController.getCatalog);
+
+// @route   GET /api/products/featured
+// @desc    Obtener productos destacados para página principal
+// @query   limit (default: 12)
+// @access  Public
+router.get('/featured', ProductController.getFeatured);
+
 // === RUTAS PARA ADMINISTRADORES ===
 
 // @route   GET /api/products/admin

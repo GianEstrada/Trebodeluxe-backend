@@ -7,6 +7,9 @@ const authMiddleware = require('../middlewares/auth.middleware');
 
 // Rutas públicas
 router.get('/active', PromotionController.getActivePromotions);
+router.get('/homepage', PromotionController.getHomepagePromotions);
+router.get('/category/:categoria', PromotionController.getPromotionsByCategory);
+router.get('/:id_promocion/products', PromotionController.getPromotionProducts);
 router.get('/validate/:codigo', PromotionController.validatePromotionCode);
 router.get('/applicable/:productId/:categoria', PromotionController.getApplicablePromotions);
 

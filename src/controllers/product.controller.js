@@ -412,6 +412,85 @@ class ProductController {
       });
     }
   }
+
+  // Obtener productos para catálogo con paginación
+  static async getCatalog(req, res) {
+    try {
+      const { 
+        limit = 20, 
+        offset = 0, 
+        categoria = null, 
+        sortBy = 'fecha_creacion', 
+        sortOrder = 'DESC' 
+      } = req.query;
+
+      const result = await ProductModel.getCatalog(
+        parseInt(limit), 
+        parseInt(offset), 
+        categoria, 
+        sortBy, 
+        sortOrder
+      );
+
+      res.json({
+        success: true,
+        message: 'Catálogo obtenido exitosamente',
+        data: result
+      });
+
+    } catch (error) {
+      console.error('Error en getCatalog:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener el catálogo',
+        error: error.message
+      });
+    }
+  }
+
+  // Obtener productos destacados
+  static async getFeatured(req, res) {
+    try {
+      const { limit = 12 } = req.query;
+
+      const products = await ProductModel.getFeatured(parseInt(limit));
+
+      res.json({
+        success: true,
+        message: 'Productos destacados obtenidos exitosamente',
+        data: products
+      });
+
+    } catch (error) {
+      console.error('Error en getFeatured:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener productos destacados',
+        error: error.message
+      });
+    }
+  }
+
+  // Obtener categorías disponibles
+  static async getCategories(req, res) {
+    try {
+      const categories = await ProductModel.getCategories();
+
+      res.json({
+        success: true,
+        message: 'Categorías obtenidas exitosamente',
+        data: categories
+      });
+
+    } catch (error) {
+      console.error('Error en getCategories:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener categorías',
+        error: error.message
+      });
+    }
+  }
 }
 
 module.exports = ProductController;

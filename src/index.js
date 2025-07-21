@@ -22,6 +22,7 @@ const shippingRoutes = require('./routes/shipping.routes');
 const productRoutes = require('./routes/product.routes');
 const promotionRoutes = require('./routes/promotion.routes');
 const sizesRoutes = require('./routes/sizes.routes');
+const imageRoutes = require('./routes/image.routes');
 
 // Importar middlewares
 const { notFound, errorHandler } = require('./middlewares/error.middleware');
@@ -95,6 +96,8 @@ app.use('/api/products', productRoutes);
 console.log('✅ Rutas products registradas');
 app.use('/api/promotions', promotionRoutes);
 console.log('✅ Rutas promotions registradas');
+app.use('/api/images', imageRoutes);
+console.log('✅ Rutas images registradas');
 console.log('Importando y registrando rutas de sizes...');
 try {
   console.log('Intentando importar sizes.routes.js...');

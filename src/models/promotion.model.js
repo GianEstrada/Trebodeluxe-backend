@@ -330,6 +330,161 @@ class PromotionModel {
       throw error;
     }
   }
+
+  // Obtener promociones para la página principal con imágenes de productos
+  static async getHomepagePromotions(limit = 5) {
+    try {
+      const query = `
+        SELECT DISTINCT
+          p.id_promocion,
+          p.nombre,
+          p.tipo,
+          p.fecha_inicio,
+          p.fecha_fin,
+          p.uso_maximo,
+          p.veces_usado,
+          CASE 
+            WHEN p.tipo = 'x_por_y' THEN 
+              json_build_object(
+                'cantidad_comprada', pxy.cantidad_comprada,
+                'cantidad_pagada', pxy.cantidad_pagada
+              )
+            WHEN p.tipo = 'porcentaje' THEN 
+              json_build_object(
+                'porcentaje', pp.porcentaje
+              )
+            WHEN p.tipo = 'codigo' THEN 
+              json_build_object(
+                'codigo', pc.codigo,
+                'descuento', pc.descuento,
+                'tipo_descuento', pc.tipo_descuento
+              )
+          END as detalles,
+          -- Imagen de ejemplo del primer producto aplicable
+          iv.url as imagen_ejemplo,
+          iv.public_id as imagen_public_id,
+          prod.nombre as producto_ejemplo,
+          prod.categoria as categoria_ejemplo
+        FROM promociones p
+        LEFT JOIN promo_x_por_y pxy ON p.id_promocion = pxy.id_promocion
+        LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion
+        LEFT JOIN promo_codigo pc ON p.id_promocion = pc.id_promocion
+        LEFT JOIN promocion_aplicacion pa ON p.id_promocion = pa.id_promocion
+        LEFT JOIN productos prod ON (
+          (pa.tipo_objetivo = 'producto' AND pa.id_producto = prod.id_producto) OR
+          (pa.tipo_objetivo = 'categoria' AND prod.categoria = pa.id_categoria) OR
+          (pa.tipo_objetivo = 'todos')
+        )
+        LEFT JOIN variantes v ON prod.id_producto = v.id_producto AND v.activo = true
+        LEFT JOIN imagenes_variante iv ON v.id_variante = iv.id_variante AND iv.orden = 1
+        WHERE p.activo = true 
+          AND p.fecha_inicio <= NOW() 
+          AND p.fecha_fin >= NOW()
+          AND prod.activo = true
+        ORDER BY p.fecha_creacion DESC
+        LIMIT $1
+      `;
+
+      const result = await db.query(query, [limit]);
+      return result.rows;
+
+    } catch (error) {
+      console.error('Error en getHomepagePromotions:', error);
+      throw error;
+    }
+  }
+
+  // Obtener productos aplicables a una promoción específica
+  static async getPromotionProducts(id_promocion, limit = 10) {
+    try {
+      const query = `
+        SELECT DISTINCT
+          prod.id_producto,
+          prod.nombre,
+          prod.categoria,
+          prod.marca,
+          v.precio,
+          v.precio_original,
+          CASE 
+            WHEN v.precio_original IS NOT NULL AND v.precio_original > v.precio 
+            THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
+            ELSE NULL
+          END as descuento_actual,
+          iv.url as imagen_principal,
+          iv.public_id as imagen_public_id
+        FROM promociones p
+        JOIN promocion_aplicacion pa ON p.id_promocion = pa.id_promocion
+        JOIN productos prod ON (
+          (pa.tipo_objetivo = 'producto' AND pa.id_producto = prod.id_producto) OR
+          (pa.tipo_objetivo = 'categoria' AND prod.categoria = pa.id_categoria) OR
+          (pa.tipo_objetivo = 'todos')
+        )
+        JOIN variantes v ON prod.id_producto = v.id_producto AND v.activo = true
+        LEFT JOIN imagenes_variante iv ON v.id_variante = iv.id_variante AND iv.orden = 1
+        WHERE p.id_promocion = $1
+          AND p.activo = true
+          AND prod.activo = true
+        ORDER BY v.precio ASC
+        LIMIT $2
+      `;
+
+      const result = await db.query(query, [id_promocion, limit]);
+      return result.rows;
+
+    } catch (error) {
+      console.error('Error en getPromotionProducts:', error);
+      throw error;
+    }
+  }
+
+  // Obtener promociones por categoría con imágenes
+  static async getPromotionsByCategory(categoria) {
+    try {
+      const query = `
+        SELECT DISTINCT
+          p.*,
+          CASE 
+            WHEN p.tipo = 'x_por_y' THEN 
+              json_build_object(
+                'cantidad_comprada', pxy.cantidad_comprada,
+                'cantidad_pagada', pxy.cantidad_pagada
+              )
+            WHEN p.tipo = 'porcentaje' THEN 
+              json_build_object(
+                'porcentaje', pp.porcentaje
+              )
+          END as detalles,
+          iv.url as imagen_ejemplo,
+          iv.public_id as imagen_public_id,
+          prod.nombre as producto_ejemplo
+        FROM promociones p
+        LEFT JOIN promo_x_por_y pxy ON p.id_promocion = pxy.id_promocion
+        LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion
+        JOIN promocion_aplicacion pa ON p.id_promocion = pa.id_promocion
+        LEFT JOIN productos prod ON (
+          (pa.tipo_objetivo = 'producto' AND pa.id_producto = prod.id_producto) OR
+          (pa.tipo_objetivo = 'categoria' AND prod.categoria = pa.id_categoria) OR
+          (pa.tipo_objetivo = 'todos')
+        )
+        LEFT JOIN variantes v ON prod.id_producto = v.id_producto AND v.activo = true
+        LEFT JOIN imagenes_variante iv ON v.id_variante = iv.id_variante AND iv.orden = 1
+        WHERE p.activo = true 
+          AND p.fecha_inicio <= NOW() 
+          AND p.fecha_fin >= NOW()
+          AND (pa.tipo_objetivo = 'todos' OR 
+               (pa.tipo_objetivo = 'categoria' AND pa.id_categoria = $1))
+          AND prod.activo = true
+        ORDER BY p.fecha_creacion DESC
+      `;
+
+      const result = await db.query(query, [categoria]);
+      return result.rows;
+
+    } catch (error) {
+      console.error('Error en getPromotionsByCategory:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = PromotionModel;

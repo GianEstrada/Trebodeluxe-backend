@@ -275,6 +275,79 @@ class PromotionController {
       });
     }
   }
+
+  // Obtener promociones para página principal con imágenes
+  static async getHomepagePromotions(req, res) {
+    try {
+      const { limit = 5 } = req.query;
+
+      const promotions = await PromotionModel.getHomepagePromotions(parseInt(limit));
+
+      res.json({
+        success: true,
+        message: 'Promociones para página principal obtenidas exitosamente',
+        data: promotions
+      });
+
+    } catch (error) {
+      console.error('Error en getHomepagePromotions:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener promociones para página principal',
+        error: error.message
+      });
+    }
+  }
+
+  // Obtener productos de una promoción específica
+  static async getPromotionProducts(req, res) {
+    try {
+      const { id_promocion } = req.params;
+      const { limit = 10 } = req.query;
+
+      const products = await PromotionModel.getPromotionProducts(
+        parseInt(id_promocion), 
+        parseInt(limit)
+      );
+
+      res.json({
+        success: true,
+        message: 'Productos de la promoción obtenidos exitosamente',
+        data: products
+      });
+
+    } catch (error) {
+      console.error('Error en getPromotionProducts:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener productos de la promoción',
+        error: error.message
+      });
+    }
+  }
+
+  // Obtener promociones por categoría con imágenes
+  static async getPromotionsByCategory(req, res) {
+    try {
+      const { categoria } = req.params;
+
+      const promotions = await PromotionModel.getPromotionsByCategory(categoria);
+
+      res.json({
+        success: true,
+        message: 'Promociones por categoría obtenidas exitosamente',
+        data: promotions
+      });
+
+    } catch (error) {
+      console.error('Error en getPromotionsByCategory:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener promociones por categoría',
+        error: error.message
+      });
+    }
+  }
 }
 
 module.exports = PromotionController;

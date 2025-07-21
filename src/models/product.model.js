@@ -606,6 +606,168 @@ class ProductModel {
       throw error;
     }
   }
+
+  // Obtener productos para catálogo con imagen principal
+  static async getCatalog(limit = 20, offset = 0, categoria = null, sortBy = 'fecha_creacion', sortOrder = 'DESC') {
+    try {
+      let whereClause = 'WHERE p.activo = true';
+      let params = [limit, offset];
+      let paramIndex = 3;
+
+      if (categoria) {
+        whereClause += ` AND p.categoria = $${paramIndex}`;
+        params.push(categoria);
+        paramIndex++;
+      }
+
+      // Validar sortBy para evitar inyección SQL
+      const validSortFields = ['fecha_creacion', 'nombre', 'precio_min', 'categoria'];
+      const validSortOrder = ['ASC', 'DESC'];
+      
+      if (!validSortFields.includes(sortBy)) sortBy = 'fecha_creacion';
+      if (!validSortOrder.includes(sortOrder.toUpperCase())) sortOrder = 'DESC';
+
+      const query = `
+        SELECT DISTINCT ON (p.id_producto)
+          p.id_producto,
+          p.nombre,
+          p.descripcion,
+          p.categoria,
+          p.marca,
+          p.fecha_creacion,
+          v.precio as precio_min,
+          v.precio_original,
+          CASE 
+            WHEN v.precio_original IS NOT NULL AND v.precio_original > v.precio 
+            THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
+            ELSE NULL
+          END as descuento_porcentaje,
+          iv.url as imagen_principal,
+          iv.public_id as imagen_public_id,
+          COALESCE(stock_total.total, 0) as stock_disponible
+        FROM productos p
+        JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+        LEFT JOIN imagenes_variante iv ON v.id_variante = iv.id_variante AND iv.orden = 1
+        LEFT JOIN (
+          SELECT 
+            s.id_producto,
+            SUM(s.cantidad) as total
+          FROM stock s
+          GROUP BY s.id_producto
+        ) stock_total ON p.id_producto = stock_total.id_producto
+        ${whereClause}
+        ORDER BY p.id_producto, v.precio ASC
+        LIMIT $1 OFFSET $2
+      `;
+
+      console.log('Query catálogo:', query);
+      console.log('Parámetros:', params);
+
+      const result = await db.query(query, params);
+      
+      // Obtener total de productos para paginación
+      const countQuery = `
+        SELECT COUNT(DISTINCT p.id_producto) as total
+        FROM productos p
+        JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+        ${categoria ? 'WHERE p.activo = true AND p.categoria = $1' : 'WHERE p.activo = true'}
+      `;
+
+      const countParams = categoria ? [categoria] : [];
+      const countResult = await db.query(countQuery, countParams);
+      
+      return {
+        products: result.rows,
+        total: parseInt(countResult.rows[0].total),
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        hasMore: parseInt(offset) + parseInt(limit) < parseInt(countResult.rows[0].total)
+      };
+
+    } catch (error) {
+      console.error('Error en getCatalog:', error);
+      throw error;
+    }
+  }
+
+  // Obtener productos destacados para página principal
+  static async getFeatured(limit = 12) {
+    try {
+      const query = `
+        SELECT DISTINCT ON (p.id_producto)
+          p.id_producto,
+          p.nombre,
+          p.descripcion,
+          p.categoria,
+          p.marca,
+          v.precio as precio_min,
+          v.precio_original,
+          CASE 
+            WHEN v.precio_original IS NOT NULL AND v.precio_original > v.precio 
+            THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
+            ELSE NULL
+          END as descuento_porcentaje,
+          iv.url as imagen_principal,
+          iv.public_id as imagen_public_id,
+          COALESCE(stock_total.total, 0) as stock_disponible
+        FROM productos p
+        JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+        LEFT JOIN imagenes_variante iv ON v.id_variante = iv.id_variante AND iv.orden = 1
+        LEFT JOIN (
+          SELECT 
+            s.id_producto,
+            SUM(s.cantidad) as total
+          FROM stock s
+          GROUP BY s.id_producto
+        ) stock_total ON p.id_producto = stock_total.id_producto
+        WHERE p.activo = true AND COALESCE(stock_total.total, 0) > 0
+        ORDER BY p.id_producto, v.precio ASC, p.fecha_creacion DESC
+        LIMIT $1
+      `;
+
+      const result = await db.query(query, [limit]);
+      return result.rows;
+
+    } catch (error) {
+      console.error('Error en getFeatured:', error);
+      throw error;
+    }
+  }
+
+  // Obtener productos por categoría
+  static async getByCategory(categoria, limit = 20, offset = 0) {
+    try {
+      return await this.getCatalog(limit, offset, categoria);
+    } catch (error) {
+      console.error('Error en getByCategory:', error);
+      throw error;
+    }
+  }
+
+  // Obtener categorías disponibles
+  static async getCategories() {
+    try {
+      const query = `
+        SELECT 
+          p.categoria,
+          COUNT(DISTINCT p.id_producto) as total_productos,
+          COUNT(DISTINCT v.id_variante) FILTER (WHERE v.activo = true) as variantes_activas
+        FROM productos p
+        LEFT JOIN variantes v ON p.id_producto = v.id_producto
+        WHERE p.activo = true AND p.categoria IS NOT NULL
+        GROUP BY p.categoria
+        HAVING COUNT(DISTINCT p.id_producto) > 0
+        ORDER BY p.categoria ASC
+      `;
+
+      const result = await db.query(query);
+      return result.rows;
+
+    } catch (error) {
+      console.error('Error en getCategories:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = ProductModel;
