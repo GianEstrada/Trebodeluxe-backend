@@ -6,6 +6,17 @@ const SizesController = require('../controllers/sizes.controller');
 console.log('🚀 INICIANDO CONFIGURACIÓN DE RUTAS SIZES...');
 
 try {
+  // Ruta de prueba simple
+  router.get('/test', (req, res) => {
+    console.log('📡 Ruta de prueba /api/sizes/test llamada');
+    res.json({ 
+      success: true, 
+      message: 'Sizes routes funcionando correctamente',
+      timestamp: new Date().toISOString()
+    });
+  });
+  console.log('✅ Ruta GET /test configurada');
+
   // Obtener todos los sistemas de tallas
   router.get('/systems', (req, res, next) => {
     console.log('📡 Ruta /api/sizes/systems llamada');
