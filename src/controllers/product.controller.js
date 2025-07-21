@@ -96,7 +96,13 @@ class ProductController {
   static async getRecentByCategory(req, res) {
     try {
       const limit = parseInt(req.query.limit) || 4;
-      const productsByCategory = await ProductModel.getRecentByCategory(limit);
+      const categoriesArray = await ProductModel.getRecentByCategory(limit);
+      
+      // Transformar array a objeto para que el frontend lo pueda consumir correctamente
+      const productsByCategory = {};
+      categoriesArray.forEach(category => {
+        productsByCategory[category.categoria] = category.productos;
+      });
       
       res.status(200).json({
         success: true,
