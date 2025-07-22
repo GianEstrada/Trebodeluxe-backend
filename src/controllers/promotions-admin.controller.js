@@ -40,7 +40,7 @@ class PromotionsController {
         LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion
         LEFT JOIN promo_codigo pc ON p.id_promocion = pc.id_promocion
         ${whereClause}
-        ORDER BY p.fecha_creacion DESC
+        ORDER BY p.id_promocion DESC
         LIMIT $${paramCount++} OFFSET $${paramCount}
       `;
       
@@ -453,7 +453,7 @@ class PromotionsController {
           AND p.fecha_inicio <= CURRENT_TIMESTAMP 
           AND p.fecha_fin >= CURRENT_TIMESTAMP
           AND (p.uso_maximo IS NULL OR p.veces_usado < p.uso_maximo)
-        ORDER BY p.fecha_creacion DESC
+        ORDER BY p.id_promocion DESC
       `;
       
       const result = await db.pool.query(query);
