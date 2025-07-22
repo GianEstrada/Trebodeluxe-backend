@@ -27,7 +27,7 @@ process.on('unhandledRejection', (error) => {
 });
 
 // Cargar variables de entorno
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '.env') });
 console.log('Variables de entorno cargadas');
 console.log('NODE_ENV:', process.env.NODE_ENV);
 console.log('Puerto configurado:', process.env.PORT);
@@ -44,6 +44,7 @@ try {
   const userRoutes = require('./src/routes/user.routes');
   const shippingRoutes = require('./src/routes/shipping.routes');
   const sizesRoutes = require('./src/routes/sizes.routes');
+  const adminProductRoutes = require('./src/routes/admin.product.routes');
   
   // Crear la aplicación Express
   console.log('Creando aplicación Express...');
@@ -112,6 +113,7 @@ try {
   app.use('/api/shipping', shippingRoutes);
   app.use('/api/sizes', sizesRoutes);
   app.use('/api/products', require('./src/routes/product.routes'));
+  app.use('/api/admin/products', adminProductRoutes);
 
   // Middleware para rutas no encontradas
   app.use((req, res) => {
