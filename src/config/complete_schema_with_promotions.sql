@@ -4,6 +4,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Eliminar tablas si existen (en orden inverso de dependencias)
+DROP TABLE IF EXISTS notas_generales CASCADE;
 DROP TABLE IF EXISTS seguimiento_envio CASCADE;
 DROP TABLE IF EXISTS pedido_detalle CASCADE;
 DROP TABLE IF EXISTS pedidos CASCADE;
@@ -97,6 +98,12 @@ CREATE TRIGGER trigger_actualizar_fecha_configuraciones
 DROP TRIGGER IF EXISTS trigger_actualizar_fecha_imagenes ON imagenes_principales;
 CREATE TRIGGER trigger_actualizar_fecha_imagenes
     BEFORE UPDATE ON imagenes_principales
+    FOR EACH ROW EXECUTE FUNCTION actualizar_fecha_modificacion();
+
+-- Trigger para actualizar fecha automáticamente en notas generales
+DROP TRIGGER IF EXISTS trigger_actualizar_fecha_notas ON notas_generales;
+CREATE TRIGGER trigger_actualizar_fecha_notas
+    BEFORE UPDATE ON notas_generales
     FOR EACH ROW EXECUTE FUNCTION actualizar_fecha_modificacion();
 
 -- ==== SISTEMA DE TALLAS ====
@@ -245,6 +252,23 @@ CREATE TABLE seguimiento_envio (
     estado_envio VARCHAR(50) -- Ej: en tránsito, entregado, etc.
 );
 
+-- ==== NOTAS GENERALES ====
+CREATE TABLE notas_generales (
+    id_nota SERIAL PRIMARY KEY,
+    titulo VARCHAR(200) NOT NULL,
+    contenido TEXT NOT NULL,
+    prioridad VARCHAR(20) NOT NULL DEFAULT 'normal' CHECK (prioridad IN ('baja', 'normal', 'alta', 'urgente')),
+    id_usuario_creador INTEGER REFERENCES usuarios(id_usuario) ON DELETE SET NULL,
+    nombre_usuario_creador VARCHAR(100), -- Para preservar el nombre aunque se elimine el usuario
+    rol_usuario_creador VARCHAR(20), -- Para preservar el rol
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    activo BOOLEAN DEFAULT true,
+    fecha_vencimiento TIMESTAMP, -- Para notas con fecha límite
+    etiquetas TEXT[], -- Array de etiquetas para categorización
+    color VARCHAR(20) DEFAULT 'default' -- Para personalización visual
+);
+
 -- ==== ÍNDICES PARA RENDIMIENTO ====
 
 CREATE INDEX idx_usuarios_correo ON usuarios(correo);
@@ -266,6 +290,11 @@ CREATE INDEX idx_promocion_aplicacion_producto ON promocion_aplicacion(id_produc
 CREATE INDEX idx_imagenes_principales_tipo ON imagenes_principales(tipo);
 CREATE INDEX idx_imagenes_principales_activo ON imagenes_principales(activo);
 CREATE INDEX idx_imagenes_principales_orden ON imagenes_principales(orden);
+CREATE INDEX idx_notas_generales_prioridad ON notas_generales(prioridad);
+CREATE INDEX idx_notas_generales_fecha_creacion ON notas_generales(fecha_creacion);
+CREATE INDEX idx_notas_generales_activo ON notas_generales(activo);
+CREATE INDEX idx_notas_generales_usuario_creador ON notas_generales(id_usuario_creador);
+CREATE INDEX idx_notas_generales_fecha_vencimiento ON notas_generales(fecha_vencimiento);
 
 
 -- ==== DATOS DE PRUEBA ====
@@ -580,5 +609,122 @@ INSERT INTO pedido_detalle (id_pedido, id_producto, id_variante, id_talla, canti
     (11, 5, 10, 3, 3, 19.99),
     (11, 6, 13, 1, 2, 15.99),
     (12, 1, 1, 3, 1, 29.99);
+
+-- ==== DATOS DE PRUEBA PARA NOTAS GENERALES ====
+-- Insertar notas generales de ejemplo
+INSERT INTO notas_generales (titulo, contenido, prioridad, id_usuario_creador, nombre_usuario_creador, rol_usuario_creador, fecha_creacion, fecha_vencimiento, etiquetas, color) VALUES 
+    -- Notas urgentes
+    ('Sistema de Pagos - Mantenimiento', 
+     'El sistema de pagos estará en mantenimiento el próximo viernes de 2:00 AM a 4:00 AM. Informar a todos los clientes y preparar mensaje en el sitio web.',
+     'urgente', 
+     1, 
+     'Juan Carlos Pérez López',
+     'admin',
+     NOW() - INTERVAL '2 hours',
+     NOW() + INTERVAL '3 days',
+     ARRAY['mantenimiento', 'pagos', 'sistema'],
+     'red'),
+     
+    ('Inventario Crítico - Sneakers Urban Pro',
+     'El stock de Sneakers Urban Pro está por agotarse. Quedan menos de 10 unidades. Contactar al proveedor inmediatamente para realizar pedido urgente.',
+     'urgente',
+     2,
+     'María Elena García Martínez',
+     'admin',
+     NOW() - INTERVAL '4 hours',
+     NOW() + INTERVAL '1 day',
+     ARRAY['inventario', 'stock', 'proveedor'],
+     'orange'),
+     
+    -- Notas de alta prioridad
+    ('Nueva Campaña Publicitaria',
+     'Lanzar campaña de redes sociales para la nueva colección de verano. Presupuesto aprobado: $5,000. Coordinar con equipo de marketing.',
+     'alta',
+     1,
+     'Juan Carlos Pérez López',
+     'admin',
+     NOW() - INTERVAL '1 day',
+     NOW() + INTERVAL '7 days',
+     ARRAY['marketing', 'campaña', 'redes sociales'],
+     'purple'),
+     
+    ('Actualización de Precios Q2',
+     'Revisar y actualizar precios de toda la línea de productos para el segundo trimestre. Considerar inflación y costos de proveedores.',
+     'alta',
+     3,
+     'Carlos Rodríguez Silva',
+     'admin',
+     NOW() - INTERVAL '6 hours',
+     NOW() + INTERVAL '2 weeks',
+     ARRAY['precios', 'productos', 'trimestre'],
+     'blue'),
+     
+    -- Notas normales
+    ('Reunión Semanal de Ventas',
+     'Reunión todos los lunes a las 10:00 AM para revisar métricas de ventas, pedidos pendientes y objetivos de la semana.',
+     'normal',
+     2,
+     'María Elena García Martínez',
+     'admin',
+     NOW() - INTERVAL '2 days',
+     NULL,
+     ARRAY['reunión', 'ventas', 'semanal'],
+     'green'),
+     
+    ('Capacitación Nuevo Sistema',
+     'Programar capacitación para todo el equipo sobre las nuevas funcionalidades del sistema de gestión de pedidos implementado.',
+     'normal',
+     1,
+     'Juan Carlos Pérez López',
+     'admin',
+     NOW() - INTERVAL '12 hours',
+     NOW() + INTERVAL '10 days',
+     ARRAY['capacitación', 'equipo', 'sistema'],
+     'blue'),
+     
+    ('Feedback Cliente Premium',
+     'El cliente premium Juan Carlos Pérez ha sugerido implementar un sistema de puntos por lealtad. Evaluar viabilidad y costos.',
+     'normal',
+     4,
+     'Ana Invitada',
+     'moderator',
+     NOW() - INTERVAL '3 days',
+     NOW() + INTERVAL '1 month',
+     ARRAY['feedback', 'cliente', 'lealtad'],
+     'yellow'),
+     
+    -- Notas de baja prioridad
+    ('Actualizar Fotos de Productos',
+     'Algunas fotos de productos están desactualizadas. Programar sesión fotográfica para productos de las categorías Camisetas y Pantalones.',
+     'baja',
+     2,
+     'María Elena García Martínez',
+     'admin',
+     NOW() - INTERVAL '5 days',
+     NOW() + INTERVAL '1 month',
+     ARRAY['fotos', 'productos', 'actualización'],
+     'default'),
+     
+    ('Optimizar SEO del Sitio Web',
+     'Mejorar el SEO de las páginas de productos y categorías. Revisar meta descriptions, títulos y alt text de imágenes.',
+     'baja',
+     3,
+     'Carlos Rodríguez Silva',
+     'admin',
+     NOW() - INTERVAL '1 week',
+     NOW() + INTERVAL '2 months',
+     ARRAY['SEO', 'web', 'optimización'],
+     'default'),
+     
+    ('Evaluación Proveedores',
+     'Realizar evaluación anual de todos los proveedores. Considerar calidad, precios, tiempos de entrega y servicio al cliente.',
+     'baja',
+     1,
+     'Juan Carlos Pérez López',
+     'admin',
+     NOW() - INTERVAL '2 weeks',
+     NOW() + INTERVAL '3 months',
+     ARRAY['proveedores', 'evaluación', 'anual'],
+     'default');
 
 COMMIT;
