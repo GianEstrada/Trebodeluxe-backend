@@ -46,6 +46,8 @@ try {
   const sizesRoutes = require('./src/routes/sizes.routes');
   const adminRoutes = require('./src/routes/admin.routes');
   const adminProductRoutes = require('./src/routes/admin.product.routes');
+  const promotionRoutes = require('./src/routes/promotion.routes');
+  const imageRoutes = require('./src/routes/image.routes');
   
   // Crear la aplicación Express
   console.log('Creando aplicación Express...');
@@ -116,6 +118,8 @@ try {
   app.use('/api/admin', adminRoutes);
   app.use('/api/products', require('./src/routes/product.routes'));
   app.use('/api/admin/products', adminProductRoutes);
+  app.use('/api/promotions', promotionRoutes);
+  app.use('/api/images', imageRoutes);
 
   // Middleware para rutas no encontradas
   app.use((req, res) => {
@@ -150,6 +154,16 @@ try {
     - POST /api/auth/login
     - GET  /api/auth/profile (protegida)
     - GET  /api/sizes
+    - GET  /api/admin/variants
+    - GET  /api/admin/products
+    - GET  /api/admin/size-systems
+    - POST /api/admin/products
+    - POST /api/admin/variants
+    - POST /api/admin/upload-image
+    - GET  /api/promotions/active
+    - GET  /api/promotions/homepage
+    - POST /api/images/variant/:id
+    - GET  /api/images/variant/:id
     `);
   });
 
