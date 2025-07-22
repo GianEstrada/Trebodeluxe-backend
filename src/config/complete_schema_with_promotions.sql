@@ -62,7 +62,7 @@ CREATE TABLE tallas (
 CREATE TABLE productos (
     id_producto SERIAL PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
-    descripcion TEXT,
+    descripcion TEXT NOT NULL,
     categoria VARCHAR(50),
     marca VARCHAR(50),
     id_sistema_talla INTEGER REFERENCES sistemas_talla(id_sistema_talla) ON DELETE SET NULL,
@@ -207,28 +207,28 @@ INSERT INTO tallas (id_sistema_talla, nombre_talla, orden) VALUES
 -- Insertar productos de prueba con fechas estratificadas
 INSERT INTO productos (nombre, descripcion, categoria, marca, id_sistema_talla, fecha_creacion) VALUES 
     -- Productos recientes (hoy)
-    ('Camiseta Premium Sport', 'Camiseta deportiva de alta calidad con tecnología dry-fit', 'Camisetas', 'TreboSport', 1, NOW()),
-    ('Pantalón Casual Denim', 'Pantalón de mezclilla con corte moderno y cómodo', 'Pantalones', 'UrbanStyle', 1, NOW()),
-    ('Sneakers Urban Pro', 'Zapatillas deportivas con diseño urbano moderno', 'Zapatos', 'SportMax', 2, NOW()),
+    ('Camiseta Premium Sport', 'Camiseta deportiva de alta calidad con tecnología dry-fit para máximo rendimiento', 'Camisetas', 'TreboSport', 1, NOW()),
+    ('Pantalón Casual Denim', 'Pantalón de mezclilla con corte moderno y cómodo, perfecto para uso diario', 'Pantalones', 'UrbanStyle', 1, NOW()),
+    ('Sneakers Urban Pro', 'Zapatillas deportivas con diseño urbano moderno y suela antideslizante', 'Zapatos', 'SportMax', 2, NOW()),
     
     -- Productos de hace 3 días
-    ('Polo Clásico Navy', 'Polo de algodón 100% con bordado distintivo', 'Camisetas', 'ClassicWear', 1, NOW() - INTERVAL '3 days'),
-    ('Shorts Deportivos', 'Shorts transpirables ideales para entrenamientos', 'Pantalones', 'FitGear', 1, NOW() - INTERVAL '3 days'),
-    ('Gorra Baseball Negra', 'Gorra ajustable con logo bordado', 'Accesorios', 'CapStyle', NULL, NOW() - INTERVAL '3 days'),
+    ('Polo Clásico Navy', 'Polo de algodón 100% con bordado distintivo, ideal para ocasiones casuales', 'Camisetas', 'ClassicWear', 1, NOW() - INTERVAL '3 days'),
+    ('Shorts Deportivos', 'Shorts transpirables ideales para entrenamientos y actividades deportivas', 'Pantalones', 'FitGear', 1, NOW() - INTERVAL '3 days'),
+    ('Gorra Baseball Negra', 'Gorra ajustable con logo bordado, protección UV y diseño clásico', 'Accesorios', 'CapStyle', NULL, NOW() - INTERVAL '3 days'),
     
     -- Productos de hace 1 semana
-    ('Chaqueta Bomber', 'Chaqueta estilo bomber con forro interior', 'Chaquetas', 'StreetStyle', 1, NOW() - INTERVAL '1 week'),
-    ('Zapatillas Running', 'Zapatillas especializadas para correr con amortiguación', 'Zapatos', 'RunTech', 2, NOW() - INTERVAL '1 week'),
-    ('Camisa Oxford', 'Camisa formal de algodón con cuello clásico', 'Camisas', 'FormalWear', 1, NOW() - INTERVAL '1 week'),
-    ('Jeans Slim Fit', 'Jeans de corte ajustado con lavado moderno', 'Pantalones', 'DenimCo', 1, NOW() - INTERVAL '1 week'),
+    ('Chaqueta Bomber', 'Chaqueta estilo bomber con forro interior suave y cierre frontal', 'Chaquetas', 'StreetStyle', 1, NOW() - INTERVAL '1 week'),
+    ('Zapatillas Running', 'Zapatillas especializadas para correr con amortiguación avanzada', 'Zapatos', 'RunTech', 2, NOW() - INTERVAL '1 week'),
+    ('Camisa Oxford', 'Camisa formal de algodón con cuello clásico, perfecta para oficina', 'Camisas', 'FormalWear', 1, NOW() - INTERVAL '1 week'),
+    ('Jeans Slim Fit', 'Jeans de corte ajustado con lavado moderno y excelente durabilidad', 'Pantalones', 'DenimCo', 1, NOW() - INTERVAL '1 week'),
     
     -- Productos de hace 2 semanas
-    ('Gorra Baseball', 'Gorra deportiva ajustable', 'Accesorios', 'SportCap', NULL, NOW() - INTERVAL '2 weeks'),
-    ('Sudadera con Capucha', 'Sudadera cómoda con bolsillo canguro', 'Sudaderas', 'ComfortWear', 1, NOW() - INTERVAL '2 weeks'),
-    ('Chaqueta Denim', 'Chaqueta de mezclilla clásica', 'Chaquetas', 'VintageStyle', 1, NOW() - INTERVAL '2 weeks'),
-    ('Tenis Casual', 'Tenis versátiles para uso diario', 'Zapatos', 'DailyWear', 2, NOW() - INTERVAL '2 weeks'),
-    ('Bermudas Cargo', 'Bermudas con múltiples bolsillos', 'Pantalones', 'UtilityWear', 1, NOW() - INTERVAL '2 weeks'),
-    ('Playera Básica Blanca', 'Playera de algodón básica en color blanco', 'Camisetas', 'BasicWear', 1, NOW() - INTERVAL '2 weeks');
+    ('Gorra Baseball', 'Gorra deportiva ajustable con diseño versátil para cualquier ocasión', 'Accesorios', 'SportCap', NULL, NOW() - INTERVAL '2 weeks'),
+    ('Sudadera con Capucha', 'Sudadera cómoda con bolsillo canguro y capucha ajustable', 'Sudaderas', 'ComfortWear', 1, NOW() - INTERVAL '2 weeks'),
+    ('Chaqueta Denim', 'Chaqueta de mezclilla clásica con corte relajado y estilo atemporal', 'Chaquetas', 'VintageStyle', 1, NOW() - INTERVAL '2 weeks'),
+    ('Tenis Casual', 'Tenis versátiles para uso diario con suela cómoda y diseño moderno', 'Zapatos', 'DailyWear', 2, NOW() - INTERVAL '2 weeks'),
+    ('Bermudas Cargo', 'Bermudas con múltiples bolsillos funcionales y tela resistente', 'Pantalones', 'UtilityWear', 1, NOW() - INTERVAL '2 weeks'),
+    ('Playera Básica Blanca', 'Playera de algodón básica en color blanco, esencial para cualquier guardarropa', 'Camisetas', 'BasicWear', 1, NOW() - INTERVAL '2 weeks');
 
 -- Insertar variantes para cada producto
 INSERT INTO variantes (id_producto, nombre, precio, precio_original) VALUES 

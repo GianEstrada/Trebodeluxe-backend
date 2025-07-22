@@ -24,6 +24,7 @@ const promotionRoutes = require('./routes/promotion.routes');
 const sizesRoutes = require('./routes/sizes.routes');
 const imageRoutes = require('./routes/image.routes');
 const adminProductRoutes = require('./routes/admin.product.routes');
+const adminRoutes = require('./routes/admin.routes');
 
 // Importar middlewares
 const { notFound, errorHandler } = require('./middlewares/error.middleware');
@@ -101,6 +102,8 @@ app.use('/api/images', imageRoutes);
 console.log('✅ Rutas images registradas');
 app.use('/api/admin/products', adminProductRoutes);
 console.log('✅ Rutas admin products registradas');
+app.use('/api/admin', adminRoutes);
+console.log('✅ Rutas admin registradas');
 console.log('Importando y registrando rutas de sizes...');
 try {
   console.log('Intentando importar sizes.routes.js...');
