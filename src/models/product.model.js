@@ -1,6 +1,148 @@
 const db = require('../config/db');
 
 class ProductModel {
+  // Obtener productos para admin con variantes e información completa
+  static async getProductsForAdmin(filters = {}) {
+    try {
+      const {
+        search = '',
+        categoria = '',
+        marca = '',
+        activo = null,
+        limit = 20,
+        offset = 0,
+        sortBy = 'fecha_creacion',
+        sortOrder = 'DESC'
+      } = filters;
+
+      let whereConditions = [];
+      let queryParams = [];
+      let paramCount = 0;
+
+      if (search) {
+        paramCount++;
+        whereConditions.push(`(p.nombre ILIKE $${paramCount} OR p.descripcion ILIKE $${paramCount})`);
+        queryParams.push(`%${search}%`);
+      }
+
+      if (categoria) {
+        paramCount++;
+        whereConditions.push(`p.categoria = $${paramCount}`);
+        queryParams.push(categoria);
+      }
+
+      if (marca) {
+        paramCount++;
+        whereConditions.push(`p.marca = $${paramCount}`);
+        queryParams.push(marca);
+      }
+
+      if (activo !== null) {
+        paramCount++;
+        whereConditions.push(`p.activo = $${paramCount}`);
+        queryParams.push(activo);
+      }
+
+      const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
+
+      const query = `
+        SELECT 
+          p.*,
+          st.nombre as sistema_talla_nombre,
+          CASE 
+            WHEN COUNT(v.id_variante) > 0 THEN 
+              json_agg(
+                json_build_object(
+                  'id_variante', v.id_variante,
+                  'nombre', v.nombre,
+                  'precio', v.precio,
+                  'precio_original', v.precio_original,
+                  'descuento_porcentaje', 
+                  CASE 
+                    WHEN v.precio_original IS NOT NULL AND v.precio_original > v.precio 
+                    THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
+                    ELSE NULL
+                  END,
+                  'activo', v.activo,
+                  'imagenes', COALESCE(img.imagenes, '[]'::json),
+                  'stock_disponible', COALESCE(stock_info.stock_total, 0),
+                  'tallas_stock', COALESCE(stock_info.tallas_stock, '[]'::json)
+                ) ORDER BY v.id_variante
+              )
+            ELSE '[]'::json
+          END as variantes,
+          CASE 
+            WHEN COUNT(v.id_variante) = 0 THEN false
+            ELSE bool_and(COALESCE(stock_info.stock_total, 0) > 0)
+          END as tiene_stock
+        FROM productos p
+        LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
+        LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+        LEFT JOIN (
+          SELECT 
+            id_variante,
+            json_agg(
+              json_build_object(
+                'id_imagen', id_imagen,
+                'url', url,
+                'public_id', public_id,
+                'orden', orden
+              ) ORDER BY orden
+            ) as imagenes
+          FROM imagenes_variante
+          GROUP BY id_variante
+        ) img ON v.id_variante = img.id_variante
+        LEFT JOIN (
+          SELECT 
+            s.id_variante,
+            SUM(s.cantidad) as stock_total,
+            json_agg(
+              json_build_object(
+                'id_talla', t.id_talla,
+                'nombre_talla', t.nombre_talla,
+                'cantidad', s.cantidad
+              ) ORDER BY t.orden
+            ) as tallas_stock
+          FROM stock s
+          JOIN tallas t ON s.id_talla = t.id_talla
+          WHERE s.cantidad > 0
+          GROUP BY s.id_variante
+        ) stock_info ON v.id_variante = stock_info.id_variante
+        ${whereClause}
+        GROUP BY p.id_producto, p.nombre, p.descripcion, p.categoria, p.marca, 
+                 p.id_sistema_talla, p.activo, p.fecha_creacion, st.nombre
+        ORDER BY p.${sortBy} ${sortOrder}
+        LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
+      `;
+
+      queryParams.push(limit, offset);
+
+      const countQuery = `
+        SELECT COUNT(DISTINCT p.id_producto) as total
+        FROM productos p
+        ${whereClause}
+      `;
+
+      const [result, countResult] = await Promise.all([
+        db.query(query, queryParams),
+        db.query(countQuery, queryParams.slice(0, -2))
+      ]);
+
+      return {
+        products: result.rows,
+        total: parseInt(countResult.rows[0].total),
+        page: Math.floor(offset / limit) + 1,
+        totalPages: Math.ceil(parseInt(countResult.rows[0].total) / limit),
+        hasNext: offset + limit < parseInt(countResult.rows[0].total),
+        hasPrev: offset > 0
+      };
+
+    } catch (error) {
+      console.error('Error en getProductsForAdmin:', error);
+      throw error;
+    }
+  }
+
   // Obtener todos los productos con variantes completas
   static async getAll() {
     try {
@@ -1055,6 +1197,229 @@ class ProductModel {
       throw error;
     } finally {
       client.release();
+    }
+  }
+
+  // =================== MÉTODOS PARA VARIANTES ===================
+
+  // Crear variante
+  static async createVariant(variantData) {
+    try {
+      const query = `
+        INSERT INTO variantes (producto_id, nombre, descripcion, precio, activo, fecha_creacion)
+        VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+        RETURNING *
+      `;
+
+      const result = await db.query(query, [
+        variantData.producto_id,
+        variantData.nombre,
+        variantData.descripcion,
+        variantData.precio,
+        variantData.activo
+      ]);
+
+      return result.rows[0];
+
+    } catch (error) {
+      console.error('Error en createVariant:', error);
+      throw error;
+    }
+  }
+
+  // Obtener variante por ID con información completa
+  static async getVariantById(id) {
+    try {
+      const query = `
+        SELECT 
+          v.*,
+          p.nombre as producto_nombre,
+          p.categoria,
+          p.marca,
+          COALESCE(img.imagenes, '[]'::json) as imagenes,
+          COALESCE(stock_info.tallas, '[]'::json) as tallas,
+          COALESCE(stock_info.stock_total, 0) as stock_total
+        FROM variantes v
+        JOIN productos p ON v.producto_id = p.id_producto
+        LEFT JOIN (
+          SELECT 
+            id_variante,
+            json_agg(
+              json_build_object(
+                'id_imagen', id_imagen,
+                'url', url,
+                'public_id', public_id,
+                'orden', orden
+              ) ORDER BY orden
+            ) as imagenes
+          FROM imagenes_variante
+          GROUP BY id_variante
+        ) img ON v.id_variante = img.id_variante
+        LEFT JOIN (
+          SELECT 
+            s.id_variante,
+            SUM(s.cantidad) as stock_total,
+            json_agg(
+              json_build_object(
+                'talla_id', t.id_talla,
+                'nombre_talla', t.nombre_talla,
+                'cantidad', s.cantidad
+              ) ORDER BY t.orden
+            ) as tallas
+          FROM stock s
+          JOIN tallas t ON s.id_talla = t.id_talla
+          GROUP BY s.id_variante
+        ) stock_info ON v.id_variante = stock_info.id_variante
+        WHERE v.id_variante = $1
+      `;
+
+      const result = await db.query(query, [id]);
+      return result.rows[0] || null;
+
+    } catch (error) {
+      console.error('Error en getVariantById:', error);
+      throw error;
+    }
+  }
+
+  // Actualizar variante
+  static async updateVariant(id, updateData) {
+    try {
+      const fields = [];
+      const values = [];
+      let paramCounter = 1;
+
+      // Construir dinámicamente la consulta UPDATE
+      for (const [key, value] of Object.entries(updateData)) {
+        if (value !== undefined) {
+          fields.push(`${key} = $${paramCounter}`);
+          values.push(value);
+          paramCounter++;
+        }
+      }
+
+      if (fields.length === 0) {
+        throw new Error('No hay campos para actualizar');
+      }
+
+      values.push(id); // Para el WHERE
+
+      const query = `
+        UPDATE variantes 
+        SET ${fields.join(', ')}
+        WHERE id_variante = $${paramCounter}
+        RETURNING *
+      `;
+
+      const result = await db.query(query, values);
+      return result.rows[0];
+
+    } catch (error) {
+      console.error('Error en updateVariant:', error);
+      throw error;
+    }
+  }
+
+  // Eliminar variante
+  static async deleteVariant(id) {
+    const client = await db.getClient();
+    
+    try {
+      await client.query('BEGIN');
+
+      // Obtener información de la variante antes de eliminarla
+      const variantInfo = await client.query(`
+        SELECT v.*, iv.public_id 
+        FROM variantes v
+        LEFT JOIN imagenes_variante iv ON v.id_variante = iv.id_variante
+        WHERE v.id_variante = $1
+      `, [id]);
+
+      if (variantInfo.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return { deletedVariant: null };
+      }
+
+      // Eliminar variante (esto eliminará en cascada stock e imágenes)
+      const deleteQuery = `
+        DELETE FROM variantes 
+        WHERE id_variante = $1 
+        RETURNING *
+      `;
+
+      const result = await client.query(deleteQuery, [id]);
+
+      await client.query('COMMIT');
+
+      // Retornar información de la variante eliminada y las imágenes a eliminar
+      const imagesToDelete = variantInfo.rows
+        .filter(row => row.public_id)
+        .map(row => row.public_id);
+
+      return {
+        deletedVariant: result.rows[0],
+        imagesToDelete
+      };
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Error en deleteVariant:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  // =================== MÉTODOS PARA STOCK ===================
+
+  // Crear o actualizar stock
+  static async createOrUpdateStock(stockData) {
+    try {
+      const query = `
+        INSERT INTO stock (variante_id, talla_id, cantidad)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (variante_id, talla_id) 
+        DO UPDATE SET 
+          cantidad = EXCLUDED.cantidad,
+          fecha_actualizacion = CURRENT_TIMESTAMP
+        RETURNING *
+      `;
+
+      const result = await db.query(query, [
+        stockData.variante_id,
+        stockData.talla_id,
+        stockData.cantidad
+      ]);
+
+      return result.rows[0];
+
+    } catch (error) {
+      console.error('Error en createOrUpdateStock:', error);
+      throw error;
+    }
+  }
+
+  // Eliminar todo el stock de una variante
+  static async deleteVariantStock(varianteId) {
+    try {
+      const query = `DELETE FROM stock WHERE variante_id = $1`;
+      const result = await db.query(query, [varianteId]);
+      return result.rowCount;
+    } catch (error) {
+      console.error('Error en deleteVariantStock:', error);
+      throw error;
+    }
+  }
+
+  // Obtener un producto básico por ID (para validaciones)
+  static async getProductById(id) {
+    try {
+      const query = `SELECT * FROM productos WHERE id_producto = $1`;
+      const result = await db.query(query, [id]);
+      return result.rows[0] || null;
+    } catch (error) {
+      console.error('Error en getProductById:', error);
+      throw error;
     }
   }
 }

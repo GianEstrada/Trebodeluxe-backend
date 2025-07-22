@@ -73,7 +73,7 @@ CREATE TABLE productos (
 CREATE TABLE variantes (
     id_variante SERIAL PRIMARY KEY,
     id_producto INTEGER NOT NULL REFERENCES productos(id_producto) ON DELETE CASCADE,
-    nombre VARCHAR(100),
+    nombre VARCHAR(100) NOT NULL,
     precio NUMERIC(10,2) NOT NULL,
     precio_original NUMERIC(10,2),
     activo BOOLEAN DEFAULT true,

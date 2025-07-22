@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const AdminProductController = require('../controllers/admin.product.controller');
-const AdminVariantController = require('../controllers/admin.variant.controller');
 const authMiddleware = require('../middlewares/auth.middleware');
 const { upload, handleMulterError } = require('../middlewares/upload.middleware');
 
@@ -64,29 +63,24 @@ router.post('/variant/:id_variante/image',
 
 // === RUTAS PARA VARIANTES ===
 
-// @route   GET /api/admin/products/:id_producto/variants
-// @desc    Obtener todas las variantes de un producto
+// @route   POST /api/admin/products/variants
+// @desc    Crear nueva variante
 // @access  Private (Admin only)
-router.get('/:id_producto/variants', AdminVariantController.getVariantsByProduct);
+router.post('/variants', AdminProductController.createVariant);
 
-// @route   POST /api/admin/products/:id_producto/variants
-// @desc    Crear nueva variante para un producto
-// @access  Private (Admin only)
-router.post('/:id_producto/variants', AdminVariantController.createVariant);
-
-// @route   GET /api/admin/products/variant/:id_variante
+// @route   GET /api/admin/products/variants/:id
 // @desc    Obtener variante por ID
 // @access  Private (Admin only)
-router.get('/variant/:id_variante', AdminVariantController.getVariantById);
+router.get('/variants/:id', AdminProductController.getVariant);
 
-// @route   PUT /api/admin/products/variant/:id_variante
+// @route   PUT /api/admin/products/variants/:id
 // @desc    Actualizar variante
 // @access  Private (Admin only)
-router.put('/variant/:id_variante', AdminVariantController.updateVariant);
+router.put('/variants/:id', AdminProductController.updateVariant);
 
-// @route   DELETE /api/admin/products/variant/:id_variante
+// @route   DELETE /api/admin/products/variants/:id
 // @desc    Eliminar variante (incluyendo imágenes de Cloudinary)
 // @access  Private (Admin only)
-router.delete('/variant/:id_variante', AdminVariantController.deleteVariant);
+router.delete('/variants/:id', AdminProductController.deleteVariant);
 
 module.exports = router;

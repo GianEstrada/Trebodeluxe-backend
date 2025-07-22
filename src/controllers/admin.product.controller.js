@@ -9,7 +9,7 @@ const AdminProductController = {
     try {
       const filters = {
         search: req.query.search || '',
-        categoria: req.query.categoria || '',
+        categoria: req.query.categoria || req.query.category || '',
         marca: req.query.marca || '',
         activo: req.query.activo !== undefined ? req.query.activo === 'true' : null,
         limit: parseInt(req.query.limit) || 20,
@@ -18,12 +18,20 @@ const AdminProductController = {
         sortOrder: req.query.sortOrder || 'DESC'
       };
 
+      // Filtros adicionales del frontend
+      if (req.query.minPrice) {
+        filters.minPrice = parseFloat(req.query.minPrice);
+      }
+      if (req.query.maxPrice) {
+        filters.maxPrice = parseFloat(req.query.maxPrice);
+      }
+
       const result = await ProductModel.getProductsForAdmin(filters);
 
       res.json({
         success: true,
         message: 'Productos obtenidos exitosamente',
-        data: result
+        ...result
       });
 
     } catch (error) {
@@ -357,6 +365,197 @@ const AdminProductController = {
       res.status(500).json({
         success: false,
         message: 'Error al obtener estadísticas',
+        error: error.message
+      });
+    }
+  },
+
+  // =================== MÉTODOS PARA VARIANTES ===================
+  
+  // Crear variante
+  async createVariant(req, res) {
+    try {
+      const { producto_id, nombre, descripcion, precio, activo = true, stock } = req.body;
+
+      // Validaciones
+      if (!producto_id || !nombre || !precio) {
+        return res.status(400).json({
+          success: false,
+          message: 'Faltan campos requeridos: producto_id, nombre, precio'
+        });
+      }
+
+      // Verificar que el producto existe
+      const productExists = await ProductModel.getProductById(producto_id);
+      if (!productExists) {
+        return res.status(404).json({
+          success: false,
+          message: 'Producto no encontrado'
+        });
+      }
+
+      // Crear variante
+      const variantData = {
+        producto_id: parseInt(producto_id),
+        nombre: nombre.trim(),
+        descripcion: descripcion?.trim() || null,
+        precio: parseFloat(precio),
+        activo: Boolean(activo),
+        imagen: null // Se manejará por separado
+      };
+
+      const variant = await ProductModel.createVariant(variantData);
+
+      // Manejar stock si se proporciona
+      if (stock && Array.isArray(stock) && stock.length > 0) {
+        await Promise.all(
+          stock.map(async (stockItem) => {
+            if (stockItem.talla_id && stockItem.cantidad > 0) {
+              await ProductModel.createOrUpdateStock({
+                variante_id: variant.id,
+                talla_id: parseInt(stockItem.talla_id),
+                cantidad: parseInt(stockItem.cantidad)
+              });
+            }
+          })
+        );
+      }
+
+      res.status(201).json({
+        success: true,
+        message: 'Variante creada exitosamente',
+        data: variant
+      });
+
+    } catch (error) {
+      console.error('Error en AdminProductController.createVariant:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al crear variante',
+        error: error.message
+      });
+    }
+  },
+
+  // Actualizar variante
+  async updateVariant(req, res) {
+    try {
+      const { id } = req.params;
+      const { nombre, descripcion, precio, activo, stock } = req.body;
+
+      const updateData = {
+        nombre: nombre?.trim(),
+        descripcion: descripcion?.trim() || null,
+        precio: precio ? parseFloat(precio) : undefined,
+        activo: activo !== undefined ? Boolean(activo) : undefined
+      };
+
+      // Remover campos undefined
+      Object.keys(updateData).forEach(key => {
+        if (updateData[key] === undefined) {
+          delete updateData[key];
+        }
+      });
+
+      const variant = await ProductModel.updateVariant(parseInt(id), updateData);
+
+      if (!variant) {
+        return res.status(404).json({
+          success: false,
+          message: 'Variante no encontrada'
+        });
+      }
+
+      // Actualizar stock si se proporciona
+      if (stock && Array.isArray(stock)) {
+        // Primero eliminar stock existente
+        await ProductModel.deleteVariantStock(variant.id);
+        
+        // Crear nuevo stock
+        await Promise.all(
+          stock.map(async (stockItem) => {
+            if (stockItem.talla_id && stockItem.cantidad > 0) {
+              await ProductModel.createOrUpdateStock({
+                variante_id: variant.id,
+                talla_id: parseInt(stockItem.talla_id),
+                cantidad: parseInt(stockItem.cantidad)
+              });
+            }
+          })
+        );
+      }
+
+      res.json({
+        success: true,
+        message: 'Variante actualizada exitosamente',
+        data: variant
+      });
+
+    } catch (error) {
+      console.error('Error en AdminProductController.updateVariant:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al actualizar variante',
+        error: error.message
+      });
+    }
+  },
+
+  // Eliminar variante
+  async deleteVariant(req, res) {
+    try {
+      const { id } = req.params;
+
+      const result = await ProductModel.deleteVariant(parseInt(id));
+
+      if (!result.deletedVariant) {
+        return res.status(404).json({
+          success: false,
+          message: 'Variante no encontrada'
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Variante eliminada exitosamente',
+        data: result
+      });
+
+    } catch (error) {
+      console.error('Error en AdminProductController.deleteVariant:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al eliminar variante',
+        error: error.message
+      });
+    }
+  },
+
+  // Obtener variante por ID
+  async getVariant(req, res) {
+    try {
+      const { id } = req.params;
+
+      const variant = await ProductModel.getVariantById(parseInt(id));
+
+      if (!variant) {
+        return res.status(404).json({
+          success: false,
+          message: 'Variante no encontrada'
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Variante obtenida exitosamente',
+        data: variant
+      });
+
+    } catch (error) {
+      console.error('Error en AdminProductController.getVariant:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener variante',
         error: error.message
       });
     }
