@@ -49,6 +49,10 @@ try {
   const promotionRoutes = require('./src/routes/promotion.routes');
   const imageRoutes = require('./src/routes/image.routes');
   const sizeSystemRoutes = require('./src/routes/size-system.routes');
+  const siteSettingsRoutes = require('./src/routes/site-settings.routes');
+  const mainImagesRoutes = require('./src/routes/main-images.routes');
+  const promotionsAdminRoutes = require('./src/routes/promotions-admin.routes');
+  const { setupSiteSettings } = require('./src/setup-site-settings');
   
   // Crear la aplicación Express
   console.log('Creando aplicación Express...');
@@ -122,6 +126,11 @@ try {
   app.use('/api/promotions', promotionRoutes);
   app.use('/api/images', imageRoutes);
   app.use('/api/size-systems', sizeSystemRoutes);
+  app.use('/api/site-settings', siteSettingsRoutes);
+  app.use('/api/main-images', mainImagesRoutes);
+  app.use('/api/admin/promotions', promotionsAdminRoutes);
+  
+  console.log('✅ Todas las rutas configuradas correctamente');
 
   // Middleware para rutas no encontradas
   app.use((req, res) => {
@@ -144,7 +153,7 @@ try {
 
   // Iniciar servidor
   const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () => {
+  app.listen(PORT, async () => {
     console.log(`
     🚀 Servidor iniciado exitosamente
     📡 Puerto: ${PORT}
@@ -170,7 +179,23 @@ try {
     - POST /api/size-systems (CRUD)
     - PUT  /api/size-systems/:id (CRUD)
     - DELETE /api/size-systems/:id (CRUD)
+    - GET  /api/site-settings/header ✨
+    - PUT  /api/site-settings/header ✨
+    - GET  /api/main-images ✨
+    - GET  /api/main-images/type/:tipo ✨
+    - POST /api/main-images ✨
+    - PUT  /api/main-images/:id ✨
+    - DELETE /api/main-images/:id ✨
+    - GET  /api/admin/promotions ✨
+    - POST /api/admin/promotions ✨
+    - PUT  /api/admin/promotions/:id ✨
+    - DELETE /api/admin/promotions/:id ✨
     `);
+    
+    // Configurar tablas automáticamente
+    console.log('🔧 Configurando base de datos...');
+    await setupSiteSettings();
+    console.log('✅ Base de datos configurada');
   });
 
 } catch (error) {
