@@ -111,6 +111,9 @@ try {
   console.log('✅ sizes.routes.js importado correctamente.');
   app.use('/api/sizes', sizesRoutes);
   console.log('✅ Rutas de sizes registradas exitosamente.');
+  // Registrar las mismas rutas bajo /api/size-systems para compatibilidad con el frontend
+  app.use('/api/size-systems', sizesRoutes);
+  console.log('✅ Rutas de size-systems registradas exitosamente.');
 } catch (error) {
   console.error('❌ Error al importar sizes.routes.js:', error);
 }

@@ -17,6 +17,13 @@ try {
   });
   console.log('✅ Ruta GET /test configurada');
 
+  // Buscar sistemas de tallas (debe ir antes de /systems para evitar conflictos)
+  router.get('/systems/search', (req, res, next) => {
+    console.log('📡 Ruta /api/sizes/systems/search llamada');
+    SizesController.searchSystems(req, res, next);
+  });
+  console.log('✅ Ruta GET /systems/search configurada');
+
   // Obtener todos los sistemas de tallas
   router.get('/systems', (req, res, next) => {
     console.log('📡 Ruta /api/sizes/systems llamada');
@@ -34,6 +41,14 @@ try {
   // Crear sistema de tallas
   router.post('/systems', authMiddleware.verifyToken, authMiddleware.requireAdmin, SizesController.createSystem);
   console.log('✅ Ruta POST /systems configurada');
+
+  // Actualizar sistema de tallas
+  router.put('/systems/:id', authMiddleware.verifyToken, authMiddleware.requireAdmin, SizesController.updateSystem);
+  console.log('✅ Ruta PUT /systems/:id configurada');
+
+  // Eliminar sistema de tallas
+  router.delete('/systems/:id', authMiddleware.verifyToken, authMiddleware.requireAdmin, SizesController.deleteSystem);
+  console.log('✅ Ruta DELETE /systems/:id configurada');
   
   // Crear talla
   router.post('/', authMiddleware.verifyToken, authMiddleware.requireAdmin, SizesController.createSize);
