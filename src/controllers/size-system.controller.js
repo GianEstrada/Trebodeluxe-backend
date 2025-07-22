@@ -1,6 +1,6 @@
 // controllers/size-system.controller.js - Controlador para CRUD de sistemas de tallas
 
-const pool = require('../config/db');
+const db = require('../config/db');
 
 const SizeSystemController = {
   // Obtener todos los sistemas de tallas con sus tallas
@@ -23,7 +23,7 @@ const SizeSystemController = {
         ORDER BY st.nombre
       `;
 
-      const result = await pool.query(query);
+      const result = await db.pool.query(query);
       
       // Limpiar datos para frontend
       const systems = result.rows.map(row => ({
@@ -78,7 +78,7 @@ const SizeSystemController = {
         ORDER BY st.nombre
       `;
 
-      const result = await pool.query(query, params);
+      const result = await db.pool.query(query, params);
       
       const systems = result.rows.map(row => ({
         id_sistema_talla: row.id_sistema_talla,
@@ -102,7 +102,7 @@ const SizeSystemController = {
 
   // Crear nuevo sistema de tallas
   createSizeSystem: async (req, res) => {
-    const client = await pool.connect();
+    const client = await db.pool.connect();
     
     try {
       await client.query('BEGIN');
@@ -173,7 +173,7 @@ const SizeSystemController = {
 
   // Actualizar sistema de tallas
   updateSizeSystem: async (req, res) => {
-    const client = await pool.connect();
+    const client = await db.pool.connect();
     
     try {
       await client.query('BEGIN');
@@ -266,7 +266,7 @@ const SizeSystemController = {
       const { id } = req.params;
 
       // Verificar que el sistema existe
-      const existingSystem = await pool.query(
+      const existingSystem = await db.pool.query(
         'SELECT id_sistema_talla FROM sistemas_talla WHERE id_sistema_talla = $1',
         [id]
       );
@@ -279,7 +279,7 @@ const SizeSystemController = {
       }
 
       // Verificar si hay productos usando este sistema
-      const productsUsing = await pool.query(
+      const productsUsing = await db.pool.query(
         'SELECT COUNT(*) as count FROM productos WHERE id_sistema_talla = $1',
         [id]
       );
@@ -292,7 +292,7 @@ const SizeSystemController = {
       }
 
       // Eliminar el sistema (las tallas se eliminan automáticamente por CASCADE)
-      await pool.query(
+      await db.pool.query(
         'DELETE FROM sistemas_talla WHERE id_sistema_talla = $1',
         [id]
       );
