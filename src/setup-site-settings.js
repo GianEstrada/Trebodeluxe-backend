@@ -1,6 +1,6 @@
 // setup-site-settings.js - Script para configurar automáticamente las configuraciones del sitio
 
-const db = require('./src/config/db');
+const db = require('./config/db');
 
 async function setupSiteSettings() {
   try {
