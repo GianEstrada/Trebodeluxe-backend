@@ -27,6 +27,7 @@ const imageRoutes = require('./routes/image.routes');
 const adminProductRoutes = require('./routes/admin.product.routes');
 const adminRoutes = require('./routes/admin.routes');
 const siteSettingsRoutes = require('./routes/site-settings.routes');
+const mainImagesRoutes = require('./routes/main-images.routes');
 
 // Importar middlewares
 const { notFound, errorHandler } = require('./middlewares/error.middleware');
@@ -108,6 +109,9 @@ app.use('/api/admin', adminRoutes);
 console.log('✅ Rutas admin registradas');
 app.use('/api/site-settings', siteSettingsRoutes);
 console.log('✅ Rutas site-settings registradas');
+app.use('/api/main-images', mainImagesRoutes);
+console.log('✅ Rutas main-images registradas');
+console.log('✅ Rutas site-settings registradas');
 console.log('Importando y registrando rutas de sizes...');
 try {
   console.log('Intentando importar sizes.routes.js...');
@@ -151,6 +155,8 @@ app.listen(PORT, async () => {
   console.log(`- GET  /api/sizes (nuevo)`);
   console.log(`- GET  /api/site-settings/header (nuevo)`);
   console.log(`- PUT  /api/site-settings/header (nuevo)`);
+  console.log(`- GET  /api/main-images (nuevo)`);
+  console.log(`- GET  /api/main-images/type/:tipo (nuevo)`);
   console.log(`\n⚠️  Si no ves los logs de configuración de sizes arriba, hay un problema de deploy.`);
 });
 

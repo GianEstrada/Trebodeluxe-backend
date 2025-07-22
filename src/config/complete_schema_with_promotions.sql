@@ -15,6 +15,7 @@ DROP TABLE IF EXISTS variantes CASCADE;
 DROP TABLE IF EXISTS productos CASCADE;
 DROP TABLE IF EXISTS tallas CASCADE;
 DROP TABLE IF EXISTS sistemas_talla CASCADE;
+DROP TABLE IF EXISTS imagenes_principales CASCADE;
 DROP TABLE IF EXISTS configuraciones_sitio CASCADE;
 DROP TABLE IF EXISTS informacion_envio CASCADE;
 DROP TABLE IF EXISTS usuarios CASCADE;
@@ -46,6 +47,23 @@ CREATE TABLE informacion_envio (
     ultima_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- ==== IMÁGENES PRINCIPALES DEL SITIO ====
+-- Tabla para imágenes principales que se muestran en la página de inicio
+CREATE TABLE imagenes_principales (
+    id_imagen SERIAL PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    url VARCHAR(500) NOT NULL,
+    public_id VARCHAR(200), -- ID de Cloudinary si se usa
+    tipo VARCHAR(50) NOT NULL CHECK (tipo IN ('hero_banner', 'promocion_banner', 'categoria_destacada')),
+    titulo VARCHAR(200), -- Texto superpuesto en la imagen
+    subtitulo VARCHAR(300), -- Subtítulo o descripción
+    enlace VARCHAR(300), -- URL de destino al hacer clic
+    orden INTEGER NOT NULL DEFAULT 1, -- Orden de aparición
+    activo BOOLEAN DEFAULT true,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- ==== CONFIGURACIONES DEL SITIO ====
 -- Tabla para configuraciones generales del sitio web
 CREATE TABLE configuraciones_sitio (
@@ -67,10 +85,16 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Trigger para actualizar fecha automáticamente
+-- Trigger para actualizar fecha automáticamente en configuraciones
 DROP TRIGGER IF EXISTS trigger_actualizar_fecha_configuraciones ON configuraciones_sitio;
 CREATE TRIGGER trigger_actualizar_fecha_configuraciones
     BEFORE UPDATE ON configuraciones_sitio
+    FOR EACH ROW EXECUTE FUNCTION actualizar_fecha_modificacion();
+
+-- Trigger para actualizar fecha automáticamente en imágenes principales
+DROP TRIGGER IF EXISTS trigger_actualizar_fecha_imagenes ON imagenes_principales;
+CREATE TRIGGER trigger_actualizar_fecha_imagenes
+    BEFORE UPDATE ON imagenes_principales
     FOR EACH ROW EXECUTE FUNCTION actualizar_fecha_modificacion();
 
 -- ==== SISTEMA DE TALLAS ====
@@ -189,6 +213,9 @@ CREATE INDEX idx_promociones_fechas ON promociones(fecha_inicio, fecha_fin);
 CREATE INDEX idx_promocion_aplicacion_tipo ON promocion_aplicacion(tipo_objetivo);
 CREATE INDEX idx_promocion_aplicacion_categoria ON promocion_aplicacion(id_categoria);
 CREATE INDEX idx_promocion_aplicacion_producto ON promocion_aplicacion(id_producto);
+CREATE INDEX idx_imagenes_principales_tipo ON imagenes_principales(tipo);
+CREATE INDEX idx_imagenes_principales_activo ON imagenes_principales(activo);
+CREATE INDEX idx_imagenes_principales_orden ON imagenes_principales(orden);
 
 -- ==== DATOS DE PRUEBA ====
 -- Insertar sistemas de tallas
@@ -402,5 +429,14 @@ INSERT INTO configuraciones_sitio (clave, valor, tipo, descripcion) VALUES
 ('header_brand_name', 'TREBOLUXE', 'text', 'Nombre de la marca que aparece en el header'),
 ('header_promo_texts', '["ENVIO GRATIS EN PEDIDOS ARRIBA DE $500 MXN", "OFERTA ESPECIAL: 20% DE DESCUENTO EN SEGUNDA PRENDA"]', 'json', 'Textos promocionales rotativos del header')
 ON CONFLICT (clave) DO NOTHING;
+
+-- ==== IMÁGENES POR DEFECTO ====
+-- Insertar imágenes por defecto para la página principal
+INSERT INTO imagenes_principales (nombre, url, tipo, titulo, subtitulo, enlace, orden, activo) VALUES
+('Hero Principal', 'https://res.cloudinary.com/demo/image/upload/sample.jpg', 'hero_banner', 'NUEVA COLECCIÓN', 'Descubre los últimos trends en moda', '/catalogo', 1, true),
+('Banner Promoción Verano', 'https://res.cloudinary.com/demo/image/upload/sample2.jpg', 'promocion_banner', 'OFERTAS DE VERANO', '20% de descuento en segunda prenda', '/catalogo?promocion=verano', 1, true),
+('Categoría Hombre', 'https://res.cloudinary.com/demo/image/upload/sample3.jpg', 'categoria_destacada', 'MODA MASCULINA', 'Estilo y elegancia para él', '/catalogo?categoria=hombre', 1, true),
+('Categoría Mujer', 'https://res.cloudinary.com/demo/image/upload/sample4.jpg', 'categoria_destacada', 'MODA FEMENINA', 'Tendencias que definen tu estilo', '/catalogo?categoria=mujer', 2, true)
+ON CONFLICT DO NOTHING;
 
 COMMIT;

@@ -4,9 +4,9 @@ const db = require('./src/config/db');
 
 async function setupSiteSettings() {
   try {
-    console.log('🔧 Configurando tabla de configuraciones del sitio...');
+    console.log('🔧 Configurando tablas de configuraciones del sitio...');
     
-    // Crear tabla si no existe
+    // Crear tabla configuraciones_sitio si no existe
     await db.pool.query(`
       CREATE TABLE IF NOT EXISTS configuraciones_sitio (
         id_configuracion SERIAL PRIMARY KEY,
@@ -14,6 +14,24 @@ async function setupSiteSettings() {
         valor TEXT,
         tipo VARCHAR(50) DEFAULT 'text',
         descripcion TEXT,
+        fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    
+    // Crear tabla imagenes_principales si no existe
+    await db.pool.query(`
+      CREATE TABLE IF NOT EXISTS imagenes_principales (
+        id_imagen SERIAL PRIMARY KEY,
+        nombre VARCHAR(100) NOT NULL,
+        url VARCHAR(500) NOT NULL,
+        public_id VARCHAR(200),
+        tipo VARCHAR(50) NOT NULL CHECK (tipo IN ('hero_banner', 'promocion_banner', 'categoria_destacada')),
+        titulo VARCHAR(200),
+        subtitulo VARCHAR(300),
+        enlace VARCHAR(300),
+        orden INTEGER NOT NULL DEFAULT 1,
+        activo BOOLEAN DEFAULT true,
         fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -40,6 +58,16 @@ async function setupSiteSettings() {
           FOR EACH ROW EXECUTE FUNCTION actualizar_fecha_modificacion();
     `);
     
+    await db.pool.query(`
+      DROP TRIGGER IF EXISTS trigger_actualizar_fecha_imagenes ON imagenes_principales;
+    `);
+    
+    await db.pool.query(`
+      CREATE TRIGGER trigger_actualizar_fecha_imagenes
+          BEFORE UPDATE ON imagenes_principales
+          FOR EACH ROW EXECUTE FUNCTION actualizar_fecha_modificacion();
+    `);
+    
     // Insertar configuraciones por defecto
     await db.pool.query(`
       INSERT INTO configuraciones_sitio (clave, valor, tipo, descripcion) VALUES
@@ -48,6 +76,16 @@ async function setupSiteSettings() {
       ON CONFLICT (clave) DO UPDATE SET
         valor = EXCLUDED.valor,
         descripcion = EXCLUDED.descripcion;
+    `);
+    
+    // Insertar imágenes por defecto
+    await db.pool.query(`
+      INSERT INTO imagenes_principales (nombre, url, tipo, titulo, subtitulo, enlace, orden, activo) VALUES
+      ('Hero Principal', 'https://res.cloudinary.com/demo/image/upload/sample.jpg', 'hero_banner', 'NUEVA COLECCIÓN', 'Descubre los últimos trends en moda', '/catalogo', 1, true),
+      ('Banner Promoción Verano', 'https://res.cloudinary.com/demo/image/upload/sample2.jpg', 'promocion_banner', 'OFERTAS DE VERANO', '20% de descuento en segunda prenda', '/catalogo?promocion=verano', 1, true),
+      ('Categoría Hombre', 'https://res.cloudinary.com/demo/image/upload/sample3.jpg', 'categoria_destacada', 'MODA MASCULINA', 'Estilo y elegancia para él', '/catalogo?categoria=hombre', 1, true),
+      ('Categoría Mujer', 'https://res.cloudinary.com/demo/image/upload/sample4.jpg', 'categoria_destacada', 'MODA FEMENINA', 'Tendencias que definen tu estilo', '/catalogo?categoria=mujer', 2, true)
+      ON CONFLICT DO NOTHING;
     `);
     
     console.log('✅ Configuraciones del sitio configuradas correctamente');
