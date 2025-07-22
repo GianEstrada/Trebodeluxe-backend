@@ -44,6 +44,7 @@ try {
   const userRoutes = require('./src/routes/user.routes');
   const shippingRoutes = require('./src/routes/shipping.routes');
   const sizesRoutes = require('./src/routes/sizes.routes');
+  const adminRoutes = require('./src/routes/admin.routes');
   const adminProductRoutes = require('./src/routes/admin.product.routes');
   
   // Crear la aplicación Express
@@ -112,6 +113,7 @@ try {
   app.use('/api/users', userRoutes);
   app.use('/api/shipping', shippingRoutes);
   app.use('/api/sizes', sizesRoutes);
+  app.use('/api/admin', adminRoutes);
   app.use('/api/products', require('./src/routes/product.routes'));
   app.use('/api/admin/products', adminProductRoutes);
 
