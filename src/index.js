@@ -6,6 +6,7 @@ const dotenv = require('dotenv');
 const path = require('path');
 const db = require('./config/db');
 const fs = require('fs');
+const { setupSiteSettings } = require('./setup-site-settings');
 
 console.log("🚀 Starting server from the latest index.js - Version:", new Date().toISOString());
 
@@ -132,9 +133,13 @@ app.use(errorHandler);
 
 // Iniciar servidor
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 Servidor ejecutándose en modo ${process.env.NODE_ENV} en el puerto ${PORT}`);
   console.log(`⏰ Timestamp: ${new Date().toISOString()}`);
+  
+  // Configurar tabla de configuraciones del sitio automáticamente
+  await setupSiteSettings();
+  
   console.log(`📋 Commit actual esperado: 07fbd7f - Add test route for sizes`);
   console.log(`\n🛣️  Rutas disponibles:`);
   console.log(`- GET  /api/health`);
@@ -144,6 +149,8 @@ app.listen(PORT, () => {
   console.log(`- GET  /api/sizes/test (nuevo)`);
   console.log(`- GET  /api/sizes/systems (nuevo)`);
   console.log(`- GET  /api/sizes (nuevo)`);
+  console.log(`- GET  /api/site-settings/header (nuevo)`);
+  console.log(`- PUT  /api/site-settings/header (nuevo)`);
   console.log(`\n⚠️  Si no ves los logs de configuración de sizes arriba, hay un problema de deploy.`);
 });
 

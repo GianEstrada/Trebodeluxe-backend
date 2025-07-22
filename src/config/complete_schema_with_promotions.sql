@@ -15,6 +15,7 @@ DROP TABLE IF EXISTS variantes CASCADE;
 DROP TABLE IF EXISTS productos CASCADE;
 DROP TABLE IF EXISTS tallas CASCADE;
 DROP TABLE IF EXISTS sistemas_talla CASCADE;
+DROP TABLE IF EXISTS configuraciones_sitio CASCADE;
 DROP TABLE IF EXISTS informacion_envio CASCADE;
 DROP TABLE IF EXISTS usuarios CASCADE;
 
@@ -44,6 +45,33 @@ CREATE TABLE informacion_envio (
     pais VARCHAR(100) NOT NULL,
     ultima_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ==== CONFIGURACIONES DEL SITIO ====
+-- Tabla para configuraciones generales del sitio web
+CREATE TABLE configuraciones_sitio (
+    id_configuracion SERIAL PRIMARY KEY,
+    clave VARCHAR(100) UNIQUE NOT NULL,
+    valor TEXT,
+    tipo VARCHAR(50) DEFAULT 'text', -- 'text', 'json', 'number', 'boolean'
+    descripcion TEXT,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Función para actualizar fecha de modificación automáticamente
+CREATE OR REPLACE FUNCTION actualizar_fecha_modificacion()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.fecha_actualizacion = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Trigger para actualizar fecha automáticamente
+DROP TRIGGER IF EXISTS trigger_actualizar_fecha_configuraciones ON configuraciones_sitio;
+CREATE TRIGGER trigger_actualizar_fecha_configuraciones
+    BEFORE UPDATE ON configuraciones_sitio
+    FOR EACH ROW EXECUTE FUNCTION actualizar_fecha_modificacion();
 
 -- ==== SISTEMA DE TALLAS ====
 CREATE TABLE sistemas_talla (
@@ -367,5 +395,12 @@ INSERT INTO promocion_aplicacion (id_promocion, tipo_objetivo, id_categoria) VAL
 INSERT INTO promocion_aplicacion (id_promocion, tipo_objetivo, id_producto) VALUES 
     (3, 'producto', 1), -- BIENVENIDA aplicable al producto 1
     (3, 'producto', 2); -- BIENVENIDA aplicable al producto 2
+
+-- ==== CONFIGURACIONES POR DEFECTO DEL SITIO ====
+-- Insertar configuraciones por defecto para el header
+INSERT INTO configuraciones_sitio (clave, valor, tipo, descripcion) VALUES
+('header_brand_name', 'TREBOLUXE', 'text', 'Nombre de la marca que aparece en el header'),
+('header_promo_texts', '["ENVIO GRATIS EN PEDIDOS ARRIBA DE $500 MXN", "OFERTA ESPECIAL: 20% DE DESCUENTO EN SEGUNDA PRENDA"]', 'json', 'Textos promocionales rotativos del header')
+ON CONFLICT (clave) DO NOTHING;
 
 COMMIT;
