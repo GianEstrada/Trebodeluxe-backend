@@ -1,9 +1,15 @@
--- complete_schema_with_promotions.sql - Esquema completo de la base de datos para Trebodeluxe con sistema de promociones
+-- complete_schema_with_promotions_and_orders.sql - Esquema completo actualizado con pedidos y envíos
 
 -- Crear extensión para UUID si no existe
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Eliminar tablas si existen (en orden inverso de dependencias)
+DROP TABLE IF EXISTS seguimiento_envio CASCADE;
+DROP TABLE IF EXISTS pedido_detalle CASCADE;
+DROP TABLE IF EXISTS pedidos CASCADE;
+DROP TABLE IF EXISTS metodos_pago CASCADE;
+DROP TABLE IF EXISTS metodos_envio CASCADE;
+
 DROP TABLE IF EXISTS promocion_aplicacion CASCADE;
 DROP TABLE IF EXISTS promo_codigo CASCADE;
 DROP TABLE IF EXISTS promo_porcentaje CASCADE;
@@ -21,7 +27,7 @@ DROP TABLE IF EXISTS informacion_envio CASCADE;
 DROP TABLE IF EXISTS usuarios CASCADE;
 
 -- ==== USUARIOS Y ENVÍO ====
--- Tabla de usuarios
+
 CREATE TABLE usuarios (
     id_usuario SERIAL PRIMARY KEY,
     nombres VARCHAR(100) NOT NULL,
@@ -33,7 +39,6 @@ CREATE TABLE usuarios (
     rol VARCHAR(20) DEFAULT 'user' CHECK (rol IN ('user', 'admin', 'moderator'))
 );
 
--- Tabla de información de envío
 CREATE TABLE informacion_envio (
     id_informacion SERIAL PRIMARY KEY,
     id_usuario INTEGER REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
@@ -48,56 +53,54 @@ CREATE TABLE informacion_envio (
 );
 
 -- ==== IMÁGENES PRINCIPALES DEL SITIO ====
--- Tabla para imágenes principales que se muestran en la página de inicio
+
 CREATE TABLE imagenes_principales (
     id_imagen SERIAL PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
     url VARCHAR(500) NOT NULL,
-    public_id VARCHAR(200), -- ID de Cloudinary si se usa
+    public_id VARCHAR(200),
     tipo VARCHAR(50) NOT NULL CHECK (tipo IN ('hero_banner', 'promocion_banner', 'categoria_destacada')),
-    titulo VARCHAR(200), -- Texto superpuesto en la imagen
-    subtitulo VARCHAR(300), -- Subtítulo o descripción
-    enlace VARCHAR(300), -- URL de destino al hacer clic
-    orden INTEGER NOT NULL DEFAULT 1, -- Orden de aparición
+    titulo VARCHAR(200),
+    subtitulo VARCHAR(300),
+    enlace VARCHAR(300),
+    orden INTEGER NOT NULL DEFAULT 1,
     activo BOOLEAN DEFAULT true,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ==== CONFIGURACIONES DEL SITIO ====
--- Tabla para configuraciones generales del sitio web
+
 CREATE TABLE configuraciones_sitio (
     id_configuracion SERIAL PRIMARY KEY,
     clave VARCHAR(100) UNIQUE NOT NULL,
     valor TEXT,
-    tipo VARCHAR(50) DEFAULT 'text', -- 'text', 'json', 'number', 'boolean'
+    tipo VARCHAR(50) DEFAULT 'text',
     descripcion TEXT,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Función para actualizar fecha de modificación automáticamente
 CREATE OR REPLACE FUNCTION actualizar_fecha_modificacion()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.fecha_actualizacion = CURRENT_TIMESTAMP;
     RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ LANGUAGE plpgsql;
 
--- Trigger para actualizar fecha automáticamente en configuraciones
 DROP TRIGGER IF EXISTS trigger_actualizar_fecha_configuraciones ON configuraciones_sitio;
 CREATE TRIGGER trigger_actualizar_fecha_configuraciones
     BEFORE UPDATE ON configuraciones_sitio
     FOR EACH ROW EXECUTE FUNCTION actualizar_fecha_modificacion();
 
--- Trigger para actualizar fecha automáticamente en imágenes principales
 DROP TRIGGER IF EXISTS trigger_actualizar_fecha_imagenes ON imagenes_principales;
 CREATE TRIGGER trigger_actualizar_fecha_imagenes
     BEFORE UPDATE ON imagenes_principales
     FOR EACH ROW EXECUTE FUNCTION actualizar_fecha_modificacion();
 
 -- ==== SISTEMA DE TALLAS ====
+
 CREATE TABLE sistemas_talla (
     id_sistema_talla SERIAL PRIMARY KEY,
     nombre VARCHAR(50) NOT NULL
@@ -111,6 +114,7 @@ CREATE TABLE tallas (
 );
 
 -- ==== PRODUCTOS ====
+
 CREATE TABLE productos (
     id_producto SERIAL PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
@@ -150,7 +154,8 @@ CREATE TABLE stock (
     UNIQUE(id_producto, id_variante, id_talla)
 );
 
--- ==== PROMOCIONES (TABLA BASE) ====
+-- ==== PROMOCIONES ====
+
 CREATE TABLE promociones (
     id_promocion SERIAL PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
@@ -162,7 +167,6 @@ CREATE TABLE promociones (
     activo BOOLEAN NOT NULL DEFAULT true
 );
 
--- ==== PROMOCIONES POR TIPO ====
 CREATE TABLE promo_x_por_y (
     id_x_por_y SERIAL PRIMARY KEY,
     id_promocion INTEGER NOT NULL REFERENCES promociones(id_promocion) ON DELETE CASCADE,
@@ -187,16 +191,62 @@ CREATE TABLE promo_codigo (
     UNIQUE(id_promocion)
 );
 
--- ==== APLICACIÓN DE PROMOCIONES ====
 CREATE TABLE promocion_aplicacion (
     id_aplicacion SERIAL PRIMARY KEY,
     id_promocion INTEGER NOT NULL REFERENCES promociones(id_promocion) ON DELETE CASCADE,
     tipo_objetivo VARCHAR(30) NOT NULL CHECK (tipo_objetivo IN ('todos', 'categoria', 'producto')),
-    id_categoria VARCHAR(50),  -- Referencia a la categoría (nombre)
+    id_categoria VARCHAR(50),
     id_producto INTEGER REFERENCES productos(id_producto) ON DELETE CASCADE
 );
 
+-- ==== NUEVAS TABLAS PARA PEDIDOS Y ENVÍOS ====
+
+CREATE TABLE metodos_envio (
+    id_metodo_envio SERIAL PRIMARY KEY,
+    nombre VARCHAR(50) NOT NULL, -- Ej: DHL, FedEx, Estafeta
+    descripcion TEXT
+);
+
+CREATE TABLE metodos_pago (
+    id_metodo_pago SERIAL PRIMARY KEY,
+    nombre VARCHAR(50) NOT NULL,
+    descripcion TEXT
+);
+
+CREATE TABLE pedidos (
+    id_pedido SERIAL PRIMARY KEY,
+    id_usuario INTEGER REFERENCES usuarios(id_usuario) ON DELETE SET NULL,
+    id_informacion_envio INTEGER REFERENCES informacion_envio(id_informacion) ON DELETE SET NULL,
+    id_metodo_envio INTEGER REFERENCES metodos_envio(id_metodo_envio) ON DELETE RESTRICT,
+    id_metodo_pago INTEGER REFERENCES metodos_pago(id_metodo_pago) ON DELETE RESTRICT,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    estado VARCHAR(20) DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'procesando', 'en_espera', 'enviado', 'terminado', 'problema')),
+    total NUMERIC(10,2),
+    token_sesion VARCHAR(100), -- Para pedidos de invitados sin cuenta
+    notas TEXT -- Campo para notas administrativas
+);
+
+CREATE TABLE pedido_detalle (
+    id_detalle SERIAL PRIMARY KEY,
+    id_pedido INTEGER NOT NULL REFERENCES pedidos(id_pedido) ON DELETE CASCADE,
+    id_producto INTEGER REFERENCES productos(id_producto) ON DELETE RESTRICT,
+    id_variante INTEGER REFERENCES variantes(id_variante) ON DELETE RESTRICT,
+    id_talla INTEGER REFERENCES tallas(id_talla) ON DELETE RESTRICT,
+    cantidad INTEGER NOT NULL,
+    precio_unitario NUMERIC(10,2) NOT NULL -- Precio al momento de la compra
+);
+
+CREATE TABLE seguimiento_envio (
+    id_seguimiento SERIAL PRIMARY KEY,
+    id_pedido INTEGER NOT NULL REFERENCES pedidos(id_pedido) ON DELETE CASCADE,
+    id_metodo_envio INTEGER NOT NULL REFERENCES metodos_envio(id_metodo_envio) ON DELETE RESTRICT,
+    clave_rastreo VARCHAR(100) NOT NULL,
+    fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    estado_envio VARCHAR(50) -- Ej: en tránsito, entregado, etc.
+);
+
 -- ==== ÍNDICES PARA RENDIMIENTO ====
+
 CREATE INDEX idx_usuarios_correo ON usuarios(correo);
 CREATE INDEX idx_usuarios_usuario ON usuarios(usuario);
 CREATE INDEX idx_informacion_envio_usuario ON informacion_envio(id_usuario);
@@ -216,6 +266,7 @@ CREATE INDEX idx_promocion_aplicacion_producto ON promocion_aplicacion(id_produc
 CREATE INDEX idx_imagenes_principales_tipo ON imagenes_principales(tipo);
 CREATE INDEX idx_imagenes_principales_activo ON imagenes_principales(activo);
 CREATE INDEX idx_imagenes_principales_orden ON imagenes_principales(orden);
+
 
 -- ==== DATOS DE PRUEBA ====
 -- Insertar sistemas de tallas
@@ -438,5 +489,96 @@ INSERT INTO imagenes_principales (nombre, url, tipo, titulo, subtitulo, enlace, 
 ('Categoría Hombre', 'https://res.cloudinary.com/demo/image/upload/sample3.jpg', 'categoria_destacada', 'MODA MASCULINA', 'Estilo y elegancia para él', '/catalogo?categoria=hombre', 1, true),
 ('Categoría Mujer', 'https://res.cloudinary.com/demo/image/upload/sample4.jpg', 'categoria_destacada', 'MODA FEMENINA', 'Tendencias que definen tu estilo', '/catalogo?categoria=mujer', 2, true)
 ON CONFLICT DO NOTHING;
+
+-- ==== DATOS DE PRUEBA PARA PEDIDOS ====
+-- Insertar métodos de envío
+INSERT INTO metodos_envio (nombre, descripcion) VALUES 
+    ('Estándar', 'Envío estándar de 3-5 días hábiles'),
+    ('Express', 'Envío express de 1-2 días hábiles'),
+    ('DHL', 'Envío vía DHL con rastreo completo'),
+    ('FedEx', 'Envío vía FedEx nacional e internacional');
+
+-- Insertar métodos de pago
+INSERT INTO metodos_pago (nombre, descripcion) VALUES 
+    ('Tarjeta de Crédito', 'Pago con tarjeta de crédito o débito'),
+    ('PayPal', 'Pago seguro con PayPal'),
+    ('Transferencia', 'Transferencia bancaria directa'),
+    ('Contra Entrega', 'Pago al momento de la entrega');
+
+-- Insertar usuarios de prueba
+INSERT INTO usuarios (nombres, apellidos, correo, contrasena, usuario, rol) VALUES 
+    ('Juan Carlos', 'Pérez López', 'juan.perez@example.com', '$2b$10$hash1', 'juanperez', 'user'),
+    ('María Elena', 'García Martínez', 'maria.garcia@example.com', '$2b$10$hash2', 'mariagarcia', 'user'),
+    ('Carlos', 'Rodríguez Silva', 'carlos.rodriguez@example.com', '$2b$10$hash3', 'carlosrodriguez', 'user'),
+    ('Ana', 'Invitada', 'invitado@example.com', '$2b$10$hash4', 'invitado', 'user');
+
+-- Insertar información de envío
+INSERT INTO informacion_envio (id_usuario, nombre_completo, telefono, direccion, ciudad, estado, codigo_postal, pais) VALUES 
+    (1, 'Juan Carlos Pérez López', '555-0101', 'Av. Reforma 123, Col. Centro', 'Ciudad de México', 'CDMX', '06000', 'México'),
+    (2, 'María Elena García Martínez', '555-0202', 'Calle Juárez 456, Col. Americana', 'Guadalajara', 'Jalisco', '44100', 'México'),
+    (3, 'Carlos Rodríguez Silva', '555-0303', 'Blvd. Díaz Ordaz 789, Col. Santa María', 'Monterrey', 'Nuevo León', '64650', 'México');
+
+-- Insertar pedidos de prueba con diferentes estados y fechas
+INSERT INTO pedidos (id_usuario, id_informacion_envio, id_metodo_envio, id_metodo_pago, fecha_creacion, estado, total, notas) VALUES 
+    -- Pedidos recientes
+    (1, 1, 1, 1, NOW(), 'pendiente', 129.97, 'Pedido recién recibido, pendiente de procesamiento'),
+    (2, 2, 2, 2, NOW() - INTERVAL '1 hour', 'procesando', 89.98, 'Verificando disponibilidad de productos'),
+    (3, 3, 1, 1, NOW() - INTERVAL '3 hours', 'en_espera', 199.99, 'En espera de confirmación de pago'),
+    
+    -- Pedidos de ayer
+    (1, 1, 3, 1, NOW() - INTERVAL '1 day', 'enviado', 79.99, 'Enviado vía DHL - Número de rastreo: DHL123456789'),
+    (2, 2, 1, 3, NOW() - INTERVAL '1 day' + INTERVAL '2 hours', 'enviado', 149.98, 'Paquete en tránsito'),
+    
+    -- Pedidos de hace 2 días
+    (3, 3, 2, 1, NOW() - INTERVAL '2 days', 'terminado', 59.99, 'Pedido entregado exitosamente'),
+    (1, 1, 1, 2, NOW() - INTERVAL '2 days' + INTERVAL '5 hours', 'terminado', 299.97, 'Cliente confirmó recepción'),
+    
+    -- Pedidos con problemas
+    (2, 2, 1, 1, NOW() - INTERVAL '3 days', 'problema', 89.99, 'Producto agotado, esperando restock para completar pedido'),
+    (3, 3, 4, 4, NOW() - INTERVAL '1 week', 'problema', 199.99, 'Dirección incorrecta, contactar cliente para actualizar'),
+    
+    -- Pedidos más antiguos
+    (1, 1, 1, 1, NOW() - INTERVAL '1 week', 'terminado', 129.97, 'Pedido completado sin incidencias'),
+    (2, 2, 2, 2, NOW() - INTERVAL '2 weeks', 'terminado', 179.98, 'Cliente muy satisfecho con la compra'),
+    (NULL, NULL, 1, 1, NOW() - INTERVAL '5 days', 'terminado', 49.99, 'Pedido de invitado completado exitosamente');
+
+-- Insertar detalles de pedidos
+INSERT INTO pedido_detalle (id_pedido, id_producto, id_variante, id_talla, cantidad, precio_unitario) VALUES 
+    -- Pedido 1 (Juan Carlos - pendiente)
+    (1, 1, 1, 3, 2, 29.99), -- 2x Camiseta Azul M
+    (1, 3, 6, 11, 1, 89.99), -- 1x Sneakers Blanco/Negro 40
+    
+    -- Pedido 2 (María - procesando)
+    (2, 2, 4, 4, 1, 49.99), -- 1x Pantalón Azul L
+    (2, 4, 8, 3, 1, 24.99), -- 1x Polo Navy M
+    
+    -- Pedido 3 (Carlos - en espera)
+    (3, 7, 14, 4, 1, 79.99), -- 1x Chaqueta Verde L
+    (3, 8, 16, 11, 1, 119.99), -- 1x Zapatillas Running 40
+    
+    -- Pedido 4 (Juan Carlos - enviado)
+    (4, 5, 10, 3, 2, 19.99), -- 2x Shorts Negro M
+    (4, 6, 13, 1, 2, 15.99), -- 2x Gorra
+    
+    -- Pedido 5 (María - enviado)
+    (5, 1, 2, 3, 3, 29.99), -- 3x Camiseta Roja M
+    (5, 4, 9, 4, 2, 24.99), -- 2x Polo Blanco L
+    
+    -- Pedido 6 (Carlos - terminado)
+    (6, 5, 11, 3, 3, 19.99), -- 3x Shorts M
+    
+    -- Pedido 7 (Juan Carlos - terminado)
+    (7, 1, 1, 4, 5, 29.99), -- 5x Camiseta Azul L
+    (7, 2, 5, 3, 3, 54.99), -- 3x Pantalón Negro M
+    
+    -- Más detalles para otros pedidos...
+    (8, 3, 7, 10, 1, 89.99),
+    (9, 8, 16, 11, 1, 199.99),
+    (10, 1, 3, 4, 2, 32.99),
+    (10, 4, 8, 4, 2, 24.99),
+    (11, 2, 4, 3, 1, 49.99),
+    (11, 5, 10, 3, 3, 19.99),
+    (11, 6, 13, 1, 2, 15.99),
+    (12, 1, 1, 3, 1, 29.99);
 
 COMMIT;

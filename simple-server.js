@@ -52,6 +52,7 @@ try {
   const siteSettingsRoutes = require('./src/routes/site-settings.routes');
   const mainImagesRoutes = require('./src/routes/main-images.routes');
   const promotionsAdminRoutes = require('./src/routes/promotions-admin.routes');
+  const ordersAdminRoutes = require('./src/routes/orders-admin.routes');
   const { setupSiteSettings } = require('./src/setup-site-settings');
   
   // Crear la aplicación Express
@@ -129,6 +130,7 @@ try {
   app.use('/api/site-settings', siteSettingsRoutes);
   app.use('/api/main-images', mainImagesRoutes);
   app.use('/api/admin/promotions', promotionsAdminRoutes);
+  app.use('/api/admin/orders', ordersAdminRoutes);
   
   console.log('✅ Todas las rutas configuradas correctamente');
 
