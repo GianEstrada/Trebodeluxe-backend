@@ -12,9 +12,32 @@ async function updateSchema() {
     const schema = fs.readFileSync(schemaPath, 'utf8');
     
     console.log('💾 Ejecutando esquema en la base de datos...');
-    await db.query(schema);
     
-    console.log('✅ Esquema actualizado exitosamente');
+    // Dividir el esquema en declaraciones individuales y ejecutar una por una
+    const statements = schema.split(';').filter(statement => statement.trim() !== '');
+    
+    for (let i = 0; i < statements.length; i++) {
+      const statement = statements[i].trim();
+      if (statement) {
+        try {
+          await db.query(statement);
+          console.log(`✅ Declaración ${i + 1}/${statements.length} ejecutada correctamente`);
+        } catch (error) {
+          // Ignorar errores de elementos que ya existen
+          if (error.message.includes('already exists') || 
+              error.message.includes('duplicate key') ||
+              error.code === '42P07' || // table already exists
+              error.code === '23505') { // unique violation
+            console.log(`⚠️  Declaración ${i + 1}/${statements.length}: elemento ya existe, continuando...`);
+          } else {
+            console.log(`❌ Error en declaración ${i + 1}:`, error.message.substring(0, 100));
+            // Continuar con las siguientes declaraciones
+          }
+        }
+      }
+    }
+    
+    console.log('✅ Proceso de actualización completado');
     console.log('🔍 Verificando tablas creadas...');
     
     // Verificar que las tablas se crearon correctamente
