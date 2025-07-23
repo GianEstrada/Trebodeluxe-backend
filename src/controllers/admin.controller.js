@@ -313,16 +313,9 @@ const createVariantForProduct = async (req, res) => {
 
 // Subir imagen a Cloudinary
 const uploadImageToCloudinary = async (req, res) => {
+  const { uploadImage, cleanupTempFile } = require('../config/cloudinary');
+  
   try {
-    const cloudinary = require('cloudinary').v2;
-    
-    // Configurar Cloudinary
-    cloudinary.config({
-      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-      api_key: process.env.CLOUDINARY_API_KEY,
-      api_secret: process.env.CLOUDINARY_API_SECRET
-    });
-
     if (!req.file) {
       return res.status(400).json({
         success: false,
@@ -330,26 +323,33 @@ const uploadImageToCloudinary = async (req, res) => {
       });
     }
 
-    // Subir imagen a Cloudinary
-    const result = await cloudinary.uploader.upload(req.file.path, {
-      folder: 'trebodeluxe/products',
-      transformation: [
-        { width: 800, height: 800, crop: 'fill' },
-        { quality: 'auto:good' }
-      ]
-    });
+    console.log('Subiendo imagen:', req.file.path);
+
+    // Subir imagen a Cloudinary usando la función centralizada
+    const result = await uploadImage(req.file.path, 'productos');
+
+    // Limpiar archivo temporal
+    cleanupTempFile(req.file.path);
 
     res.json({
       success: true,
-      url: result.secure_url,
-      public_id: result.public_id
+      url: result.url,
+      public_id: result.public_id,
+      message: 'Imagen subida exitosamente'
     });
     
   } catch (error) {
     console.error('Error al subir imagen:', error);
+    
+    // Limpiar archivo temporal en caso de error
+    if (req.file && req.file.path) {
+      cleanupTempFile(req.file.path);
+    }
+    
     res.status(500).json({
       success: false,
-      message: 'Error al subir la imagen'
+      message: 'Error al subir la imagen',
+      error: error.message
     });
   }
 };

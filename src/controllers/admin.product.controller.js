@@ -55,7 +55,9 @@ const AdminProductController = {
         id_sistema_talla,
         nombre_variante,
         precio,
-        precio_original
+        precio_original,
+        imagen_url,
+        imagen_public_id
       } = req.body;
 
       // Validaciones
@@ -82,9 +84,25 @@ const AdminProductController = {
         }
       });
 
-      // Si hay imagen, subirla
+      // Manejar imagen
       let imageData = null;
-      if (req.file) {
+      
+      // Prioridad 1: Imagen ya subida (imagen_url e imagen_public_id en el cuerpo)
+      if (imagen_url && imagen_public_id) {
+        try {
+          imageData = await ImageModel.createVariantImage({
+            id_variante: product.variante_inicial.id_variante,
+            url: imagen_url,
+            public_id: imagen_public_id,
+            orden: 1
+          });
+          console.log('Imagen pre-subida guardada en BD:', imagen_url);
+        } catch (imageError) {
+          console.error('Error al guardar imagen pre-subida en BD:', imageError);
+        }
+      }
+      // Prioridad 2: Archivo subido con multer
+      else if (req.file) {
         try {
           // Subir a Cloudinary
           const cloudinaryResult = await uploadImage(req.file.path, 'productos');
@@ -99,6 +117,7 @@ const AdminProductController = {
 
           // Limpiar archivo temporal
           cleanupTempFile(req.file.path);
+          console.log('Imagen subida y guardada:', cloudinaryResult.url);
 
         } catch (imageError) {
           console.error('Error al subir imagen:', imageError);

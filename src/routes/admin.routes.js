@@ -1,10 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
 const adminController = require('../controllers/admin.controller');
+const authMiddleware = require('../middlewares/auth.middleware');
+const { upload, handleMulterError } = require('../middlewares/upload.middleware');
 
-// Configurar multer para subida de archivos
-const upload = multer({ dest: 'uploads/' });
+// Middleware para todas las rutas de admin
+router.use(authMiddleware.verifyToken);
+router.use(authMiddleware.requireAdmin);
 
 // Rutas para variantes
 router.get('/variants', adminController.getAllVariants);
@@ -16,6 +18,10 @@ router.post('/products', adminController.createProductWithVariant);
 router.post('/variants', adminController.createVariantForProduct);
 
 // Ruta para subir imágenes
-router.post('/upload-image', upload.single('image'), adminController.uploadImageToCloudinary);
+router.post('/upload-image', 
+  upload.single('image'), 
+  handleMulterError,
+  adminController.uploadImageToCloudinary
+);
 
 module.exports = router;
