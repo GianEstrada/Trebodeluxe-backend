@@ -302,9 +302,13 @@ class ProductModel {
                 THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
                 ELSE NULL
               END,
-              'imagenes', COALESCE(img.imagenes, '[]'::json)
+              'imagenes', COALESCE(img.imagenes, '[]'::json),
+              'stock_total', COALESCE(stock.total_stock, 0),
+              'disponible', COALESCE(stock.total_stock, 0) > 0
             ) ORDER BY v.id_variante
-          ) FILTER (WHERE v.id_variante IS NOT NULL) as variantes
+          ) FILTER (WHERE v.id_variante IS NOT NULL) as variantes,
+          COALESCE(MAX(stock.total_stock), 0) as stock_total_producto,
+          COALESCE(MAX(stock.total_stock), 0) > 0 as producto_disponible
         FROM productos p
         LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
         LEFT JOIN (
@@ -321,6 +325,13 @@ class ProductModel {
           FROM imagenes_variante
           GROUP BY id_variante
         ) img ON v.id_variante = img.id_variante
+        LEFT JOIN (
+          SELECT 
+            id_variante,
+            SUM(cantidad) as total_stock
+          FROM stock
+          GROUP BY id_variante
+        ) stock ON v.id_variante = stock.id_variante
         WHERE p.activo = true
         GROUP BY p.id_producto
         ORDER BY p.fecha_creacion DESC
@@ -368,7 +379,9 @@ class ProductModel {
                   THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
                   ELSE NULL
                 END,
-                'imagenes', COALESCE(img.imagenes, '[]'::json)
+                'imagenes', COALESCE(img.imagenes, '[]'::json),
+                'stock_total', COALESCE(stock.total_stock, 0),
+                'disponible', COALESCE(stock.total_stock, 0) > 0
               ) ORDER BY v.id_variante
             ) FILTER (WHERE v.id_variante IS NOT NULL) as variantes
           FROM productos p
@@ -387,6 +400,13 @@ class ProductModel {
             FROM imagenes_variante
             GROUP BY id_variante
           ) img ON v.id_variante = img.id_variante
+          LEFT JOIN (
+            SELECT 
+              id_variante,
+              SUM(cantidad) as total_stock
+            FROM stock
+            GROUP BY id_variante
+          ) stock ON v.id_variante = stock.id_variante
           WHERE p.activo = true
           GROUP BY p.id_producto
         ) productos_variantes ON p.id_producto = productos_variantes.id_producto

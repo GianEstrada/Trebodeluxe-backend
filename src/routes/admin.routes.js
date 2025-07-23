@@ -17,6 +17,14 @@ router.get('/size-systems', adminController.getSizeSystems);
 router.post('/products', adminController.createProductWithVariant);
 router.post('/variants', adminController.createVariantForProduct);
 
+// Rutas para editar y eliminar productos
+router.get('/products/:id', adminController.getProductById);
+router.put('/products/:id', adminController.updateProduct);
+router.delete('/products/:id', adminController.deleteProduct);
+
+// Ruta para crear variantes en productos existentes
+router.post('/products/variants', adminController.createVariantForProduct);
+
 // Ruta para subir imágenes
 router.post('/upload-image', 
   upload.single('image'), 

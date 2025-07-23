@@ -392,11 +392,194 @@ const uploadImageToCloudinary = async (req, res) => {
   }
 };
 
+// Eliminar producto
+const deleteProduct = async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    const { id } = req.params;
+    
+    // Verificar que el producto existe
+    const checkQuery = 'SELECT id_producto FROM productos WHERE id_producto = $1';
+    const checkResult = await client.query(checkQuery, [id]);
+    
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Producto no encontrado'
+      });
+    }
+    
+    // Marcar como inactivo en lugar de eliminar (soft delete)
+    const deleteQuery = 'UPDATE productos SET activo = false WHERE id_producto = $1';
+    await client.query(deleteQuery, [id]);
+    
+    await client.query('COMMIT');
+    
+    res.json({
+      success: true,
+      message: 'Producto eliminado correctamente'
+    });
+    
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error al eliminar producto:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  } finally {
+    client.release();
+  }
+};
+
+// Obtener producto por ID para edición
+const getProductById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const query = `
+      SELECT 
+        p.id_producto,
+        p.nombre,
+        p.descripcion,
+        p.categoria,
+        p.marca,
+        p.id_sistema_talla,
+        st.nombre as sistema_talla,
+        JSON_AGG(
+          JSON_BUILD_OBJECT(
+            'id_variante', v.id_variante,
+            'nombre', v.nombre,
+            'precio', v.precio,
+            'precio_original', v.precio_original,
+            'activo', v.activo,
+            'imagenes', COALESCE(imagenes.imagenes, '[]'::json),
+            'tallas', COALESCE(tallas.tallas, '[]'::json)
+          )
+        ) as variantes
+      FROM productos p
+      LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
+      LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+      LEFT JOIN (
+        SELECT 
+          id_variante,
+          JSON_AGG(
+            JSON_BUILD_OBJECT(
+              'url', url,
+              'public_id', public_id,
+              'orden', orden
+            ) ORDER BY orden
+          ) as imagenes
+        FROM imagenes_variante
+        GROUP BY id_variante
+      ) imagenes ON v.id_variante = imagenes.id_variante
+      LEFT JOIN (
+        SELECT 
+          s.id_variante,
+          JSON_AGG(
+            JSON_BUILD_OBJECT(
+              'id_talla', t.id_talla,
+              'nombre_talla', t.nombre_talla,
+              'cantidad', s.cantidad
+            )
+          ) as tallas
+        FROM stock s
+        JOIN tallas t ON s.id_talla = t.id_talla
+        GROUP BY s.id_variante
+      ) tallas ON v.id_variante = tallas.id_variante
+      WHERE p.id_producto = $1 AND p.activo = true
+      GROUP BY p.id_producto, p.nombre, p.descripcion, p.categoria, p.marca, 
+               p.id_sistema_talla, st.nombre;
+    `;
+    
+    const result = await pool.query(query, [id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Producto no encontrado'
+      });
+    }
+    
+    res.json({
+      success: true,
+      product: result.rows[0]
+    });
+    
+  } catch (error) {
+    console.error('Error al obtener producto:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+};
+
+// Actualizar producto
+const updateProduct = async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    const { id } = req.params;
+    const { 
+      nombre, 
+      descripcion, 
+      categoria,
+      marca,
+      id_sistema_talla
+    } = req.body;
+    
+    // Actualizar producto
+    const updateQuery = `
+      UPDATE productos 
+      SET nombre = $1, descripcion = $2, categoria = $3, marca = $4, id_sistema_talla = $5
+      WHERE id_producto = $6 AND activo = true
+      RETURNING id_producto;
+    `;
+    
+    const result = await client.query(updateQuery, [
+      nombre, descripcion, categoria, marca, id_sistema_talla, id
+    ]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Producto no encontrado'
+      });
+    }
+    
+    await client.query('COMMIT');
+    
+    res.json({
+      success: true,
+      message: 'Producto actualizado correctamente'
+    });
+    
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error al actualizar producto:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   getAllVariants,
   getAllProducts,
   getSizeSystems,
   createProductWithVariant,
   createVariantForProduct,
-  uploadImageToCloudinary
+  uploadImageToCloudinary,
+  deleteProduct,
+  getProductById,
+  updateProduct
 };
