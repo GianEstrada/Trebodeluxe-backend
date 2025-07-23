@@ -227,7 +227,7 @@ CREATE TABLE pedidos (
     id_metodo_envio INTEGER REFERENCES metodos_envio(id_metodo_envio) ON DELETE RESTRICT,
     id_metodo_pago INTEGER REFERENCES metodos_pago(id_metodo_pago) ON DELETE RESTRICT,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    estado VARCHAR(20) DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'procesando', 'en_espera', 'enviado', 'terminado', 'problema')),
+    estado VARCHAR(20) DEFAULT 'pendiente' CHECK (estado IN ('carrito', 'pendiente', 'procesando', 'en_espera', 'enviado', 'terminado', 'problema')),
     total NUMERIC(10,2),
     token_sesion VARCHAR(100), -- Para pedidos de invitados sin cuenta
     notas TEXT -- Campo para notas administrativas
