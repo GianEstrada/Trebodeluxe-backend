@@ -15,7 +15,7 @@ const registerUser = async (req, res) => {
   const { nombres, apellidos, correo, contrasena, usuario, shippingInfo } = req.body;
 
   // Iniciar transacción para mantener consistencia
-  const client = await db.connect();
+  const client = await db.pool.connect();
   
   try {
     await client.query('BEGIN');
