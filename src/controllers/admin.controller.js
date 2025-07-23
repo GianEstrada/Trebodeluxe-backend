@@ -172,8 +172,27 @@ const createProductWithVariant = async (req, res) => {
       
       const id_variante = variantResult.rows[0].id_variante;
 
-      // Agregar imagen si existe
-      if (variante.imagen_url && variante.imagen_public_id) {
+      // Agregar imágenes si existen
+      if (variante.imagenes && variante.imagenes.length > 0) {
+        for (let i = 0; i < variante.imagenes.length; i++) {
+          const imagen = variante.imagenes[i];
+          if (imagen.url && imagen.public_id) {
+            const imageQuery = `
+              INSERT INTO imagenes_variante (id_variante, url, public_id, orden)
+              VALUES ($1, $2, $3, $4);
+            `;
+            
+            await client.query(imageQuery, [
+              id_variante,
+              imagen.url,
+              imagen.public_id,
+              i + 1
+            ]);
+          }
+        }
+      }
+      // Fallback para compatibilidad con formato anterior
+      else if (variante.imagen_url && variante.imagen_public_id) {
         const imageQuery = `
           INSERT INTO imagenes_variante (id_variante, url, public_id, orden)
           VALUES ($1, $2, $3, 1);
@@ -240,6 +259,7 @@ const createVariantForProduct = async (req, res) => {
       precio_original,
       imagen_url,
       imagen_public_id,
+      imagenes,
       tallas 
     } = req.body;
 
@@ -259,8 +279,27 @@ const createVariantForProduct = async (req, res) => {
     
     const id_variante = variantResult.rows[0].id_variante;
 
-    // Agregar imagen si existe
-    if (imagen_url && imagen_public_id) {
+    // Agregar imágenes si existen (formato nuevo con array)
+    if (imagenes && imagenes.length > 0) {
+      for (let i = 0; i < imagenes.length; i++) {
+        const imagen = imagenes[i];
+        if (imagen.url && imagen.public_id) {
+          const imageQuery = `
+            INSERT INTO imagenes_variante (id_variante, url, public_id, orden)
+            VALUES ($1, $2, $3, $4);
+          `;
+          
+          await client.query(imageQuery, [
+            id_variante,
+            imagen.url,
+            imagen.public_id,
+            i + 1
+          ]);
+        }
+      }
+    }
+    // Fallback para compatibilidad con formato anterior
+    else if (imagen_url && imagen_public_id) {
       const imageQuery = `
         INSERT INTO imagenes_variante (id_variante, url, public_id, orden)
         VALUES ($1, $2, $3, 1);
