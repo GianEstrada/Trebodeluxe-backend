@@ -22,6 +22,11 @@ router.get('/products/:id', adminController.getProductById);
 router.put('/products/:id', adminController.updateProduct);
 router.delete('/products/:id', adminController.deleteProduct);
 
+// Rutas para editar y eliminar variantes
+router.get('/variants/:id', adminController.getVariantById);
+router.put('/variants/:id', adminController.updateVariant);
+router.delete('/variants/:id', adminController.deleteVariant);
+
 // Ruta para crear variantes en productos existentes
 router.post('/products/variants', adminController.createVariantForProduct);
 

@@ -572,6 +572,232 @@ const updateProduct = async (req, res) => {
   }
 };
 
+// Eliminar variante
+const deleteVariant = async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    const { id } = req.params;
+    
+    // Verificar que la variante existe
+    const checkQuery = 'SELECT id_variante FROM variantes WHERE id_variante = $1';
+    const checkResult = await client.query(checkQuery, [id]);
+    
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Variante no encontrada'
+      });
+    }
+    
+    // Marcar como inactiva en lugar de eliminar (soft delete)
+    const deleteQuery = 'UPDATE variantes SET activo = false WHERE id_variante = $1';
+    await client.query(deleteQuery, [id]);
+    
+    await client.query('COMMIT');
+    
+    res.json({
+      success: true,
+      message: 'Variante eliminada correctamente'
+    });
+    
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error al eliminar variante:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  } finally {
+    client.release();
+  }
+};
+
+// Obtener variante por ID para edición
+const getVariantById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const query = `
+      SELECT 
+        v.id_variante,
+        v.nombre,
+        v.precio,
+        v.precio_original,
+        v.activo,
+        v.id_producto,
+        p.nombre as nombre_producto,
+        p.descripcion as descripcion_producto,
+        p.categoria,
+        p.marca,
+        p.id_sistema_talla,
+        st.nombre as sistema_talla,
+        COALESCE(
+          JSON_AGG(
+            CASE WHEN iv.id_imagen IS NOT NULL THEN
+              JSON_BUILD_OBJECT(
+                'id_imagen', iv.id_imagen,
+                'url', iv.url,
+                'public_id', iv.public_id,
+                'orden', iv.orden
+              )
+            END
+          ) FILTER (WHERE iv.id_imagen IS NOT NULL), '[]'
+        ) as imagenes,
+        COALESCE(
+          JSON_AGG(
+            CASE WHEN t.id_talla IS NOT NULL THEN
+              JSON_BUILD_OBJECT(
+                'id_talla', t.id_talla,
+                'nombre_talla', t.nombre_talla,
+                'cantidad', COALESCE(s.cantidad, 0)
+              )
+            END
+          ) FILTER (WHERE t.id_talla IS NOT NULL), '[]'
+        ) as tallas
+      FROM variantes v
+      INNER JOIN productos p ON v.id_producto = p.id_producto
+      LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
+      LEFT JOIN imagenes_variante iv ON v.id_variante = iv.id_variante
+      LEFT JOIN tallas t ON t.id_sistema_talla = p.id_sistema_talla
+      LEFT JOIN stock s ON s.id_variante = v.id_variante AND s.id_talla = t.id_talla
+      WHERE v.id_variante = $1 AND v.activo = true AND p.activo = true
+      GROUP BY v.id_variante, v.nombre, v.precio, v.precio_original, v.activo,
+               v.id_producto, p.nombre, p.descripcion, p.categoria, p.marca,
+               p.id_sistema_talla, st.nombre;
+    `;
+    
+    const result = await pool.query(query, [id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Variante no encontrada'
+      });
+    }
+    
+    res.json({
+      success: true,
+      variant: result.rows[0]
+    });
+    
+  } catch (error) {
+    console.error('Error al obtener variante:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+};
+
+// Actualizar variante
+const updateVariant = async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    const { id } = req.params;
+    const { 
+      nombre,
+      precio,
+      precio_original,
+      imagenes,
+      tallas
+    } = req.body;
+    
+    // Actualizar variante
+    const updateQuery = `
+      UPDATE variantes 
+      SET nombre = $1, precio = $2, precio_original = $3
+      WHERE id_variante = $4 AND activo = true
+      RETURNING id_variante;
+    `;
+    
+    const result = await client.query(updateQuery, [
+      nombre, precio, precio_original || null, id
+    ]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Variante no encontrada'
+      });
+    }
+    
+    // Actualizar imágenes si se proporcionan
+    if (imagenes && imagenes.length > 0) {
+      // Eliminar imágenes existentes
+      await client.query('DELETE FROM imagenes_variante WHERE id_variante = $1', [id]);
+      
+      // Agregar nuevas imágenes
+      for (let i = 0; i < imagenes.length; i++) {
+        const imagen = imagenes[i];
+        if (imagen.url && imagen.public_id) {
+          const imageQuery = `
+            INSERT INTO imagenes_variante (id_variante, url, public_id, orden)
+            VALUES ($1, $2, $3, $4);
+          `;
+          
+          await client.query(imageQuery, [
+            id,
+            imagen.url,
+            imagen.public_id,
+            i + 1
+          ]);
+        }
+      }
+    }
+    
+    // Actualizar stock por tallas si se proporciona
+    if (tallas && tallas.length > 0) {
+      // Eliminar stock existente
+      await client.query('DELETE FROM stock WHERE id_variante = $1', [id]);
+      
+      // Obtener id_producto para el stock
+      const productQuery = 'SELECT id_producto FROM variantes WHERE id_variante = $1';
+      const productResult = await client.query(productQuery, [id]);
+      const id_producto = productResult.rows[0].id_producto;
+      
+      // Agregar nuevo stock
+      for (const talla of tallas) {
+        if (talla.cantidad > 0) {
+          const stockQuery = `
+            INSERT INTO stock (id_producto, id_variante, id_talla, cantidad)
+            VALUES ($1, $2, $3, $4);
+          `;
+          
+          await client.query(stockQuery, [
+            id_producto,
+            id,
+            talla.id_talla,
+            talla.cantidad
+          ]);
+        }
+      }
+    }
+    
+    await client.query('COMMIT');
+    
+    res.json({
+      success: true,
+      message: 'Variante actualizada correctamente'
+    });
+    
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error al actualizar variante:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   getAllVariants,
   getAllProducts,
@@ -581,5 +807,8 @@ module.exports = {
   uploadImageToCloudinary,
   deleteProduct,
   getProductById,
-  updateProduct
+  updateProduct,
+  deleteVariant,
+  getVariantById,
+  updateVariant
 };
