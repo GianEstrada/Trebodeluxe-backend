@@ -1,4 +1,4 @@
-const pool = require('../config/db');
+const { pool } = require('../config/db');
 const { uploadImage, cleanupTempFile } = require('../config/cloudinary');
 
 // Obtener todas las variantes con información completa
