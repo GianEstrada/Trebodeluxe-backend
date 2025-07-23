@@ -639,7 +639,7 @@ const getVariantById = async (req, res) => {
     const query = `
       SELECT 
         v.id_variante,
-        v.nombre,
+        v.nombre as nombre_variante,
         v.precio,
         v.precio_original,
         v.activo,
@@ -650,39 +650,47 @@ const getVariantById = async (req, res) => {
         p.marca,
         p.id_sistema_talla,
         st.nombre as sistema_talla,
-        COALESCE(
-          JSON_AGG(
-            CASE WHEN iv.id_imagen IS NOT NULL THEN
-              JSON_BUILD_OBJECT(
-                'id_imagen', iv.id_imagen,
-                'url', iv.url,
-                'public_id', iv.public_id,
-                'orden', iv.orden
-              )
-            END
-          ) FILTER (WHERE iv.id_imagen IS NOT NULL), '[]'
-        ) as imagenes,
-        COALESCE(
-          JSON_AGG(
-            CASE WHEN t.id_talla IS NOT NULL THEN
-              JSON_BUILD_OBJECT(
-                'id_talla', t.id_talla,
-                'nombre_talla', t.nombre_talla,
-                'cantidad', COALESCE(s.cantidad, 0)
-              )
-            END
-          ) FILTER (WHERE t.id_talla IS NOT NULL), '[]'
-        ) as tallas
+        COALESCE(img.imagenes, '[]'::json) as imagenes,
+        COALESCE(stock_info.tallas_stock, '[]'::json) as tallas_stock
       FROM variantes v
       INNER JOIN productos p ON v.id_producto = p.id_producto
       LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
-      LEFT JOIN imagenes_variante iv ON v.id_variante = iv.id_variante
-      LEFT JOIN tallas t ON t.id_sistema_talla = p.id_sistema_talla
-      LEFT JOIN stock s ON s.id_variante = v.id_variante AND s.id_talla = t.id_talla
-      WHERE v.id_variante = $1 AND v.activo = true AND p.activo = true
-      GROUP BY v.id_variante, v.nombre, v.precio, v.precio_original, v.activo,
-               v.id_producto, p.nombre, p.descripcion, p.categoria, p.marca,
-               p.id_sistema_talla, st.nombre;
+      LEFT JOIN (
+        SELECT 
+          id_variante,
+          JSON_AGG(
+            JSON_BUILD_OBJECT(
+              'id_imagen', id_imagen,
+              'url', url,
+              'public_id', public_id,
+              'orden', orden
+            ) ORDER BY orden
+          ) as imagenes
+        FROM imagenes_variante
+        WHERE id_variante = $1
+        GROUP BY id_variante
+      ) img ON v.id_variante = img.id_variante
+      LEFT JOIN (
+        SELECT 
+          s.id_variante,
+          JSON_AGG(
+            JSON_BUILD_OBJECT(
+              'id_talla', t.id_talla,
+              'nombre_talla', t.nombre_talla,
+              'cantidad', COALESCE(s.cantidad, 0)
+            ) ORDER BY t.orden, t.id_talla
+          ) as tallas_stock
+        FROM tallas t
+        LEFT JOIN stock s ON s.id_talla = t.id_talla AND s.id_variante = $1
+        WHERE t.id_sistema_talla = (
+          SELECT p2.id_sistema_talla 
+          FROM productos p2 
+          INNER JOIN variantes v2 ON p2.id_producto = v2.id_producto 
+          WHERE v2.id_variante = $1
+        )
+        GROUP BY s.id_variante
+      ) stock_info ON v.id_variante = stock_info.id_variante
+      WHERE v.id_variante = $1 AND v.activo = true AND p.activo = true;
     `;
     
     const result = await pool.query(query, [id]);
