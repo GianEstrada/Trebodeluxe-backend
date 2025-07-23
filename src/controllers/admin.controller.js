@@ -581,8 +581,8 @@ const deleteVariant = async (req, res) => {
     
     const { id } = req.params;
     
-    // Verificar que la variante existe
-    const checkQuery = 'SELECT id_variante FROM variantes WHERE id_variante = $1';
+    // Verificar que la variante existe y obtener el ID del producto
+    const checkQuery = 'SELECT id_variante, id_producto FROM variantes WHERE id_variante = $1';
     const checkResult = await client.query(checkQuery, [id]);
     
     if (checkResult.rows.length === 0) {
@@ -592,9 +592,25 @@ const deleteVariant = async (req, res) => {
       });
     }
     
+    const { id_producto } = checkResult.rows[0];
+    
     // Marcar como inactiva en lugar de eliminar (soft delete)
     const deleteQuery = 'UPDATE variantes SET activo = false WHERE id_variante = $1';
     await client.query(deleteQuery, [id]);
+    
+    // Verificar si todas las variantes del producto están inactivas
+    const activeVariantsQuery = `
+      SELECT COUNT(*) as active_count 
+      FROM variantes 
+      WHERE id_producto = $1 AND activo = true
+    `;
+    const activeVariantsResult = await client.query(activeVariantsQuery, [id_producto]);
+    
+    // Si no hay variantes activas, marcar el producto como inactivo
+    if (parseInt(activeVariantsResult.rows[0].active_count) === 0) {
+      const deactivateProductQuery = 'UPDATE productos SET activo = false WHERE id_producto = $1';
+      await client.query(deactivateProductQuery, [id_producto]);
+    }
     
     await client.query('COMMIT');
     
