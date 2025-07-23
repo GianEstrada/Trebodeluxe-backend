@@ -17,8 +17,8 @@ const uploadImage = async (filePath, folder = 'productos') => {
     const result = await cloudinary.uploader.upload(filePath, {
       folder: `trebodeluxe/${folder}`,
       resource_type: 'auto',
-      quality: 'auto',
-      format: 'auto'
+      quality: 'auto'
+      // Removido format: 'auto' porque no es válido para upload
     });
 
     console.log('Imagen subida exitosamente:', result.public_id);
