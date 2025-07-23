@@ -1,4 +1,6 @@
 const cloudinary = require('cloudinary').v2;
+const fs = require('fs');
+const path = require('path');
 
 // Configurar Cloudinary
 cloudinary.config({
@@ -79,10 +81,23 @@ const generateImageVariants = (publicId) => {
   };
 };
 
+// Función para limpiar archivos temporales
+const cleanupTempFile = (filePath) => {
+  try {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      console.log(`Archivo temporal eliminado: ${filePath}`);
+    }
+  } catch (error) {
+    console.error(`Error al eliminar archivo temporal ${filePath}:`, error);
+  }
+};
+
 module.exports = {
   cloudinary,
   uploadImage,
   deleteImage,
   getOptimizedUrl,
-  generateImageVariants
+  generateImageVariants,
+  cleanupTempFile
 };

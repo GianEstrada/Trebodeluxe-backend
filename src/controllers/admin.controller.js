@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { uploadImage, cleanupTempFile } = require('../config/cloudinary');
 
 // Obtener todas las variantes con información completa
 const getAllVariants = async (req, res) => {
@@ -313,8 +314,6 @@ const createVariantForProduct = async (req, res) => {
 
 // Subir imagen a Cloudinary
 const uploadImageToCloudinary = async (req, res) => {
-  const { uploadImage, cleanupTempFile } = require('../config/cloudinary');
-  
   try {
     if (!req.file) {
       return res.status(400).json({
