@@ -54,6 +54,7 @@ try {
   const promotionsAdminRoutes = require('./src/routes/promotions-admin.routes');
   const ordersAdminRoutes = require('./src/routes/orders-admin.routes');
   const notesRoutes = require('./src/routes/notes.routes');
+  const cartRoutes = require('./src/routes/cart.routes');
   const { setupSiteSettings } = require('./src/setup-site-settings');
   
   // Crear la aplicación Express
@@ -133,6 +134,7 @@ try {
   app.use('/api/admin/promotions', promotionsAdminRoutes);
   app.use('/api/admin/orders', ordersAdminRoutes);
   app.use('/api/notes', notesRoutes);
+  app.use('/api/cart', cartRoutes);
   
   console.log('✅ Todas las rutas configuradas correctamente');
 
@@ -194,6 +196,11 @@ try {
     - POST /api/admin/promotions ✨
     - PUT  /api/admin/promotions/:id ✨
     - DELETE /api/admin/promotions/:id ✨
+    - GET  /api/cart (CARRITO) 🛒
+    - POST /api/cart/add (CARRITO) 🛒
+    - PUT  /api/cart/update (CARRITO) 🛒
+    - DELETE /api/cart/remove (CARRITO) 🛒
+    - DELETE /api/cart/clear (CARRITO) 🛒
     `);
     
     // Configurar tablas automáticamente
