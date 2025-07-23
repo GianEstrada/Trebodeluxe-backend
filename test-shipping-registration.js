@@ -7,7 +7,7 @@
 
 require('dotenv').config();
 
-const API_URL = process.env.API_URL || 'https://trebodeluxe-backend.onrender.com';
+const API_URL = 'https://trebodeluxe-backend.onrender.com';
 
 async function testRegistrationWithShipping() {
   console.log('🧪 Probando registro con datos de envío...\n');
