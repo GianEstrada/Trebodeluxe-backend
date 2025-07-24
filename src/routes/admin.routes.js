@@ -40,8 +40,15 @@ router.post('/upload-image',
 // Ruta para eliminar imágenes
 router.delete('/delete-image', adminController.deleteImageFromCloudinary);
 
-// Rutas para imágenes principales del sitio
+// Rutas para imágenes principales del sitio (legacy)
 router.get('/home-images', adminController.getHomeImages);
 router.put('/home-images', adminController.updateHomeImage);
+
+// Rutas para el nuevo sistema de imágenes principales
+router.get('/principal-images', adminController.getPrincipalImages);
+router.post('/principal-images', adminController.createPrincipalImage);
+router.put('/principal-images/:id', adminController.updatePrincipalImage);
+router.delete('/principal-images/:id', adminController.deletePrincipalImage);
+router.put('/principal-images/:id/position', adminController.updateImagePosition);
 
 module.exports = router;

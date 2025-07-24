@@ -998,3 +998,271 @@ module.exports = {
   getHomeImages,
   updateHomeImage
 };
+
+// ================== NUEVAS FUNCIONES PARA IMÁGENES PRINCIPALES ==================
+
+// Obtener todas las imágenes principales
+const getPrincipalImages = async (req, res) => {
+  try {
+    const { search } = req.query;
+    
+    let query = `
+      SELECT 
+        id_imagen,
+        nombre,
+        descripcion,
+        url,
+        public_id,
+        posicion,
+        orden,
+        activo,
+        fecha_creacion,
+        fecha_actualizacion
+      FROM imagenes_principales_nuevas
+      WHERE activo = true
+    `;
+    
+    const queryParams = [];
+    
+    // Agregar filtro de búsqueda si se proporciona
+    if (search && search.trim()) {
+      query += ` AND (nombre ILIKE $1 OR descripcion ILIKE $1)`;
+      queryParams.push(`%${search.trim()}%`);
+    }
+    
+    query += ` ORDER BY 
+      CASE posicion 
+        WHEN 'izquierda' THEN 1 
+        WHEN 'derecha' THEN 2 
+        WHEN 'inactiva' THEN 3 
+      END,
+      orden ASC, 
+      fecha_creacion DESC
+    `;
+    
+    const result = await pool.query(query, queryParams);
+    
+    res.json({
+      success: true,
+      images: result.rows
+    });
+    
+  } catch (error) {
+    console.error('Error al obtener imágenes principales:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener las imágenes principales'
+    });
+  }
+};
+
+// Crear nueva imagen principal
+const createPrincipalImage = async (req, res) => {
+  try {
+    const { nombre, descripcion, url, public_id, posicion = 'inactiva' } = req.body;
+    
+    if (!nombre || !url || !public_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nombre, URL y public_id son requeridos'
+      });
+    }
+    
+    // Validar posición
+    const validPositions = ['inactiva', 'izquierda', 'derecha'];
+    if (!validPositions.includes(posicion)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Posición no válida'
+      });
+    }
+    
+    const query = `
+      INSERT INTO imagenes_principales_nuevas (nombre, descripcion, url, public_id, posicion)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `;
+    
+    const result = await pool.query(query, [nombre, descripcion, url, public_id, posicion]);
+    
+    res.json({
+      success: true,
+      message: 'Imagen principal creada correctamente',
+      image: result.rows[0]
+    });
+    
+  } catch (error) {
+    console.error('Error al crear imagen principal:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al crear la imagen principal'
+    });
+  }
+};
+
+// Actualizar imagen principal
+const updatePrincipalImage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nombre, descripcion } = req.body;
+    
+    if (!nombre) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nombre es requerido'
+      });
+    }
+    
+    const query = `
+      UPDATE imagenes_principales_nuevas 
+      SET nombre = $1, descripcion = $2, fecha_actualizacion = CURRENT_TIMESTAMP
+      WHERE id_imagen = $3
+      RETURNING *
+    `;
+    
+    const result = await pool.query(query, [nombre, descripcion, id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Imagen no encontrada'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Imagen principal actualizada correctamente',
+      image: result.rows[0]
+    });
+    
+  } catch (error) {
+    console.error('Error al actualizar imagen principal:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al actualizar la imagen principal'
+    });
+  }
+};
+
+// Eliminar imagen principal
+const deletePrincipalImage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Primero obtener los datos de la imagen para eliminar de Cloudinary
+    const selectQuery = `
+      SELECT public_id FROM imagenes_principales_nuevas WHERE id_imagen = $1
+    `;
+    const selectResult = await pool.query(selectQuery, [id]);
+    
+    if (selectResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Imagen no encontrada'
+      });
+    }
+    
+    const { public_id } = selectResult.rows[0];
+    
+    // Eliminar de la base de datos
+    const deleteQuery = `
+      DELETE FROM imagenes_principales_nuevas WHERE id_imagen = $1
+      RETURNING *
+    `;
+    const deleteResult = await pool.query(deleteQuery, [id]);
+    
+    // Eliminar de Cloudinary
+    try {
+      if (public_id) {
+        await deleteImage(public_id);
+      }
+    } catch (cloudinaryError) {
+      console.warn('Error al eliminar imagen de Cloudinary:', cloudinaryError);
+      // No fallar la operación si Cloudinary falla
+    }
+    
+    res.json({
+      success: true,
+      message: 'Imagen principal eliminada correctamente',
+      image: deleteResult.rows[0]
+    });
+    
+  } catch (error) {
+    console.error('Error al eliminar imagen principal:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al eliminar la imagen principal'
+    });
+  }
+};
+
+// Actualizar posición de imagen
+const updateImagePosition = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { posicion } = req.body;
+    
+    // Validar posición
+    const validPositions = ['inactiva', 'izquierda', 'derecha'];
+    if (!validPositions.includes(posicion)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Posición no válida'
+      });
+    }
+    
+    const query = `
+      UPDATE imagenes_principales_nuevas 
+      SET posicion = $1, fecha_actualizacion = CURRENT_TIMESTAMP
+      WHERE id_imagen = $2
+      RETURNING *
+    `;
+    
+    const result = await pool.query(query, [posicion, id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Imagen no encontrada'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Posición actualizada correctamente',
+      image: result.rows[0]
+    });
+    
+  } catch (error) {
+    console.error('Error al actualizar posición:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al actualizar la posición'
+    });
+  }
+};
+
+// Exportar las nuevas funciones junto con las existentes
+module.exports = {
+  getAllVariants,
+  getAllProducts,
+  getSizeSystems,
+  createProductWithVariant,
+  createVariantForProduct,
+  uploadImageToCloudinary,
+  deleteImageFromCloudinary,
+  deleteProduct,
+  getProductById,
+  updateProduct,
+  deleteVariant,
+  getVariantById,
+  updateVariant,
+  getHomeImages,
+  updateHomeImage,
+  // Nuevas funciones para imágenes principales
+  getPrincipalImages,
+  createPrincipalImage,
+  updatePrincipalImage,
+  deletePrincipalImage,
+  updateImagePosition
+};
