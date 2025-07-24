@@ -1,5 +1,5 @@
 const { pool } = require('../config/db');
-const { uploadImage, cleanupTempFile } = require('../config/cloudinary');
+const { uploadImage, deleteImage, cleanupTempFile } = require('../config/cloudinary');
 
 // Obtener todas las variantes con información completa
 const getAllVariants = async (req, res) => {
@@ -725,12 +725,16 @@ const updateVariant = async (req, res) => {
     
     const { id } = req.params;
     const { 
+      nombre_variante,
       nombre,
       precio,
       precio_original,
       imagenes,
       tallas
     } = req.body;
+    
+    // Usar nombre_variante si existe, sino usar nombre para compatibilidad
+    const variantName = nombre_variante || nombre;
     
     // Actualizar variante
     const updateQuery = `
@@ -741,7 +745,7 @@ const updateVariant = async (req, res) => {
     `;
     
     const result = await client.query(updateQuery, [
-      nombre, precio, precio_original || null, id
+      variantName, precio, precio_original || null, id
     ]);
     
     if (result.rows.length === 0) {
@@ -822,6 +826,44 @@ const updateVariant = async (req, res) => {
   }
 };
 
+// Función para eliminar imagen de Cloudinary
+const deleteImageFromCloudinary = async (req, res) => {
+  try {
+    const { public_id, variant_id } = req.body;
+    
+    if (!public_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'public_id es requerido'
+      });
+    }
+
+    // Eliminar imagen de Cloudinary
+    const result = await deleteImage(public_id);
+    
+    // Si se proporciona variant_id, también eliminar de la base de datos
+    if (variant_id) {
+      await pool.query(
+        'DELETE FROM imagenes_variante WHERE public_id = $1 AND id_variante = $2',
+        [public_id, variant_id]
+      );
+    }
+    
+    res.json({
+      success: true,
+      message: 'Imagen eliminada correctamente',
+      result: result
+    });
+    
+  } catch (error) {
+    console.error('Error al eliminar imagen:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al eliminar la imagen'
+    });
+  }
+};
+
 module.exports = {
   getAllVariants,
   getAllProducts,
@@ -829,6 +871,7 @@ module.exports = {
   createProductWithVariant,
   createVariantForProduct,
   uploadImageToCloudinary,
+  deleteImageFromCloudinary,
   deleteProduct,
   getProductById,
   updateProduct,

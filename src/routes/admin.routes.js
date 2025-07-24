@@ -37,4 +37,7 @@ router.post('/upload-image',
   adminController.uploadImageToCloudinary
 );
 
+// Ruta para eliminar imágenes
+router.delete('/delete-image', adminController.deleteImageFromCloudinary);
+
 module.exports = router;
