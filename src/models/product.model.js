@@ -102,7 +102,8 @@ class ProductModel {
               json_build_object(
                 'id_talla', t.id_talla,
                 'nombre_talla', t.nombre_talla,
-                'cantidad', s.cantidad
+                'cantidad', s.cantidad,
+                'precio', s.precio
               ) ORDER BY t.orden
             ) as tallas_stock
           FROM stock s
@@ -198,7 +199,8 @@ class ProductModel {
                 'id_talla', t.id_talla,
                 'nombre_talla', t.nombre_talla,
                 'orden', t.orden,
-                'cantidad', s.cantidad
+                'cantidad', s.cantidad,
+                'precio', s.precio
               )
             ) FILTER (WHERE s.cantidad > 0) as tallas
           FROM stock s
@@ -271,7 +273,8 @@ class ProductModel {
                 'id_talla', t.id_talla,
                 'nombre_talla', t.nombre_talla,
                 'orden', t.orden,
-                'cantidad', s.cantidad
+                'cantidad', s.cantidad,
+                'precio', s.precio
               )
             ) FILTER (WHERE s.cantidad > 0) as tallas
           FROM stock s
