@@ -768,6 +768,10 @@ const updateVariant = async (req, res) => {
       imagenes,
       tallas
     } = req.body;
+
+    console.log('🔧 [BACKEND] updateVariant recibido para ID:', id);
+    console.log('📦 [BACKEND] Datos recibidos:', req.body);
+    console.log('💰 [BACKEND] precio_unico:', precio_unico, 'precio:', precio);
     
     // Usar nombre_variante si existe, sino usar nombre para compatibilidad
     const variantName = nombre_variante || nombre;
