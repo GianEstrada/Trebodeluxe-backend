@@ -40,4 +40,8 @@ router.post('/upload-image',
 // Ruta para eliminar imágenes
 router.delete('/delete-image', adminController.deleteImageFromCloudinary);
 
+// Rutas para imágenes principales del sitio
+router.get('/home-images', adminController.getHomeImages);
+router.put('/home-images', adminController.updateHomeImage);
+
 module.exports = router;

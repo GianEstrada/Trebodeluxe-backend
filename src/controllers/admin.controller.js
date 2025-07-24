@@ -896,6 +896,91 @@ const deleteImageFromCloudinary = async (req, res) => {
   }
 };
 
+// Obtener imágenes principales del sitio
+const getHomeImages = async (req, res) => {
+  try {
+    const query = `
+      SELECT setting_key, setting_value, public_id 
+      FROM site_settings 
+      WHERE setting_key IN ('heroImage1', 'heroImage2', 'promosBannerImage')
+    `;
+    
+    const result = await pool.query(query);
+    
+    // Crear objeto con las imágenes
+    const images = {
+      heroImage1: '/797e7904b64e13508ab322be3107e368-1@2x.png',
+      heroImage2: '/look-polo-2-1@2x.png',
+      promosBannerImage: '/promociones-playa.jpg'
+    };
+    
+    // Actualizar con los valores de la base de datos
+    result.rows.forEach(row => {
+      images[row.setting_key] = row.setting_value;
+    });
+    
+    res.json({
+      success: true,
+      images
+    });
+    
+  } catch (error) {
+    console.error('Error al obtener imágenes principales:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener las imágenes principales'
+    });
+  }
+};
+
+// Actualizar imagen principal del sitio
+const updateHomeImage = async (req, res) => {
+  try {
+    const { imageType, url, public_id } = req.body;
+    
+    if (!imageType || !url) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tipo de imagen y URL son requeridos'
+      });
+    }
+    
+    // Verificar que el tipo de imagen sea válido
+    const validTypes = ['heroImage1', 'heroImage2', 'promosBannerImage'];
+    if (!validTypes.includes(imageType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tipo de imagen no válido'
+      });
+    }
+    
+    // Actualizar o insertar la configuración
+    const query = `
+      INSERT INTO site_settings (setting_key, setting_value, public_id, updated_at)
+      VALUES ($1, $2, $3, NOW())
+      ON CONFLICT (setting_key)
+      DO UPDATE SET 
+        setting_value = EXCLUDED.setting_value,
+        public_id = EXCLUDED.public_id,
+        updated_at = NOW()
+    `;
+    
+    await pool.query(query, [imageType, url, public_id]);
+    
+    res.json({
+      success: true,
+      message: 'Imagen actualizada correctamente'
+    });
+    
+  } catch (error) {
+    console.error('Error al actualizar imagen principal:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al actualizar la imagen principal'
+    });
+  }
+};
+
 module.exports = {
   getAllVariants,
   getAllProducts,
@@ -909,5 +994,7 @@ module.exports = {
   updateProduct,
   deleteVariant,
   getVariantById,
-  updateVariant
+  updateVariant,
+  getHomeImages,
+  updateHomeImage
 };
