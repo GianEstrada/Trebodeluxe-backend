@@ -8,8 +8,7 @@ const getAllVariants = async (req, res) => {
       SELECT 
         v.id_variante,
         v.nombre as nombre_variante,
-        v.precio,
-        v.precio_original,
+        MIN(s.precio) as precio,
         v.activo as variante_activa,
         p.id_producto,
         p.nombre as nombre_producto,
@@ -25,7 +24,8 @@ const getAllVariants = async (req, res) => {
               JSON_BUILD_OBJECT(
                 'id_talla', t.id_talla,
                 'nombre_talla', t.nombre_talla,
-                'cantidad', COALESCE(s.cantidad, 0)
+                'cantidad', COALESCE(s.cantidad, 0),
+                'precio', s.precio
               )
             END
           ) FILTER (WHERE t.id_talla IS NOT NULL), '[]'
@@ -37,7 +37,7 @@ const getAllVariants = async (req, res) => {
       LEFT JOIN tallas t ON t.id_sistema_talla = p.id_sistema_talla
       LEFT JOIN stock s ON s.id_variante = v.id_variante AND s.id_talla = t.id_talla
       WHERE p.activo = true AND v.activo = true
-      GROUP BY v.id_variante, v.nombre, v.precio, v.precio_original, v.activo,
+      GROUP BY v.id_variante, v.nombre, v.activo,
                p.id_producto, p.nombre, p.descripcion, p.categoria, p.marca,
                st.nombre, iv.url, iv.public_id
       ORDER BY p.nombre, v.nombre;
@@ -156,18 +156,16 @@ const createProductWithVariant = async (req, res) => {
 
     // Crear variantes
     for (const variante of variantes) {
-      // Crear variante
+      // Crear variante (sin precios, van en stock)
       const variantQuery = `
-        INSERT INTO variantes (id_producto, nombre, precio, precio_original)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO variantes (id_producto, nombre)
+        VALUES ($1, $2)
         RETURNING id_variante;
       `;
       
       const variantResult = await client.query(variantQuery, [
         id_producto,
-        variante.nombre,
-        variante.precio,
-        variante.precio_original || null
+        variante.nombre
       ]);
       
       const id_variante = variantResult.rows[0].id_variante;
@@ -205,20 +203,21 @@ const createProductWithVariant = async (req, res) => {
         ]);
       }
 
-      // Agregar stock por tallas
+      // Agregar stock por tallas con precio
       if (variante.tallas && variante.tallas.length > 0) {
         for (const talla of variante.tallas) {
           if (talla.cantidad > 0) {
             const stockQuery = `
-              INSERT INTO stock (id_producto, id_variante, id_talla, cantidad)
-              VALUES ($1, $2, $3, $4);
+              INSERT INTO stock (id_producto, id_variante, id_talla, cantidad, precio)
+              VALUES ($1, $2, $3, $4, $5);
             `;
             
             await client.query(stockQuery, [
               id_producto,
               id_variante,
               talla.id_talla,
-              talla.cantidad
+              talla.cantidad,
+              variante.precio || null
             ]);
           }
         }
@@ -263,18 +262,16 @@ const createVariantForProduct = async (req, res) => {
       tallas 
     } = req.body;
 
-    // Crear variante
+    // Crear variante (sin precios, van en stock)
     const variantQuery = `
-      INSERT INTO variantes (id_producto, nombre, precio, precio_original)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO variantes (id_producto, nombre)
+      VALUES ($1, $2)
       RETURNING id_variante;
     `;
     
     const variantResult = await client.query(variantQuery, [
       id_producto,
-      nombre,
-      precio,
-      precio_original || null
+      nombre
     ]);
     
     const id_variante = variantResult.rows[0].id_variante;
@@ -312,20 +309,21 @@ const createVariantForProduct = async (req, res) => {
       ]);
     }
 
-    // Agregar stock por tallas
+    // Agregar stock por tallas con precios
     if (tallas && tallas.length > 0) {
       for (const talla of tallas) {
         if (talla.cantidad > 0) {
           const stockQuery = `
-            INSERT INTO stock (id_producto, id_variante, id_talla, cantidad)
-            VALUES ($1, $2, $3, $4);
+            INSERT INTO stock (id_producto, id_variante, id_talla, cantidad, precio)
+            VALUES ($1, $2, $3, $4, $5);
           `;
           
           await client.query(stockQuery, [
             id_producto,
             id_variante,
             talla.id_talla,
-            talla.cantidad
+            talla.cantidad,
+            precio || null
           ]);
         }
       }
@@ -453,8 +451,7 @@ const getProductById = async (req, res) => {
           JSON_BUILD_OBJECT(
             'id_variante', v.id_variante,
             'nombre', v.nombre,
-            'precio', v.precio,
-            'precio_original', v.precio_original,
+            'precio', COALESCE(MIN(stock_precios.precio), NULL),
             'activo', v.activo,
             'imagenes', COALESCE(imagenes.imagenes, '[]'::json),
             'tallas', COALESCE(tallas.tallas, '[]'::json)
@@ -463,6 +460,11 @@ const getProductById = async (req, res) => {
       FROM productos p
       LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
       LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+      LEFT JOIN (
+        SELECT id_variante, precio
+        FROM stock
+        WHERE precio IS NOT NULL
+      ) stock_precios ON v.id_variante = stock_precios.id_variante
       LEFT JOIN (
         SELECT 
           id_variante,
@@ -483,7 +485,8 @@ const getProductById = async (req, res) => {
             JSON_BUILD_OBJECT(
               'id_talla', t.id_talla,
               'nombre_talla', t.nombre_talla,
-              'cantidad', s.cantidad
+              'cantidad', s.cantidad,
+              'precio', s.precio
             )
           ) as tallas
         FROM stock s
@@ -640,8 +643,7 @@ const getVariantById = async (req, res) => {
       SELECT 
         v.id_variante,
         v.nombre as nombre_variante,
-        v.precio,
-        v.precio_original,
+        MIN(s.precio) as precio,
         v.activo,
         v.id_producto,
         p.nombre as nombre_producto,
@@ -655,6 +657,7 @@ const getVariantById = async (req, res) => {
       FROM variantes v
       INNER JOIN productos p ON v.id_producto = p.id_producto
       LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
+      LEFT JOIN stock s ON v.id_variante = s.id_variante
       LEFT JOIN (
         SELECT 
           id_variante,
@@ -677,7 +680,8 @@ const getVariantById = async (req, res) => {
             JSON_BUILD_OBJECT(
               'id_talla', t.id_talla,
               'nombre_talla', t.nombre_talla,
-              'cantidad', COALESCE(s.cantidad, 0)
+              'cantidad', COALESCE(s.cantidad, 0),
+              'precio', s.precio
             ) ORDER BY t.orden, t.id_talla
           ) as tallas_stock
         FROM tallas t
@@ -690,7 +694,10 @@ const getVariantById = async (req, res) => {
         )
         GROUP BY s.id_variante
       ) stock_info ON v.id_variante = stock_info.id_variante
-      WHERE v.id_variante = $1 AND v.activo = true AND p.activo = true;
+      WHERE v.id_variante = $1 AND v.activo = true AND p.activo = true
+      GROUP BY v.id_variante, v.nombre, v.activo, v.id_producto,
+               p.nombre, p.descripcion, p.categoria, p.marca, p.id_sistema_talla,
+               st.nombre, img.imagenes, stock_info.tallas_stock;
     `;
     
     const result = await pool.query(query, [id]);
@@ -768,16 +775,16 @@ const updateVariant = async (req, res) => {
       }
     }
     
-    // Actualizar variante
+    // Actualizar variante (solo nombre, los precios van en stock)
     const updateQuery = `
       UPDATE variantes 
-      SET nombre = $1, precio = $2, precio_original = $3
-      WHERE id_variante = $4 AND activo = true
+      SET nombre = $1
+      WHERE id_variante = $2 AND activo = true
       RETURNING id_variante;
     `;
     
     const result = await client.query(updateQuery, [
-      variantName, precio, precio_original || null, id
+      variantName, id
     ]);
     
     if (result.rows.length === 0) {
@@ -821,22 +828,34 @@ const updateVariant = async (req, res) => {
       const productResult = await client.query(productQuery, [id]);
       const id_producto = productResult.rows[0].id_producto;
       
-      // Agregar nuevo stock
+      // Agregar nuevo stock con precios
       for (const talla of tallas) {
         if (talla.cantidad > 0) {
           const stockQuery = `
-            INSERT INTO stock (id_producto, id_variante, id_talla, cantidad)
-            VALUES ($1, $2, $3, $4);
+            INSERT INTO stock (id_producto, id_variante, id_talla, cantidad, precio)
+            VALUES ($1, $2, $3, $4, $5);
           `;
           
           await client.query(stockQuery, [
             id_producto,
             id,
             talla.id_talla,
-            talla.cantidad
+            talla.cantidad,
+            precio || null
           ]);
         }
       }
+    } else if (precio !== undefined) {
+      // Si no se proporcionan tallas pero sí precio, actualizar todo el stock existente
+      const updateStockPriceQuery = `
+        UPDATE stock 
+        SET precio = $1
+        WHERE id_variante = $2;
+      `;
+      
+      await client.query(updateStockPriceQuery, [
+        precio, id
+      ]);
     }
     
     await client.query('COMMIT');
