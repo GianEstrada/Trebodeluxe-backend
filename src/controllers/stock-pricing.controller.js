@@ -261,8 +261,144 @@ const getVariantsWithStockPricing = async (req, res) => {
   }
 };
 
+/**
+ * Crear producto completo con variante usando sistema V2
+ */
+const createProductWithVariantV2 = async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    const { 
+      // Datos del producto
+      producto_nombre,
+      producto_descripcion,
+      categoria,
+      marca,
+      id_sistema_talla,
+      id_categoria,
+      
+      // Datos de la variante
+      nombre_variante,
+      imagen_url,
+      imagen_public_id,
+      precio_unico,
+      tallas_stock
+    } = req.body;
+
+    console.log('📊 Creando producto con variante V2:', {
+      producto_nombre,
+      categoria,
+      precio_unico,
+      tallas_count: tallas_stock?.length || 0
+    });
+
+    // 1. Crear producto
+    const productQuery = `
+      INSERT INTO productos (nombre, descripcion, categoria, marca, id_sistema_talla, id_categoria)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id_producto;
+    `;
+    
+    const productResult = await client.query(productQuery, [
+      producto_nombre,
+      producto_descripcion,
+      categoria,
+      marca,
+      id_sistema_talla,
+      id_categoria
+    ]);
+    
+    const id_producto = productResult.rows[0].id_producto;
+
+    // 2. Crear variante SIN precios (los precios van en stock)
+    const variantQuery = `
+      INSERT INTO variantes (id_producto, nombre)
+      VALUES ($1, $2)
+      RETURNING id_variante;
+    `;
+    
+    const variantResult = await client.query(variantQuery, [
+      id_producto,
+      nombre_variante || producto_nombre
+    ]);
+    
+    const id_variante = variantResult.rows[0].id_variante;
+
+    // 3. Agregar imagen principal si existe
+    if (imagen_url && imagen_public_id) {
+      const imageQuery = `
+        INSERT INTO imagenes_variante (id_variante, url, public_id, orden)
+        VALUES ($1, $2, $3, $4);
+      `;
+      
+      await client.query(imageQuery, [
+        id_variante,
+        imagen_url,
+        imagen_public_id,
+        1
+      ]);
+    }
+
+    // 4. Crear stock con precios V2
+    let stockCreated = 0;
+    if (tallas_stock && Array.isArray(tallas_stock)) {
+      for (const talla of tallas_stock) {
+        if (talla.cantidad > 0) {
+          const stockQuery = `
+            INSERT INTO stock (id_variante, id_talla, cantidad, precio, precio_original)
+            VALUES ($1, $2, $3, $4, $5);
+          `;
+          
+          await client.query(stockQuery, [
+            id_variante,
+            talla.id_talla,
+            talla.cantidad,
+            talla.precio,
+            talla.precio_original || null
+          ]);
+          
+          stockCreated++;
+        }
+      }
+    }
+
+    await client.query('COMMIT');
+    
+    console.log('✅ Producto y variante creados V2:', {
+      id_producto,
+      id_variante,
+      stockCreated
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Producto y variante creados exitosamente',
+      data: {
+        id_producto,
+        id_variante,
+        stock_items: stockCreated,
+        pricing_system: 'V2'
+      }
+    });
+    
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ Error creating product with variant V2:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al crear producto con variante',
+      error: error.message
+    });
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   createVariantWithStockPricing,
   updateVariantWithStockPricing,
-  getVariantsWithStockPricing
+  getVariantsWithStockPricing,
+  createProductWithVariantV2
 };

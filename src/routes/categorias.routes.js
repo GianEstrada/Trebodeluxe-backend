@@ -1,20 +1,293 @@
 const express = require('express');
 const router = express.Router();
-const {
-  getCategorias,
-  getCategoriaById,
-  createCategoria,
-  updateCategoria,
-  deleteCategoria,
-  getProductosByCategoria
-} = require('../controllers/categorias.controller');
+const { verifyToken, requireAdmin } = require('../middlewares/auth.middleware');
+const database = require('../config/db');
 
-// Rutas para categorías
-router.get('/', getCategorias);                    // GET /api/admin/categorias
-router.get('/:id', getCategoriaById);              // GET /api/admin/categorias/:id
-router.post('/', createCategoria);                 // POST /api/admin/categorias
-router.put('/:id', updateCategoria);               // PUT /api/admin/categorias/:id
-router.delete('/:id', deleteCategoria);            // DELETE /api/admin/categorias/:id
-router.get('/:id/productos', getProductosByCategoria); // GET /api/admin/categorias/:id/productos
+// Obtener todas las categorías (público)
+router.get('/', async (req, res) => {
+  try {
+    const query = `
+      SELECT 
+        id_categoria,
+        nombre,
+        descripcion,
+        activo,
+        orden,
+        fecha_creacion,
+        fecha_actualizacion
+      FROM categorias 
+      WHERE activo = true 
+      ORDER BY orden ASC, nombre ASC
+    `;
+    
+    const result = await database.query(query);
+    
+    res.json({
+      success: true,
+      categorias: result.rows
+    });
+  } catch (error) {
+    console.error('Error al obtener categorías:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+});
+
+// Obtener todas las categorías para admin (incluye inactivas)
+router.get('/admin', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const { search } = req.query;
+    
+    let query = `
+      SELECT 
+        id_categoria,
+        nombre,
+        descripcion,
+        activo,
+        orden,
+        fecha_creacion,
+        fecha_actualizacion,
+        (SELECT COUNT(*) FROM productos WHERE id_categoria = categorias.id_categoria) as productos_count
+      FROM categorias 
+    `;
+    
+    let queryParams = [];
+    
+    if (search) {
+      query += ` WHERE LOWER(nombre) LIKE LOWER($1) OR LOWER(descripcion) LIKE LOWER($1)`;
+      queryParams.push(`%${search}%`);
+    }
+    
+    query += ` ORDER BY orden ASC, nombre ASC`;
+    
+    const result = await database.query(query, queryParams);
+    
+    res.json({
+      success: true,
+      categorias: result.rows
+    });
+  } catch (error) {
+    console.error('Error al obtener categorías para admin:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+});
+
+// Crear nueva categoría
+router.post('/', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const { nombre, descripcion, orden } = req.body;
+    
+    if (!nombre || nombre.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'El nombre de la categoría es requerido'
+      });
+    }
+    
+    // Verificar si ya existe
+    const existingCheck = await database.query(
+      'SELECT id_categoria FROM categorias WHERE LOWER(nombre) = LOWER($1)',
+      [nombre.trim()]
+    );
+    
+    if (existingCheck.rows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ya existe una categoría con ese nombre'
+      });
+    }
+    
+    // Obtener el próximo orden si no se especifica
+    let finalOrder = orden;
+    if (!finalOrder) {
+      const maxOrderResult = await database.query('SELECT COALESCE(MAX(orden), 0) + 1 as next_order FROM categorias');
+      finalOrder = maxOrderResult.rows[0].next_order;
+    }
+    
+    const query = `
+      INSERT INTO categorias (nombre, descripcion, orden, activo)
+      VALUES ($1, $2, $3, true)
+      RETURNING id_categoria, nombre, descripcion, orden, activo, fecha_creacion
+    `;
+    
+    const result = await database.query(query, [
+      nombre.trim(),
+      descripcion?.trim() || null,
+      finalOrder
+    ]);
+    
+    res.json({
+      success: true,
+      message: 'Categoría creada exitosamente',
+      categoria: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error al crear categoría:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+});
+
+// Actualizar categoría
+router.put('/:id', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nombre, descripcion, orden, activo } = req.body;
+    
+    if (!nombre || nombre.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'El nombre de la categoría es requerido'
+      });
+    }
+    
+    // Verificar si la categoría existe
+    const categoryCheck = await database.query(
+      'SELECT id_categoria FROM categorias WHERE id_categoria = $1',
+      [id]
+    );
+    
+    if (categoryCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Categoría no encontrada'
+      });
+    }
+    
+    // Verificar si el nombre ya existe en otra categoría
+    const existingCheck = await database.query(
+      'SELECT id_categoria FROM categorias WHERE LOWER(nombre) = LOWER($1) AND id_categoria != $2',
+      [nombre.trim(), id]
+    );
+    
+    if (existingCheck.rows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ya existe otra categoría con ese nombre'
+      });
+    }
+    
+    const query = `
+      UPDATE categorias 
+      SET nombre = $1, descripcion = $2, orden = $3, activo = $4
+      WHERE id_categoria = $5
+      RETURNING id_categoria, nombre, descripcion, orden, activo, fecha_creacion, fecha_actualizacion
+    `;
+    
+    const result = await database.query(query, [
+      nombre.trim(),
+      descripcion?.trim() || null,
+      orden || 0,
+      activo !== undefined ? activo : true,
+      id
+    ]);
+    
+    res.json({
+      success: true,
+      message: 'Categoría actualizada exitosamente',
+      categoria: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error al actualizar categoría:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+});
+
+// Eliminar categoría
+router.delete('/:id', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Verificar si la categoría existe
+    const categoryCheck = await database.query(
+      'SELECT id_categoria, nombre FROM categorias WHERE id_categoria = $1',
+      [id]
+    );
+    
+    if (categoryCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Categoría no encontrada'
+      });
+    }
+    
+    // Verificar si hay productos usando esta categoría
+    const productsCheck = await database.query(
+      'SELECT COUNT(*) as count FROM productos WHERE id_categoria = $1',
+      [id]
+    );
+    
+    if (parseInt(productsCheck.rows[0].count) > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `No se puede eliminar la categoría "${categoryCheck.rows[0].nombre}" porque tiene productos asociados. Primero debe reasignar o eliminar los productos.`
+      });
+    }
+    
+    await database.query('DELETE FROM categorias WHERE id_categoria = $1', [id]);
+    
+    res.json({
+      success: true,
+      message: 'Categoría eliminada exitosamente'
+    });
+  } catch (error) {
+    console.error('Error al eliminar categoría:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+});
+
+// Obtener categoría por ID
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const query = `
+      SELECT 
+        id_categoria,
+        nombre,
+        descripcion,
+        activo,
+        orden,
+        fecha_creacion,
+        fecha_actualizacion,
+        (SELECT COUNT(*) FROM productos WHERE id_categoria = categorias.id_categoria) as productos_count
+      FROM categorias 
+      WHERE id_categoria = $1
+    `;
+    
+    const result = await database.query(query, [id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Categoría no encontrada'
+      });
+    }
+    
+    res.json({
+      success: true,
+      categoria: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error al obtener categoría:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+});
 
 module.exports = router;

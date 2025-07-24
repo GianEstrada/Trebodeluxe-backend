@@ -96,6 +96,23 @@ CREATE TRIGGER trigger_actualizar_fecha_imagenes
     BEFORE UPDATE ON imagenes_index
     FOR EACH ROW EXECUTE FUNCTION actualizar_fecha_modificacion();
 
+DROP TRIGGER IF EXISTS trigger_actualizar_fecha_categorias ON categorias;
+CREATE TRIGGER trigger_actualizar_fecha_categorias
+    BEFORE UPDATE ON categorias
+    FOR EACH ROW EXECUTE FUNCTION actualizar_fecha_modificacion();
+
+-- ==== CATEGORÍAS ====
+
+CREATE TABLE categorias (
+    id_categoria SERIAL PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL UNIQUE,
+    descripcion TEXT,
+    activo BOOLEAN DEFAULT true,
+    orden INTEGER DEFAULT 0,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- ==== SISTEMA DE TALLAS ====
 
 CREATE TABLE sistemas_talla (
@@ -116,7 +133,7 @@ CREATE TABLE productos (
     id_producto SERIAL PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
     descripcion TEXT NOT NULL,
-    categoria VARCHAR(50),
+    id_categoria INTEGER REFERENCES categorias(id_categoria) ON DELETE SET NULL,
     marca VARCHAR(50),
     id_sistema_talla INTEGER REFERENCES sistemas_talla(id_sistema_talla) ON DELETE SET NULL,
     activo BOOLEAN DEFAULT true,
@@ -127,8 +144,6 @@ CREATE TABLE variantes (
     id_variante SERIAL PRIMARY KEY,
     id_producto INTEGER NOT NULL REFERENCES productos(id_producto) ON DELETE CASCADE,
     nombre VARCHAR(100) NOT NULL,
-    precio NUMERIC(10,2) NOT NULL,
-    precio_original NUMERIC(10,2),
     activo BOOLEAN DEFAULT true,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -147,6 +162,7 @@ CREATE TABLE stock (
     id_variante INTEGER NOT NULL REFERENCES variantes(id_variante) ON DELETE CASCADE,
     id_talla INTEGER NOT NULL REFERENCES tallas(id_talla) ON DELETE CASCADE,
     cantidad INTEGER NOT NULL DEFAULT 0,
+    precio NUMERIC(10,2) NOT NULL DEFAULT 0,
     fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(id_producto, id_variante, id_talla)
 );
@@ -246,7 +262,9 @@ CREATE TABLE seguimiento_envio (
 CREATE INDEX idx_usuarios_correo ON usuarios(correo);
 CREATE INDEX idx_usuarios_usuario ON usuarios(usuario);
 CREATE INDEX idx_informacion_envio_usuario ON informacion_envio(id_usuario);
-CREATE INDEX idx_productos_categoria ON productos(categoria);
+CREATE INDEX idx_categorias_activo ON categorias(activo);
+CREATE INDEX idx_categorias_orden ON categorias(orden);
+CREATE INDEX idx_productos_categoria ON productos(id_categoria);
 CREATE INDEX idx_productos_activo ON productos(activo);
 CREATE INDEX idx_productos_fecha ON productos(fecha_creacion);
 CREATE INDEX idx_variantes_producto ON variantes(id_producto);
@@ -256,6 +274,7 @@ CREATE INDEX idx_imagenes_variante_orden ON imagenes_variante(orden);
 CREATE INDEX idx_stock_producto ON stock(id_producto);
 CREATE INDEX idx_stock_variante ON stock(id_variante);
 CREATE INDEX idx_stock_talla ON stock(id_talla);
+CREATE INDEX idx_stock_precio ON stock(precio);
 CREATE INDEX idx_promociones_activo ON promociones(activo);
 CREATE INDEX idx_promociones_fechas ON promociones(fecha_inicio, fecha_fin);
 CREATE INDEX idx_promocion_aplicacion_tipo ON promocion_aplicacion(tipo_objetivo);

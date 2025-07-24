@@ -56,6 +56,8 @@ try {
   const notesRoutes = require('./src/routes/notes.routes');
   const cartRoutes = require('./src/routes/cart.routes');
   const publicIndexImagesRoutes = require('./src/routes/public-index-images.routes');
+  const categoriasRoutes = require('./src/routes/categorias.routes');
+  const adminVariantRoutes = require('./src/routes/admin.variant.routes');
   const { setupSiteSettings } = require('./src/setup-site-settings');
   
   // Crear la aplicación Express
@@ -137,6 +139,8 @@ try {
   app.use('/api/notes', notesRoutes);
   app.use('/api/cart', cartRoutes);
   app.use('/api/public', publicIndexImagesRoutes);
+  app.use('/api/categorias', categoriasRoutes);
+  app.use('/api/admin/variants', adminVariantRoutes);
   
   console.log('✅ Todas las rutas configuradas correctamente');
 

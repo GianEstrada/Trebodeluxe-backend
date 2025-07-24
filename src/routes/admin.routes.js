@@ -22,6 +22,7 @@ router.post('/variants', adminController.createVariantForProduct);
 // Rutas para variantes con nuevo sistema de precios en stock
 router.get('/variants-v2', stockPricingController.getVariantsWithStockPricing);
 router.post('/variants-v2', stockPricingController.createVariantWithStockPricing);
+router.post('/variants-v2/new-product', stockPricingController.createProductWithVariantV2);
 router.put('/variants-v2/:id_variante', stockPricingController.updateVariantWithStockPricing);
 
 router.get('/products', adminController.getAllProducts);
