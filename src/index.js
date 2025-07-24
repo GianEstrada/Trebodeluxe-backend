@@ -115,8 +115,8 @@ app.use('/api/site-settings', siteSettingsRoutes);
 console.log('✅ Rutas site-settings registradas');
 app.use('/api/main-images', mainImagesRoutes);
 console.log('✅ Rutas main-images registradas');
-app.use('/api/public/index-images', publicIndexImagesRoutes);
-console.log('✅ Rutas public index-images registradas');
+app.use('/api/public', publicIndexImagesRoutes);
+console.log('✅ Rutas public index images registradas');
 console.log('✅ Rutas site-settings registradas');
 console.log('Importando y registrando rutas de sizes...');
 try {
