@@ -643,7 +643,6 @@ const getVariantById = async (req, res) => {
       SELECT 
         v.id_variante,
         v.nombre as nombre_variante,
-        MIN(s.precio) as precio,
         v.activo,
         v.id_producto,
         p.nombre as nombre_producto,
@@ -657,7 +656,6 @@ const getVariantById = async (req, res) => {
       FROM variantes v
       INNER JOIN productos p ON v.id_producto = p.id_producto
       LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
-      LEFT JOIN stock s ON v.id_variante = s.id_variante
       LEFT JOIN (
         SELECT 
           id_variante,
@@ -695,9 +693,6 @@ const getVariantById = async (req, res) => {
         GROUP BY s.id_variante
       ) stock_info ON v.id_variante = stock_info.id_variante
       WHERE v.id_variante = $1 AND v.activo = true AND p.activo = true
-      GROUP BY v.id_variante, v.nombre, v.activo, v.id_producto,
-               p.nombre, p.descripcion, p.categoria, p.marca, p.id_sistema_talla,
-               st.nombre, img.imagenes, stock_info.tallas_stock;
     `;
     
     const result = await pool.query(query, [id]);
