@@ -763,6 +763,7 @@ const updateVariant = async (req, res) => {
       nombre_variante,
       nombre,
       precio,
+      precio_unico,
       precio_original,
       imagenes,
       tallas
@@ -846,51 +847,108 @@ const updateVariant = async (req, res) => {
       const productResult = await client.query(productQuery, [id]);
       const id_producto = productResult.rows[0].id_producto;
       
-      // Procesar cada talla individualmente
-      for (const talla of tallas) {
-        // Verificar si ya existe stock para esta talla
-        const existingStockQuery = `
-          SELECT id_stock FROM stock 
-          WHERE id_variante = $1 AND id_talla = $2
-        `;
-        const existingStock = await client.query(existingStockQuery, [id, talla.id_talla]);
-        
-        // Determinar el precio a usar: precio específico de la talla o precio general
-        const precioFinal = talla.precio !== undefined ? talla.precio : precio;
-        
-        if (existingStock.rows.length > 0) {
-          // Actualizar stock existente
-          const updateStockQuery = `
-            UPDATE stock 
-            SET cantidad = $1, precio = $2
-            WHERE id_variante = $3 AND id_talla = $4;
+      // Si precio_unico es true, usar el precio general para todas las tallas
+      if (precio_unico === true && precio !== undefined) {
+        // Aplicar precio único a todas las tallas de la variante
+        for (const talla of tallas) {
+          // Verificar si ya existe stock para esta talla
+          const existingStockQuery = `
+            SELECT id_stock FROM stock 
+            WHERE id_variante = $1 AND id_talla = $2
           `;
+          const existingStock = await client.query(existingStockQuery, [id, talla.id_talla]);
           
-          await client.query(updateStockQuery, [
-            talla.cantidad,
-            precioFinal,
-            id,
-            talla.id_talla
-          ]);
-        } else if (talla.cantidad > 0) {
-          // Crear nuevo stock solo si la cantidad es mayor a 0
-          const stockQuery = `
-            INSERT INTO stock (id_producto, id_variante, id_talla, cantidad, precio)
-            VALUES ($1, $2, $3, $4, $5);
+          if (existingStock.rows.length > 0) {
+            // Actualizar stock existente con precio único
+            const updateStockQuery = `
+              UPDATE stock 
+              SET cantidad = $1, precio = $2
+              WHERE id_variante = $3 AND id_talla = $4;
+            `;
+            
+            await client.query(updateStockQuery, [
+              talla.cantidad,
+              precio, // Usar precio único para todas las tallas
+              id,
+              talla.id_talla
+            ]);
+          } else if (talla.cantidad > 0) {
+            // Crear nuevo stock solo si la cantidad es mayor a 0
+            const stockQuery = `
+              INSERT INTO stock (id_producto, id_variante, id_talla, cantidad, precio)
+              VALUES ($1, $2, $3, $4, $5);
+            `;
+            
+            await client.query(stockQuery, [
+              id_producto,
+              id,
+              talla.id_talla,
+              talla.cantidad,
+              precio // Usar precio único para todas las tallas
+            ]);
+          } else {
+            // Si la cantidad es 0, eliminar el stock si existe
+            await client.query('DELETE FROM stock WHERE id_variante = $1 AND id_talla = $2', [id, talla.id_talla]);
+          }
+        }
+      } else {
+        // Procesar cada talla individualmente con precios diferenciados
+        for (const talla of tallas) {
+          // Verificar si ya existe stock para esta talla
+          const existingStockQuery = `
+            SELECT id_stock FROM stock 
+            WHERE id_variante = $1 AND id_talla = $2
           `;
+          const existingStock = await client.query(existingStockQuery, [id, talla.id_talla]);
           
-          await client.query(stockQuery, [
-            id_producto,
-            id,
-            talla.id_talla,
-            talla.cantidad,
-            precioFinal
-          ]);
-        } else {
-          // Si la cantidad es 0, eliminar el stock si existe
-          await client.query('DELETE FROM stock WHERE id_variante = $1 AND id_talla = $2', [id, talla.id_talla]);
+          // Determinar el precio a usar: precio específico de la talla o precio general
+          const precioFinal = talla.precio !== undefined ? talla.precio : precio;
+          
+          if (existingStock.rows.length > 0) {
+            // Actualizar stock existente
+            const updateStockQuery = `
+              UPDATE stock 
+              SET cantidad = $1, precio = $2
+              WHERE id_variante = $3 AND id_talla = $4;
+            `;
+            
+            await client.query(updateStockQuery, [
+              talla.cantidad,
+              precioFinal,
+              id,
+              talla.id_talla
+            ]);
+          } else if (talla.cantidad > 0) {
+            // Crear nuevo stock solo si la cantidad es mayor a 0
+            const stockQuery = `
+              INSERT INTO stock (id_producto, id_variante, id_talla, cantidad, precio)
+              VALUES ($1, $2, $3, $4, $5);
+            `;
+            
+            await client.query(stockQuery, [
+              id_producto,
+              id,
+              talla.id_talla,
+              talla.cantidad,
+              precioFinal
+            ]);
+          } else {
+            // Si la cantidad es 0, eliminar el stock si existe
+            await client.query('DELETE FROM stock WHERE id_variante = $1 AND id_talla = $2', [id, talla.id_talla]);
+          }
         }
       }
+    } else if (precio_unico === true && precio !== undefined) {
+      // Si se envía precio_unico sin tallas específicas, aplicar a todas las tallas existentes
+      const updateAllPricesQuery = `
+        UPDATE stock 
+        SET precio = $1
+        WHERE id_variante = $2;
+      `;
+      
+      await client.query(updateAllPricesQuery, [
+        precio, id
+      ]);
     } else if (precio !== undefined) {
       // Si no se proporcionan tallas pero sí precio, actualizar todo el stock existente
       const updateStockPriceQuery = `
