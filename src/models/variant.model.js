@@ -4,19 +4,17 @@ const VariantModel = {
   // Crear nueva variante para un producto existente
   async createVariant(variantData) {
     try {
-      const { id_producto, nombre, precio, precio_original } = variantData;
+      const { id_producto, nombre } = variantData;
 
       const query = `
-        INSERT INTO variantes (id_producto, nombre, precio, precio_original, activo)
-        VALUES ($1, $2, $3, $4, true)
+        INSERT INTO variantes (id_producto, nombre, activo)
+        VALUES ($1, $2, true)
         RETURNING *
       `;
 
       const result = await db.query(query, [
         id_producto,
-        nombre,
-        precio,
-        precio_original
+        nombre
       ]);
 
       return result.rows[0];
@@ -33,11 +31,8 @@ const VariantModel = {
       const query = `
         SELECT 
           v.*,
-          CASE 
-            WHEN v.precio_original IS NOT NULL AND v.precio_original > v.precio 
-            THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
-            ELSE NULL
-          END as descuento_porcentaje,
+          COALESCE(stock_precios.precio_min, 0) as precio_min,
+          NULL as descuento_porcentaje,
           COALESCE(stock_info.stock_total, 0) as stock_disponible,
           json_agg(
             json_build_object(
@@ -48,6 +43,14 @@ const VariantModel = {
             ) ORDER BY iv.orden
           ) FILTER (WHERE iv.id_imagen IS NOT NULL) as imagenes
         FROM variantes v
+        LEFT JOIN (
+          SELECT 
+            id_variante,
+            MIN(precio) as precio_min
+          FROM stock
+          WHERE precio IS NOT NULL
+          GROUP BY id_variante
+        ) stock_precios ON v.id_variante = stock_precios.id_variante
         LEFT JOIN (
           SELECT 
             id_variante,
@@ -73,15 +76,13 @@ const VariantModel = {
   // Actualizar variante
   async updateVariant(id_variante, updateData) {
     try {
-      const { nombre, precio, precio_original, activo } = updateData;
+      const { nombre, activo } = updateData;
 
       const query = `
         UPDATE variantes 
         SET 
           nombre = COALESCE($2, nombre),
-          precio = COALESCE($3, precio),
-          precio_original = COALESCE($4, precio_original),
-          activo = COALESCE($5, activo)
+          activo = COALESCE($3, activo)
         WHERE id_variante = $1
         RETURNING *
       `;
@@ -89,8 +90,6 @@ const VariantModel = {
       const result = await db.query(query, [
         id_variante,
         nombre,
-        precio,
-        precio_original,
         activo
       ]);
 
@@ -150,11 +149,8 @@ const VariantModel = {
           p.nombre as producto_nombre,
           p.categoria,
           p.marca,
-          CASE 
-            WHEN v.precio_original IS NOT NULL AND v.precio_original > v.precio 
-            THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
-            ELSE NULL
-          END as descuento_porcentaje,
+          COALESCE(stock_precios.precio_min, 0) as precio_min,
+          NULL as descuento_porcentaje,
           COALESCE(stock_info.stock_total, 0) as stock_disponible,
           json_agg(
             json_build_object(
@@ -169,13 +165,21 @@ const VariantModel = {
         LEFT JOIN (
           SELECT 
             id_variante,
+            MIN(precio) as precio_min
+          FROM stock
+          WHERE precio IS NOT NULL
+          GROUP BY id_variante
+        ) stock_precios ON v.id_variante = stock_precios.id_variante
+        LEFT JOIN (
+          SELECT 
+            id_variante,
             SUM(cantidad) as stock_total
           FROM stock
           GROUP BY id_variante
         ) stock_info ON v.id_variante = stock_info.id_variante
         LEFT JOIN imagenes_variante iv ON v.id_variante = iv.id_variante
         WHERE v.id_variante = $1
-        GROUP BY v.id_variante, p.nombre, p.categoria, p.marca, stock_info.stock_total
+        GROUP BY v.id_variante, p.nombre, p.categoria, p.marca, stock_info.stock_total, stock_precios.precio_min
       `;
 
       const result = await db.query(query, [id_variante]);

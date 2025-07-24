@@ -45,10 +45,18 @@ const ImageModel = {
           iv.public_id,
           iv.orden,
           v.nombre as variante_nombre,
-          v.precio,
-          v.precio_original
+          COALESCE(sp.precio_min, 0) as precio,
+          NULL as precio_original
         FROM imagenes_variante iv
         JOIN variantes v ON iv.id_variante = v.id_variante
+        LEFT JOIN (
+          SELECT 
+            id_variante,
+            MIN(precio) as precio_min
+          FROM stock
+          WHERE precio IS NOT NULL
+          GROUP BY id_variante
+        ) sp ON v.id_variante = sp.id_variante
         WHERE v.id_producto = $1
         ORDER BY v.id_variante ASC, iv.orden ASC
       `, [id_producto]);
@@ -115,10 +123,18 @@ const ImageModel = {
           iv.url,
           iv.public_id,
           v.nombre as variante_nombre,
-          v.precio,
-          v.precio_original
+          COALESCE(sp.precio_min, 0) as precio,
+          NULL as precio_original
         FROM imagenes_variante iv
         JOIN variantes v ON iv.id_variante = v.id_variante
+        LEFT JOIN (
+          SELECT 
+            id_variante,
+            MIN(precio) as precio_min
+          FROM stock
+          WHERE precio IS NOT NULL
+          GROUP BY id_variante
+        ) sp ON v.id_variante = sp.id_variante
         WHERE v.id_producto = $1 AND v.activo = true
         ORDER BY v.id_variante ASC, iv.orden ASC
       `, [id_producto]);
@@ -141,12 +157,20 @@ const ImageModel = {
           p.marca,
           v.id_variante,
           v.nombre as variante_nombre,
-          v.precio,
-          v.precio_original,
+          COALESCE(sp.precio_min, 0) as precio,
+          NULL as precio_original,
           iv.url,
           iv.public_id
         FROM productos p
         JOIN variantes v ON p.id_producto = v.id_producto
+        LEFT JOIN (
+          SELECT 
+            id_variante,
+            MIN(precio) as precio_min
+          FROM stock
+          WHERE precio IS NOT NULL
+          GROUP BY id_variante
+        ) sp ON v.id_variante = sp.id_variante
         JOIN imagenes_variante iv ON v.id_variante = iv.id_variante
         WHERE p.activo = true AND v.activo = true
         ORDER BY p.id_producto DESC, v.id_variante ASC, iv.orden ASC

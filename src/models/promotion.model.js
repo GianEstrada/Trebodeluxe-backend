@@ -403,13 +403,9 @@ class PromotionModel {
           prod.nombre,
           prod.categoria,
           prod.marca,
-          v.precio,
-          v.precio_original,
-          CASE 
-            WHEN v.precio_original IS NOT NULL AND v.precio_original > v.precio 
-            THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
-            ELSE NULL
-          END as descuento_actual,
+          COALESCE(stock_precios.precio_min, 0) as precio,
+          NULL as precio_original,
+          NULL as descuento_actual,
           iv.url as imagen_principal,
           iv.public_id as imagen_public_id
         FROM promociones p
@@ -420,11 +416,19 @@ class PromotionModel {
           (pa.tipo_objetivo = 'todos')
         )
         JOIN variantes v ON prod.id_producto = v.id_producto AND v.activo = true
+        LEFT JOIN (
+          SELECT 
+            id_variante,
+            MIN(precio) as precio_min
+          FROM stock
+          WHERE precio IS NOT NULL
+          GROUP BY id_variante
+        ) stock_precios ON v.id_variante = stock_precios.id_variante
         LEFT JOIN imagenes_variante iv ON v.id_variante = iv.id_variante AND iv.orden = 1
         WHERE p.id_promocion = $1
           AND p.activo = true
           AND prod.activo = true
-        ORDER BY v.precio ASC
+        ORDER BY stock_precios.precio_min ASC
         LIMIT $2
       `;
 

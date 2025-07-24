@@ -175,11 +175,6 @@ class ProductModel {
           WHERE precio IS NOT NULL
           GROUP BY id_variante
         ) stock_precios ON v.id_variante = stock_precios.id_variante
-            ) ORDER BY v.id_variante
-          ) FILTER (WHERE v.id_variante IS NOT NULL) as variantes
-        FROM productos p
-        LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
-        LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
         LEFT JOIN (
           SELECT 
             id_variante,
@@ -253,9 +248,6 @@ class ProductModel {
           WHERE precio IS NOT NULL
           GROUP BY id_variante
         ) stock_precios ON v.id_variante = stock_precios.id_variante
-        FROM productos p
-        LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
-        LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
         LEFT JOIN (
           SELECT 
             id_variante,
@@ -821,11 +813,11 @@ class ProductModel {
         LEFT JOIN imagenes_variante iv ON v.id_variante = iv.id_variante AND iv.orden = 1
         LEFT JOIN (
           SELECT 
-            s.id_producto,
+            s.id_variante,
             SUM(s.cantidad) as total
           FROM stock s
-          GROUP BY s.id_producto
-        ) stock_total ON p.id_producto = stock_total.id_producto
+          GROUP BY s.id_variante
+        ) stock_total ON v.id_variante = stock_total.id_variante
         ${whereClause}
         ORDER BY p.id_producto, stock_precios.precio ASC
         LIMIT $1 OFFSET $2
@@ -890,11 +882,11 @@ class ProductModel {
         LEFT JOIN imagenes_variante iv ON v.id_variante = iv.id_variante AND iv.orden = 1
         LEFT JOIN (
           SELECT 
-            s.id_producto,
+            s.id_variante,
             SUM(s.cantidad) as total
           FROM stock s
-          GROUP BY s.id_producto
-        ) stock_total ON p.id_producto = stock_total.id_producto
+          GROUP BY s.id_variante
+        ) stock_total ON v.id_variante = stock_total.id_variante
         WHERE p.activo = true AND COALESCE(stock_total.total, 0) > 0
         ORDER BY p.id_producto, stock_precios.precio ASC, p.fecha_creacion DESC
         LIMIT $1
@@ -1277,7 +1269,7 @@ class ProductModel {
           COALESCE(stock_info.tallas, '[]'::json) as tallas,
           COALESCE(stock_info.stock_total, 0) as stock_total
         FROM variantes v
-        JOIN productos p ON v.producto_id = p.id_producto
+        JOIN productos p ON v.id_producto = p.id_producto
         LEFT JOIN (
           SELECT 
             id_variante,

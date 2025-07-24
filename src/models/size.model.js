@@ -223,7 +223,7 @@ class SizeModel {
           s.*,
           p.nombre as producto_nombre,
           v.nombre as variante_nombre,
-          v.precio,
+          s.precio,
           t.nombre_talla,
           st.nombre as sistema_nombre
         FROM stock s
