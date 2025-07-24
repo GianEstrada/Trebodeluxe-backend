@@ -44,11 +44,18 @@ router.delete('/delete-image', adminController.deleteImageFromCloudinary);
 router.get('/home-images', adminController.getHomeImages);
 router.put('/home-images', adminController.updateHomeImage);
 
-// Rutas para el nuevo sistema de imágenes principales
-router.get('/principal-images', adminController.getPrincipalImages);
-router.post('/principal-images', adminController.createPrincipalImage);
-router.put('/principal-images/:id', adminController.updatePrincipalImage);
-router.delete('/principal-images/:id', adminController.deletePrincipalImage);
+// Rutas para el sistema de imágenes index
+router.get('/index-images', adminController.getIndexImages);
+router.post('/index-images', adminController.createIndexImage);
+router.put('/index-images/:id', adminController.updateIndexImage);
+router.delete('/index-images/:id', adminController.deleteIndexImage);
+router.put('/index-images/:id/status', adminController.updateImageStatus);
+
+// Rutas de compatibilidad (redirects a imágenes index)
+router.get('/principal-images', adminController.getIndexImages);
+router.post('/principal-images', adminController.createIndexImage);
+router.put('/principal-images/:id', adminController.updateIndexImage);
+router.delete('/principal-images/:id', adminController.deleteIndexImage);
 router.put('/principal-images/:id/position', adminController.updateImagePosition);
 
 module.exports = router;

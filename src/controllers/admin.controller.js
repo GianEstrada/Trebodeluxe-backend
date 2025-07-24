@@ -999,12 +999,12 @@ module.exports = {
   updateHomeImage
 };
 
-// ================== NUEVAS FUNCIONES PARA IMÁGENES PRINCIPALES ==================
+// ================== FUNCIONES PARA IMÁGENES INDEX ==================
 
-// Obtener todas las imágenes principales
-const getPrincipalImages = async (req, res) => {
+// Obtener todas las imágenes index
+const getIndexImages = async (req, res) => {
   try {
-    const { search } = req.query;
+    const { search, seccion } = req.query;
     
     let query = `
       SELECT 
@@ -1013,30 +1013,40 @@ const getPrincipalImages = async (req, res) => {
         descripcion,
         url,
         public_id,
-        posicion,
-        orden,
-        activo,
+        seccion,
+        estado,
         fecha_creacion,
         fecha_actualizacion
-      FROM imagenes_principales_nuevas
-      WHERE activo = true
+      FROM imagenes_index
     `;
     
     const queryParams = [];
+    const whereConditions = [];
+    
+    // Filtrar por sección si se proporciona
+    if (seccion && ['principal', 'banner'].includes(seccion)) {
+      whereConditions.push(`seccion = $${queryParams.length + 1}`);
+      queryParams.push(seccion);
+    }
     
     // Agregar filtro de búsqueda si se proporciona
     if (search && search.trim()) {
-      query += ` AND (nombre ILIKE $1 OR descripcion ILIKE $1)`;
+      whereConditions.push(`(nombre ILIKE $${queryParams.length + 1} OR descripcion ILIKE $${queryParams.length + 1})`);
       queryParams.push(`%${search.trim()}%`);
     }
     
+    if (whereConditions.length > 0) {
+      query += ` WHERE ${whereConditions.join(' AND ')}`;
+    }
+    
     query += ` ORDER BY 
-      CASE posicion 
+      seccion ASC,
+      CASE estado 
         WHEN 'izquierda' THEN 1 
         WHEN 'derecha' THEN 2 
-        WHEN 'inactiva' THEN 3 
+        WHEN 'activo' THEN 1
+        WHEN 'inactivo' THEN 3 
       END,
-      orden ASC, 
       fecha_creacion DESC
     `;
     
@@ -1048,60 +1058,95 @@ const getPrincipalImages = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Error al obtener imágenes principales:', error);
+    console.error('Error al obtener imágenes index:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al obtener las imágenes principales'
+      message: 'Error al obtener las imágenes index'
     });
   }
 };
 
-// Crear nueva imagen principal
-const createPrincipalImage = async (req, res) => {
+// Crear nueva imagen index
+const createIndexImage = async (req, res) => {
   try {
-    const { nombre, descripcion, url, public_id, posicion = 'inactiva' } = req.body;
+    const { nombre, descripcion, url, public_id, seccion, estado = 'inactivo' } = req.body;
     
-    if (!nombre || !url || !public_id) {
+    if (!nombre || !url || !public_id || !seccion) {
       return res.status(400).json({
         success: false,
-        message: 'Nombre, URL y public_id son requeridos'
+        message: 'Nombre, URL, public_id y sección son requeridos'
       });
     }
     
-    // Validar posición
-    const validPositions = ['inactiva', 'izquierda', 'derecha'];
-    if (!validPositions.includes(posicion)) {
+    // Validar sección
+    const validSections = ['principal', 'banner'];
+    if (!validSections.includes(seccion)) {
       return res.status(400).json({
         success: false,
-        message: 'Posición no válida'
+        message: 'Sección no válida. Debe ser "principal" o "banner"'
       });
     }
+    
+    // Validar estado según la sección
+    let validStates;
+    if (seccion === 'principal') {
+      validStates = ['inactivo', 'izquierda', 'derecha'];
+    } else {
+      validStates = ['activo', 'inactivo'];
+    }
+    
+    if (!validStates.includes(estado)) {
+      return res.status(400).json({
+        success: false,
+        message: `Estado no válido para la sección ${seccion}. Valores permitidos: ${validStates.join(', ')}`
+      });
+    }
+    
+    // Verificar restricciones de estado único
+    await enforceUniqueState(seccion, estado);
     
     const query = `
-      INSERT INTO imagenes_principales_nuevas (nombre, descripcion, url, public_id, posicion)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO imagenes_index (nombre, descripcion, url, public_id, seccion, estado)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
     `;
     
-    const result = await pool.query(query, [nombre, descripcion, url, public_id, posicion]);
+    const result = await pool.query(query, [nombre, descripcion, url, public_id, seccion, estado]);
     
     res.json({
       success: true,
-      message: 'Imagen principal creada correctamente',
+      message: 'Imagen index creada correctamente',
       image: result.rows[0]
     });
     
   } catch (error) {
-    console.error('Error al crear imagen principal:', error);
+    console.error('Error al crear imagen index:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al crear la imagen principal'
+      message: error.message || 'Error al crear la imagen index'
     });
   }
 };
 
-// Actualizar imagen principal
-const updatePrincipalImage = async (req, res) => {
+// Función auxiliar para enforcer estados únicos
+const enforceUniqueState = async (seccion, estado) => {
+  if (seccion === 'principal' && (estado === 'izquierda' || estado === 'derecha')) {
+    // Solo puede haber una imagen izquierda y una derecha
+    await pool.query(
+      'UPDATE imagenes_index SET estado = $1 WHERE seccion = $2 AND estado = $3',
+      ['inactivo', 'principal', estado]
+    );
+  } else if (seccion === 'banner' && estado === 'activo') {
+    // Solo puede haber una imagen activa en banner
+    await pool.query(
+      'UPDATE imagenes_index SET estado = $1 WHERE seccion = $2 AND estado = $3',
+      ['inactivo', 'banner', 'activo']
+    );
+  }
+};
+
+// Actualizar imagen index
+const updateIndexImage = async (req, res) => {
   try {
     const { id } = req.params;
     const { nombre, descripcion } = req.body;
@@ -1114,7 +1159,7 @@ const updatePrincipalImage = async (req, res) => {
     }
     
     const query = `
-      UPDATE imagenes_principales_nuevas 
+      UPDATE imagenes_index 
       SET nombre = $1, descripcion = $2, fecha_actualizacion = CURRENT_TIMESTAMP
       WHERE id_imagen = $3
       RETURNING *
@@ -1131,27 +1176,27 @@ const updatePrincipalImage = async (req, res) => {
     
     res.json({
       success: true,
-      message: 'Imagen principal actualizada correctamente',
+      message: 'Imagen index actualizada correctamente',
       image: result.rows[0]
     });
     
   } catch (error) {
-    console.error('Error al actualizar imagen principal:', error);
+    console.error('Error al actualizar imagen index:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al actualizar la imagen principal'
+      message: 'Error al actualizar la imagen index'
     });
   }
 };
 
-// Eliminar imagen principal
-const deletePrincipalImage = async (req, res) => {
+// Eliminar imagen index
+const deleteIndexImage = async (req, res) => {
   try {
     const { id } = req.params;
     
     // Primero obtener los datos de la imagen para eliminar de Cloudinary
     const selectQuery = `
-      SELECT public_id FROM imagenes_principales_nuevas WHERE id_imagen = $1
+      SELECT public_id FROM imagenes_index WHERE id_imagen = $1
     `;
     const selectResult = await pool.query(selectQuery, [id]);
     
@@ -1166,7 +1211,7 @@ const deletePrincipalImage = async (req, res) => {
     
     // Eliminar de la base de datos
     const deleteQuery = `
-      DELETE FROM imagenes_principales_nuevas WHERE id_imagen = $1
+      DELETE FROM imagenes_index WHERE id_imagen = $1
       RETURNING *
     `;
     const deleteResult = await pool.query(deleteQuery, [id]);
@@ -1183,63 +1228,85 @@ const deletePrincipalImage = async (req, res) => {
     
     res.json({
       success: true,
-      message: 'Imagen principal eliminada correctamente',
+      message: 'Imagen index eliminada correctamente',
       image: deleteResult.rows[0]
     });
     
   } catch (error) {
-    console.error('Error al eliminar imagen principal:', error);
+    console.error('Error al eliminar imagen index:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al eliminar la imagen principal'
+      message: 'Error al eliminar la imagen index'
     });
   }
 };
 
-// Actualizar posición de imagen
-const updateImagePosition = async (req, res) => {
+// Actualizar estado de imagen index
+const updateImageStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { posicion } = req.body;
+    const { estado } = req.body;
     
-    // Validar posición
-    const validPositions = ['inactiva', 'izquierda', 'derecha'];
-    if (!validPositions.includes(posicion)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Posición no válida'
-      });
-    }
+    // Primero obtener la imagen para validar la sección
+    const selectQuery = 'SELECT seccion FROM imagenes_index WHERE id_imagen = $1';
+    const selectResult = await pool.query(selectQuery, [id]);
     
-    const query = `
-      UPDATE imagenes_principales_nuevas 
-      SET posicion = $1, fecha_actualizacion = CURRENT_TIMESTAMP
-      WHERE id_imagen = $2
-      RETURNING *
-    `;
-    
-    const result = await pool.query(query, [posicion, id]);
-    
-    if (result.rows.length === 0) {
+    if (selectResult.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Imagen no encontrada'
       });
     }
     
+    const { seccion } = selectResult.rows[0];
+    
+    // Validar estado según la sección
+    let validStates;
+    if (seccion === 'principal') {
+      validStates = ['inactivo', 'izquierda', 'derecha'];
+    } else {
+      validStates = ['activo', 'inactivo'];
+    }
+    
+    if (!validStates.includes(estado)) {
+      return res.status(400).json({
+        success: false,
+        message: `Estado no válido para la sección ${seccion}. Valores permitidos: ${validStates.join(', ')}`
+      });
+    }
+    
+    // Verificar restricciones de estado único antes de actualizar
+    await enforceUniqueState(seccion, estado);
+    
+    const updateQuery = `
+      UPDATE imagenes_index 
+      SET estado = $1, fecha_actualizacion = CURRENT_TIMESTAMP
+      WHERE id_imagen = $2
+      RETURNING *
+    `;
+    
+    const result = await pool.query(updateQuery, [estado, id]);
+    
     res.json({
       success: true,
-      message: 'Posición actualizada correctamente',
+      message: 'Estado actualizado correctamente',
       image: result.rows[0]
     });
     
   } catch (error) {
-    console.error('Error al actualizar posición:', error);
+    console.error('Error al actualizar estado:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al actualizar la posición'
+      message: 'Error al actualizar el estado'
     });
   }
+};
+
+// Actualizar posición de imagen (mantenida para compatibilidad)
+// Actualizar posición de imagen (mantenida para compatibilidad)
+const updateImagePosition = async (req, res) => {
+  // Redirigir a updateImageStatus para mantener compatibilidad
+  return updateImageStatus(req, res);
 };
 
 // Exportar las nuevas funciones junto con las existentes
@@ -1259,10 +1326,10 @@ module.exports = {
   updateVariant,
   getHomeImages,
   updateHomeImage,
-  // Nuevas funciones para imágenes principales
-  getPrincipalImages,
-  createPrincipalImage,
-  updatePrincipalImage,
-  deletePrincipalImage,
-  updateImagePosition
+  // Funciones para imágenes index
+  getIndexImages,
+  createIndexImage,
+  updateIndexImage,
+  deleteIndexImage,
+  updateImageStatus
 };

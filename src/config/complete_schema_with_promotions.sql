@@ -21,7 +21,7 @@ DROP TABLE IF EXISTS variantes CASCADE;
 DROP TABLE IF EXISTS productos CASCADE;
 DROP TABLE IF EXISTS tallas CASCADE;
 DROP TABLE IF EXISTS sistemas_talla CASCADE;
-DROP TABLE IF EXISTS imagenes_principales CASCADE;
+DROP TABLE IF EXISTS imagenes_index CASCADE;
 DROP TABLE IF EXISTS configuraciones_sitio CASCADE;
 DROP TABLE IF EXISTS informacion_envio CASCADE;
 DROP TABLE IF EXISTS usuarios CASCADE;
@@ -52,19 +52,16 @@ CREATE TABLE informacion_envio (
     ultima_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- ==== IMÁGENES PRINCIPALES DEL SITIO ====
+-- ==== IMÁGENES INDEX DEL SITIO ====
 
-CREATE TABLE imagenes_principales (
+CREATE TABLE imagenes_index (
     id_imagen SERIAL PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
     url VARCHAR(500) NOT NULL,
     public_id VARCHAR(200),
-    tipo VARCHAR(50) NOT NULL CHECK (tipo IN ('hero_banner', 'promocion_banner', 'categoria_destacada')),
-    titulo VARCHAR(200),
-    subtitulo VARCHAR(300),
-    enlace VARCHAR(300),
-    orden INTEGER NOT NULL DEFAULT 1,
-    activo BOOLEAN DEFAULT true,
+    seccion VARCHAR(50) NOT NULL CHECK (seccion IN ('principal', 'banner')),
+    descripcion TEXT,
+    estado VARCHAR(20) NOT NULL DEFAULT 'inactivo' CHECK (estado IN ('activo', 'inactivo', 'izquierda', 'derecha')),
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -94,9 +91,9 @@ CREATE TRIGGER trigger_actualizar_fecha_configuraciones
     BEFORE UPDATE ON configuraciones_sitio
     FOR EACH ROW EXECUTE FUNCTION actualizar_fecha_modificacion();
 
-DROP TRIGGER IF EXISTS trigger_actualizar_fecha_imagenes ON imagenes_principales;
+DROP TRIGGER IF EXISTS trigger_actualizar_fecha_imagenes ON imagenes_index;
 CREATE TRIGGER trigger_actualizar_fecha_imagenes
-    BEFORE UPDATE ON imagenes_principales
+    BEFORE UPDATE ON imagenes_index
     FOR EACH ROW EXECUTE FUNCTION actualizar_fecha_modificacion();
 
 -- ==== SISTEMA DE TALLAS ====
@@ -264,9 +261,8 @@ CREATE INDEX idx_promociones_fechas ON promociones(fecha_inicio, fecha_fin);
 CREATE INDEX idx_promocion_aplicacion_tipo ON promocion_aplicacion(tipo_objetivo);
 CREATE INDEX idx_promocion_aplicacion_categoria ON promocion_aplicacion(id_categoria);
 CREATE INDEX idx_promocion_aplicacion_producto ON promocion_aplicacion(id_producto);
-CREATE INDEX idx_imagenes_principales_tipo ON imagenes_principales(tipo);
-CREATE INDEX idx_imagenes_principales_activo ON imagenes_principales(activo);
-CREATE INDEX idx_imagenes_principales_orden ON imagenes_principales(orden);
+CREATE INDEX idx_imagenes_index_seccion ON imagenes_index(seccion);
+CREATE INDEX idx_imagenes_index_estado ON imagenes_index(estado);
 CREATE INDEX idx_notas_generales_prioridad ON notas_generales(prioridad);
 CREATE INDEX idx_notas_generales_fecha_creacion ON notas_generales(fecha_creacion);
 CREATE INDEX idx_notas_generales_activo ON notas_generales(activo);
