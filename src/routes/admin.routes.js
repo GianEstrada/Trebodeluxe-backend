@@ -1,15 +1,29 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/admin.controller');
+const stockPricingController = require('../controllers/stock-pricing.controller');
 const authMiddleware = require('../middlewares/auth.middleware');
 const { upload, handleMulterError } = require('../middlewares/upload.middleware');
+
+// Importar rutas de categorías
+const categoriasRoutes = require('./categorias.routes');
 
 // Middleware para todas las rutas de admin
 router.use(authMiddleware.verifyToken);
 router.use(authMiddleware.requireAdmin);
 
-// Rutas para variantes
+// Rutas de categorías
+router.use('/categorias', categoriasRoutes);
+
+// Rutas para variantes (legacy - mantenemos para compatibilidad)
 router.get('/variants', adminController.getAllVariants);
+router.post('/variants', adminController.createVariantForProduct);
+
+// Rutas para variantes con nuevo sistema de precios en stock
+router.get('/variants-v2', stockPricingController.getVariantsWithStockPricing);
+router.post('/variants-v2', stockPricingController.createVariantWithStockPricing);
+router.put('/variants-v2/:id_variante', stockPricingController.updateVariantWithStockPricing);
+
 router.get('/products', adminController.getAllProducts);
 router.get('/size-systems', adminController.getSizeSystems);
 

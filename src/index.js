@@ -30,6 +30,7 @@ const adminRoutes = require('./routes/admin.routes');
 const siteSettingsRoutes = require('./routes/site-settings.routes');
 const mainImagesRoutes = require('./routes/main-images.routes');
 const publicIndexImagesRoutes = require('./routes/public-index-images.routes');
+const publicCategoriasRoutes = require('./routes/public-categorias.routes');
 
 // Importar middlewares
 const { notFound, errorHandler } = require('./middlewares/error.middleware');
@@ -117,6 +118,8 @@ app.use('/api/main-images', mainImagesRoutes);
 console.log('✅ Rutas main-images registradas');
 app.use('/api/public', publicIndexImagesRoutes);
 console.log('✅ Rutas public index images registradas');
+app.use('/api/categorias', publicCategoriasRoutes);
+console.log('✅ Rutas public categorias registradas');
 console.log('✅ Rutas site-settings registradas');
 console.log('Importando y registrando rutas de sizes...');
 try {
