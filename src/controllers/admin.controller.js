@@ -1303,7 +1303,6 @@ const updateImageStatus = async (req, res) => {
 };
 
 // Actualizar posición de imagen (mantenida para compatibilidad)
-// Actualizar posición de imagen (mantenida para compatibilidad)
 const updateImagePosition = async (req, res) => {
   // Redirigir a updateImageStatus para mantener compatibilidad
   return updateImageStatus(req, res);
@@ -1331,5 +1330,6 @@ module.exports = {
   createIndexImage,
   updateIndexImage,
   deleteIndexImage,
-  updateImageStatus
+  updateImageStatus,
+  updateImagePosition
 };
