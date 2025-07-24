@@ -60,7 +60,11 @@ class ProductModel {
                   'activo', v.activo,
                   'imagenes', COALESCE(img.imagenes, '[]'::json),
                   'stock_disponible', COALESCE(stock_info.stock_total, 0),
-                  'tallas_stock', COALESCE(stock_info.tallas_stock, '[]'::json)
+                  'tallas_stock', COALESCE(stock_info.tallas_stock, '[]'::json),
+                  'precio_minimo', precios_info.precio_minimo,
+                  'precio_maximo', precios_info.precio_maximo,
+                  'precios_distintos', precios_info.precios_distintos,
+                  'precio_unico', precios_info.precio_unico
                 ) ORDER BY v.id_variante
               )
             ELSE '[]'::json
@@ -111,6 +115,19 @@ class ProductModel {
           WHERE s.cantidad > 0
           GROUP BY s.id_variante
         ) stock_info ON v.id_variante = stock_info.id_variante
+        LEFT JOIN (
+          SELECT 
+            s.id_variante,
+            MIN(s.precio) as precio_minimo,
+            MAX(s.precio) as precio_maximo,
+            COUNT(DISTINCT s.precio) FILTER (WHERE s.precio IS NOT NULL) as precios_distintos,
+            CASE 
+              WHEN COUNT(DISTINCT s.precio) FILTER (WHERE s.precio IS NOT NULL) <= 1 THEN true
+              ELSE false
+            END as precio_unico
+          FROM stock s
+          GROUP BY s.id_variante
+        ) precios_info ON v.id_variante = precios_info.id_variante
         ${whereClause}
         GROUP BY p.id_producto, p.nombre, p.descripcion, p.categoria, p.marca, 
                  p.id_sistema_talla, p.activo, p.fecha_creacion, st.nombre
@@ -236,7 +253,11 @@ class ProductModel {
               'activo', v.activo,
               'imagenes', COALESCE(img.imagenes, '[]'::json),
               'stock_disponible', COALESCE(stock_info.stock_total, 0),
-              'tallas_disponibles', COALESCE(stock_info.tallas, '[]'::json)
+              'tallas_disponibles', COALESCE(stock_info.tallas, '[]'::json),
+              'precio_minimo', precios_info.precio_minimo,
+              'precio_maximo', precios_info.precio_maximo,
+              'precios_distintos', precios_info.precios_distintos,
+              'precio_unico', precios_info.precio_unico
             ) ORDER BY v.id_variante
           ) FILTER (WHERE v.id_variante IS NOT NULL) as variantes
         FROM productos p
@@ -281,6 +302,19 @@ class ProductModel {
           INNER JOIN tallas t ON s.id_talla = t.id_talla
           GROUP BY s.id_variante
         ) stock_info ON v.id_variante = stock_info.id_variante
+        LEFT JOIN (
+          SELECT 
+            s.id_variante,
+            MIN(s.precio) as precio_minimo,
+            MAX(s.precio) as precio_maximo,
+            COUNT(DISTINCT s.precio) FILTER (WHERE s.precio IS NOT NULL) as precios_distintos,
+            CASE 
+              WHEN COUNT(DISTINCT s.precio) FILTER (WHERE s.precio IS NOT NULL) <= 1 THEN true
+              ELSE false
+            END as precio_unico
+          FROM stock s
+          GROUP BY s.id_variante
+        ) precios_info ON v.id_variante = precios_info.id_variante
         WHERE p.id_producto = $1 AND p.activo = true
         GROUP BY p.id_producto, st.nombre
       `;
@@ -1268,11 +1302,18 @@ class ProductModel {
           p.nombre as producto_nombre,
           p.categoria,
           p.marca,
+          p.id_sistema_talla,
+          st.nombre as sistema_talla,
           COALESCE(img.imagenes, '[]'::json) as imagenes,
-          COALESCE(stock_info.tallas, '[]'::json) as tallas,
-          COALESCE(stock_info.stock_total, 0) as stock_total
+          COALESCE(stock_info.tallas_stock, '[]'::json) as tallas_stock,
+          COALESCE(stock_info.stock_total, 0) as stock_total,
+          precios_info.precio_minimo,
+          precios_info.precio_maximo,
+          precios_info.precios_distintos,
+          precios_info.precio_unico
         FROM variantes v
         JOIN productos p ON v.id_producto = p.id_producto
+        LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
         LEFT JOIN (
           SELECT 
             id_variante,
@@ -1293,15 +1334,37 @@ class ProductModel {
             SUM(s.cantidad) as stock_total,
             json_agg(
               json_build_object(
-                'talla_id', t.id_talla,
+                'id_talla', t.id_talla,
                 'nombre_talla', t.nombre_talla,
-                'cantidad', s.cantidad
-              ) ORDER BY t.orden
-            ) as tallas
-          FROM stock s
-          JOIN tallas t ON s.id_talla = t.id_talla
+                'cantidad', COALESCE(s.cantidad, 0),
+                'precio', s.precio,
+                'orden', t.orden
+              ) ORDER BY t.orden, t.id_talla
+            ) as tallas_stock
+          FROM tallas t
+          LEFT JOIN stock s ON s.id_talla = t.id_talla AND s.id_variante = $1
+          WHERE t.id_sistema_talla = (
+            SELECT p2.id_sistema_talla 
+            FROM productos p2 
+            INNER JOIN variantes v2 ON p2.id_producto = v2.id_producto 
+            WHERE v2.id_variante = $1
+          )
           GROUP BY s.id_variante
         ) stock_info ON v.id_variante = stock_info.id_variante
+        LEFT JOIN (
+          SELECT 
+            s.id_variante,
+            MIN(s.precio) as precio_minimo,
+            MAX(s.precio) as precio_maximo,
+            COUNT(DISTINCT s.precio) FILTER (WHERE s.precio IS NOT NULL) as precios_distintos,
+            CASE 
+              WHEN COUNT(DISTINCT s.precio) FILTER (WHERE s.precio IS NOT NULL) <= 1 THEN true
+              ELSE false
+            END as precio_unico
+          FROM stock s
+          WHERE s.id_variante = $1
+          GROUP BY s.id_variante
+        ) precios_info ON v.id_variante = precios_info.id_variante
         WHERE v.id_variante = $1
       `;
 
