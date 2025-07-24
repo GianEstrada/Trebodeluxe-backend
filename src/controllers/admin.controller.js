@@ -725,6 +725,13 @@ const updateVariant = async (req, res) => {
     
     const { id } = req.params;
     const { 
+      // Datos del producto (opcionales)
+      id_producto,
+      nombre_producto,
+      categoria,
+      descripcion_producto,
+      marca,
+      // Datos de la variante
       nombre_variante,
       nombre,
       precio,
@@ -735,6 +742,31 @@ const updateVariant = async (req, res) => {
     
     // Usar nombre_variante si existe, sino usar nombre para compatibilidad
     const variantName = nombre_variante || nombre;
+    
+    // Si se proporcionan datos del producto, actualizarlos
+    if (id_producto && (nombre_producto || categoria || descripcion_producto || marca)) {
+      const productUpdateQuery = `
+        UPDATE productos 
+        SET 
+          nombre = COALESCE($1, nombre),
+          categoria = COALESCE($2, categoria),
+          descripcion = COALESCE($3, descripcion),
+          marca = COALESCE($4, marca)
+        WHERE id_producto = $5 AND activo = true
+        RETURNING id_producto;
+      `;
+      
+      const productResult = await client.query(productUpdateQuery, [
+        nombre_producto, categoria, descripcion_producto, marca, id_producto
+      ]);
+      
+      if (productResult.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Producto no encontrado'
+        });
+      }
+    }
     
     // Actualizar variante
     const updateQuery = `
@@ -811,7 +843,7 @@ const updateVariant = async (req, res) => {
     
     res.json({
       success: true,
-      message: 'Variante actualizada correctamente'
+      message: 'Producto y variante actualizados correctamente'
     });
     
   } catch (error) {
