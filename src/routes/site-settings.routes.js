@@ -3,10 +3,14 @@
 const express = require('express');
 const router = express.Router();
 const SiteSettingsController = require('../controllers/site-settings.controller');
+const adminController = require('../controllers/admin.controller');
 
 // Rutas públicas (para obtener configuraciones)
 router.get('/header', SiteSettingsController.getHeaderSettings);
 router.get('/setting/:key', SiteSettingsController.getSetting);
+
+// Ruta pública para imágenes index (temporal)
+router.get('/index-images', adminController.getIndexImages);
 
 // Rutas administrativas (requieren autenticación)
 router.get('/all', SiteSettingsController.getAllSettings);
