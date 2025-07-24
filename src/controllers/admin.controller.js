@@ -8,7 +8,13 @@ const getAllVariants = async (req, res) => {
       SELECT 
         v.id_variante,
         v.nombre as nombre_variante,
-        MIN(s.precio) as precio,
+        MIN(s.precio) as precio_minimo,
+        MAX(s.precio) as precio_maximo,
+        COUNT(DISTINCT s.precio) FILTER (WHERE s.precio IS NOT NULL) as precios_distintos,
+        CASE 
+          WHEN COUNT(DISTINCT s.precio) FILTER (WHERE s.precio IS NOT NULL) <= 1 THEN true
+          ELSE false
+        END as precio_unico,
         v.activo as variante_activa,
         p.id_producto,
         p.nombre as nombre_producto,
@@ -25,9 +31,10 @@ const getAllVariants = async (req, res) => {
                 'id_talla', t.id_talla,
                 'nombre_talla', t.nombre_talla,
                 'cantidad', COALESCE(s.cantidad, 0),
-                'precio', s.precio
+                'precio', s.precio,
+                'orden', t.orden
               )
-            END
+            END ORDER BY t.orden
           ) FILTER (WHERE t.id_talla IS NOT NULL), '[]'
         ) as tallas_stock
       FROM variantes v
@@ -652,7 +659,11 @@ const getVariantById = async (req, res) => {
         p.id_sistema_talla,
         st.nombre as sistema_talla,
         COALESCE(img.imagenes, '[]'::json) as imagenes,
-        COALESCE(stock_info.tallas_stock, '[]'::json) as tallas_stock
+        COALESCE(stock_info.tallas_stock, '[]'::json) as tallas_stock,
+        precios_info.precio_minimo,
+        precios_info.precio_maximo,
+        precios_info.precios_distintos,
+        precios_info.precio_unico
       FROM variantes v
       INNER JOIN productos p ON v.id_producto = p.id_producto
       LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
@@ -679,7 +690,8 @@ const getVariantById = async (req, res) => {
               'id_talla', t.id_talla,
               'nombre_talla', t.nombre_talla,
               'cantidad', COALESCE(s.cantidad, 0),
-              'precio', s.precio
+              'precio', s.precio,
+              'orden', t.orden
             ) ORDER BY t.orden, t.id_talla
           ) as tallas_stock
         FROM tallas t
@@ -692,6 +704,20 @@ const getVariantById = async (req, res) => {
         )
         GROUP BY s.id_variante
       ) stock_info ON v.id_variante = stock_info.id_variante
+      LEFT JOIN (
+        SELECT 
+          s.id_variante,
+          MIN(s.precio) as precio_minimo,
+          MAX(s.precio) as precio_maximo,
+          COUNT(DISTINCT s.precio) FILTER (WHERE s.precio IS NOT NULL) as precios_distintos,
+          CASE 
+            WHEN COUNT(DISTINCT s.precio) FILTER (WHERE s.precio IS NOT NULL) <= 1 THEN true
+            ELSE false
+          END as precio_unico
+        FROM stock s
+        WHERE s.id_variante = $1
+        GROUP BY s.id_variante
+      ) precios_info ON v.id_variante = precios_info.id_variante
       WHERE v.id_variante = $1 AND v.activo = true AND p.activo = true
     `;
     
@@ -815,17 +841,39 @@ const updateVariant = async (req, res) => {
     
     // Actualizar stock por tallas si se proporciona
     if (tallas && tallas.length > 0) {
-      // Eliminar stock existente
-      await client.query('DELETE FROM stock WHERE id_variante = $1', [id]);
-      
       // Obtener id_producto para el stock
       const productQuery = 'SELECT id_producto FROM variantes WHERE id_variante = $1';
       const productResult = await client.query(productQuery, [id]);
       const id_producto = productResult.rows[0].id_producto;
       
-      // Agregar nuevo stock con precios
+      // Procesar cada talla individualmente
       for (const talla of tallas) {
-        if (talla.cantidad > 0) {
+        // Verificar si ya existe stock para esta talla
+        const existingStockQuery = `
+          SELECT id_stock FROM stock 
+          WHERE id_variante = $1 AND id_talla = $2
+        `;
+        const existingStock = await client.query(existingStockQuery, [id, talla.id_talla]);
+        
+        // Determinar el precio a usar: precio específico de la talla o precio general
+        const precioFinal = talla.precio !== undefined ? talla.precio : precio;
+        
+        if (existingStock.rows.length > 0) {
+          // Actualizar stock existente
+          const updateStockQuery = `
+            UPDATE stock 
+            SET cantidad = $1, precio = $2
+            WHERE id_variante = $3 AND id_talla = $4;
+          `;
+          
+          await client.query(updateStockQuery, [
+            talla.cantidad,
+            precioFinal,
+            id,
+            talla.id_talla
+          ]);
+        } else if (talla.cantidad > 0) {
+          // Crear nuevo stock solo si la cantidad es mayor a 0
           const stockQuery = `
             INSERT INTO stock (id_producto, id_variante, id_talla, cantidad, precio)
             VALUES ($1, $2, $3, $4, $5);
@@ -836,8 +884,11 @@ const updateVariant = async (req, res) => {
             id,
             talla.id_talla,
             talla.cantidad,
-            precio || null
+            precioFinal
           ]);
+        } else {
+          // Si la cantidad es 0, eliminar el stock si existe
+          await client.query('DELETE FROM stock WHERE id_variante = $1 AND id_talla = $2', [id, talla.id_talla]);
         }
       }
     } else if (precio !== undefined) {
