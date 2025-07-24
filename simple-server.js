@@ -55,6 +55,7 @@ try {
   const ordersAdminRoutes = require('./src/routes/orders-admin.routes');
   const notesRoutes = require('./src/routes/notes.routes');
   const cartRoutes = require('./src/routes/cart.routes');
+  const publicIndexImagesRoutes = require('./src/routes/public-index-images.routes');
   const { setupSiteSettings } = require('./src/setup-site-settings');
   
   // Crear la aplicación Express
@@ -135,6 +136,7 @@ try {
   app.use('/api/admin/orders', ordersAdminRoutes);
   app.use('/api/notes', notesRoutes);
   app.use('/api/cart', cartRoutes);
+  app.use('/api/public', publicIndexImagesRoutes);
   
   console.log('✅ Todas las rutas configuradas correctamente');
 
@@ -201,6 +203,8 @@ try {
     - PUT  /api/cart/update (CARRITO) 🛒
     - DELETE /api/cart/remove (CARRITO) 🛒
     - DELETE /api/cart/clear (CARRITO) 🛒
+    - GET  /api/public/index-images (PÚBLICO) 🌐
+    - GET  /api/public/index-images/:seccion/:estado (PÚBLICO) 🌐
     `);
     
     // Configurar tablas automáticamente
