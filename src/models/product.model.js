@@ -55,14 +55,8 @@ class ProductModel {
                 json_build_object(
                   'id_variante', v.id_variante,
                   'nombre', v.nombre,
-                  'precio', v.precio,
-                  'precio_original', v.precio_original,
-                  'descuento_porcentaje', 
-                  CASE 
-                    WHEN v.precio_original IS NOT NULL AND v.precio_original > v.precio 
-                    THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
-                    ELSE NULL
-                  END,
+                  'precio', stock_precios.precio,
+                  'descuento_porcentaje', NULL,
                   'activo', v.activo,
                   'imagenes', COALESCE(img.imagenes, '[]'::json),
                   'stock_disponible', COALESCE(stock_info.stock_total, 0),
@@ -78,6 +72,14 @@ class ProductModel {
         FROM productos p
         LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
         LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+        LEFT JOIN (
+          SELECT 
+            id_variante,
+            MIN(precio) as precio
+          FROM stock
+          WHERE precio IS NOT NULL
+          GROUP BY id_variante
+        ) stock_precios ON v.id_variante = stock_precios.id_variante
         LEFT JOIN (
           SELECT 
             id_variante,
@@ -154,18 +156,25 @@ class ProductModel {
             json_build_object(
               'id_variante', v.id_variante,
               'nombre', v.nombre,
-              'precio', v.precio,
-              'precio_original', v.precio_original,
-              'descuento_porcentaje', 
-              CASE 
-                WHEN v.precio_original IS NOT NULL AND v.precio_original > v.precio 
-                THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
-                ELSE NULL
-              END,
+              'precio', stock_precios.precio,
+              'descuento_porcentaje', NULL,
               'activo', v.activo,
               'imagenes', COALESCE(img.imagenes, '[]'::json),
               'stock_disponible', COALESCE(stock_info.stock_total, 0),
               'tallas_disponibles', COALESCE(stock_info.tallas, '[]'::json)
+            ) ORDER BY v.id_variante
+          ) FILTER (WHERE v.id_variante IS NOT NULL) as variantes
+        FROM productos p
+        LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
+        LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+        LEFT JOIN (
+          SELECT 
+            id_variante,
+            MIN(precio) as precio
+          FROM stock
+          WHERE precio IS NOT NULL
+          GROUP BY id_variante
+        ) stock_precios ON v.id_variante = stock_precios.id_variante
             ) ORDER BY v.id_variante
           ) FILTER (WHERE v.id_variante IS NOT NULL) as variantes
         FROM productos p
@@ -225,20 +234,25 @@ class ProductModel {
             json_build_object(
               'id_variante', v.id_variante,
               'nombre', v.nombre,
-              'precio', v.precio,
-              'precio_original', v.precio_original,
-              'descuento_porcentaje', 
-              CASE 
-                WHEN v.precio_original IS NOT NULL AND v.precio_original > v.precio 
-                THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
-                ELSE NULL
-              END,
+              'precio', stock_precios.precio,
+              'descuento_porcentaje', NULL,
               'activo', v.activo,
               'imagenes', COALESCE(img.imagenes, '[]'::json),
               'stock_disponible', COALESCE(stock_info.stock_total, 0),
               'tallas_disponibles', COALESCE(stock_info.tallas, '[]'::json)
             ) ORDER BY v.id_variante
           ) FILTER (WHERE v.id_variante IS NOT NULL) as variantes
+        FROM productos p
+        LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
+        LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+        LEFT JOIN (
+          SELECT 
+            id_variante,
+            MIN(precio) as precio
+          FROM stock
+          WHERE precio IS NOT NULL
+          GROUP BY id_variante
+        ) stock_precios ON v.id_variante = stock_precios.id_variante
         FROM productos p
         LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
         LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
@@ -294,14 +308,8 @@ class ProductModel {
             json_build_object(
               'id_variante', v.id_variante,
               'nombre', v.nombre,
-              'precio', v.precio,
-              'precio_original', v.precio_original,
-              'descuento_porcentaje', 
-              CASE 
-                WHEN v.precio_original IS NOT NULL AND v.precio_original > v.precio 
-                THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
-                ELSE NULL
-              END,
+              'precio', stock_precios.precio,
+              'descuento_porcentaje', NULL,
               'imagenes', COALESCE(img.imagenes, '[]'::json),
               'stock_total', COALESCE(stock.total_stock, 0),
               'disponible', COALESCE(stock.total_stock, 0) > 0
@@ -311,6 +319,14 @@ class ProductModel {
           COALESCE(MAX(stock.total_stock), 0) > 0 as producto_disponible
         FROM productos p
         LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+        LEFT JOIN (
+          SELECT 
+            id_variante,
+            MIN(precio) as precio
+          FROM stock
+          WHERE precio IS NOT NULL
+          GROUP BY id_variante
+        ) stock_precios ON v.id_variante = stock_precios.id_variante
         LEFT JOIN (
           SELECT 
             id_variante,
@@ -371,21 +387,23 @@ class ProductModel {
               json_build_object(
                 'id_variante', v.id_variante,
                 'nombre', v.nombre,
-                'precio', v.precio,
-                'precio_original', v.precio_original,
-                'descuento_porcentaje', 
-                CASE 
-                  WHEN v.precio_original IS NOT NULL AND v.precio_original > v.precio 
-                  THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
-                  ELSE NULL
-                END,
+                'precio', stock_precios.precio,
+                'descuento_porcentaje', NULL,
                 'imagenes', COALESCE(img.imagenes, '[]'::json),
                 'stock_total', COALESCE(stock.total_stock, 0),
                 'disponible', COALESCE(stock.total_stock, 0) > 0
               ) ORDER BY v.id_variante
-            ) FILTER (WHERE v.id_variante IS NOT NULL) as variantes
+            ) as variantes
           FROM productos p
           LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+          LEFT JOIN (
+            SELECT 
+              id_variante,
+              MIN(precio) as precio
+            FROM stock
+            WHERE precio IS NOT NULL
+            GROUP BY id_variante
+          ) stock_precios ON v.id_variante = stock_precios.id_variante
           LEFT JOIN (
             SELECT 
               id_variante,
@@ -441,19 +459,21 @@ class ProductModel {
             json_build_object(
               'id_variante', v.id_variante,
               'nombre', v.nombre,
-              'precio', v.precio,
-              'precio_original', v.precio_original,
-              'descuento_porcentaje', 
-              CASE 
-                WHEN v.precio_original IS NOT NULL AND v.precio_original > v.precio 
-                THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
-                ELSE NULL
-              END,
+              'precio', stock_precios.precio,
+              'descuento_porcentaje', NULL,
               'imagenes', COALESCE(img.imagenes, '[]'::json)
             ) ORDER BY v.id_variante
           ) FILTER (WHERE v.id_variante IS NOT NULL) as variantes
         FROM productos p
         LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+        LEFT JOIN (
+          SELECT 
+            id_variante,
+            MIN(precio) as precio
+          FROM stock
+          WHERE precio IS NOT NULL
+          GROUP BY id_variante
+        ) stock_precios ON v.id_variante = stock_precios.id_variante
         LEFT JOIN (
           SELECT 
             id_variante,
@@ -469,25 +489,8 @@ class ProductModel {
           GROUP BY id_variante
         ) img ON v.id_variante = img.id_variante
         WHERE p.activo = true
-          AND EXISTS (
-            SELECT 1 FROM variantes v2 
-            WHERE v2.id_producto = p.id_producto 
-              AND v2.precio_original IS NOT NULL 
-              AND v2.precio_original > v2.precio
-              AND v2.activo = true
-          )
         GROUP BY p.id_producto
-        ORDER BY (
-          SELECT MAX(
-            CASE 
-              WHEN v3.precio_original IS NOT NULL AND v3.precio_original > v3.precio 
-              THEN ROUND(((v3.precio_original - v3.precio) / v3.precio_original * 100)::numeric, 2)
-              ELSE 0
-            END
-          )
-          FROM variantes v3 
-          WHERE v3.id_producto = p.id_producto AND v3.activo = true
-        ) DESC
+        ORDER BY p.fecha_creacion DESC
         LIMIT $1
       `;
       
@@ -528,16 +531,14 @@ class ProductModel {
       if (productData.variantes && productData.variantes.length > 0) {
         for (const variant of productData.variantes) {
           const variantQuery = `
-            INSERT INTO variantes (id_producto, nombre, precio, precio_original, activo)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO variantes (id_producto, nombre, activo)
+            VALUES ($1, $2, $3)
             RETURNING *
           `;
           
           const variantResult = await client.query(variantQuery, [
             productId,
             variant.nombre || null,
-            variant.precio,
-            variant.precio_original || null,
             variant.activo !== false
           ]);
           
@@ -627,19 +628,21 @@ class ProductModel {
             json_build_object(
               'id_variante', v.id_variante,
               'nombre', v.nombre,
-              'precio', v.precio,
-              'precio_original', v.precio_original,
-              'descuento_porcentaje', 
-              CASE 
-                WHEN v.precio_original IS NOT NULL AND v.precio_original > v.precio 
-                THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
-                ELSE NULL
-              END,
+              'precio', stock_precios.precio,
+              'descuento_porcentaje', NULL,
               'imagenes', COALESCE(img.imagenes, '[]'::json)
             ) ORDER BY v.id_variante
           ) FILTER (WHERE v.id_variante IS NOT NULL) as variantes
         FROM productos p
         LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+        LEFT JOIN (
+          SELECT 
+            id_variante,
+            MIN(precio) as precio
+          FROM stock
+          WHERE precio IS NOT NULL
+          GROUP BY id_variante
+        ) stock_precios ON v.id_variante = stock_precios.id_variante
         LEFT JOIN (
           SELECT 
             id_variante,
@@ -697,19 +700,21 @@ class ProductModel {
             json_build_object(
               'id_variante', v.id_variante,
               'nombre', v.nombre,
-              'precio', v.precio,
-              'precio_original', v.precio_original,
-              'descuento_porcentaje', 
-              CASE 
-                WHEN v.precio_original IS NOT NULL AND v.precio_original > v.precio 
-                THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
-                ELSE NULL
-              END,
+              'precio', stock_precios.precio,
+              'descuento_porcentaje', NULL,
               'imagenes', COALESCE(img.imagenes, '[]'::json)
             ) ORDER BY v.id_variante
           ) FILTER (WHERE v.id_variante IS NOT NULL) as variantes
         FROM productos p
         LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+        LEFT JOIN (
+          SELECT 
+            id_variante,
+            MIN(precio) as precio
+          FROM stock
+          WHERE precio IS NOT NULL
+          GROUP BY id_variante
+        ) stock_precios ON v.id_variante = stock_precios.id_variante
         LEFT JOIN (
           SELECT 
             id_variante,
@@ -797,18 +802,22 @@ class ProductModel {
           p.categoria,
           p.marca,
           p.fecha_creacion,
-          v.precio as precio_min,
-          v.precio_original,
-          CASE 
-            WHEN v.precio_original IS NOT NULL AND v.precio_original > v.precio 
-            THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
-            ELSE NULL
-          END as descuento_porcentaje,
+          stock_precios.precio as precio_min,
+          NULL as precio_original,
+          NULL as descuento_porcentaje,
           iv.url as imagen_principal,
           iv.public_id as imagen_public_id,
           COALESCE(stock_total.total, 0) as stock_disponible
         FROM productos p
         JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+        LEFT JOIN (
+          SELECT 
+            s.id_variante,
+            MIN(s.precio) as precio
+          FROM stock s
+          WHERE s.precio IS NOT NULL
+          GROUP BY s.id_variante
+        ) stock_precios ON v.id_variante = stock_precios.id_variante
         LEFT JOIN imagenes_variante iv ON v.id_variante = iv.id_variante AND iv.orden = 1
         LEFT JOIN (
           SELECT 
@@ -818,7 +827,7 @@ class ProductModel {
           GROUP BY s.id_producto
         ) stock_total ON p.id_producto = stock_total.id_producto
         ${whereClause}
-        ORDER BY p.id_producto, v.precio ASC
+        ORDER BY p.id_producto, stock_precios.precio ASC
         LIMIT $1 OFFSET $2
       `;
 
@@ -862,18 +871,22 @@ class ProductModel {
           p.descripcion,
           p.categoria,
           p.marca,
-          v.precio as precio_min,
-          v.precio_original,
-          CASE 
-            WHEN v.precio_original IS NOT NULL AND v.precio_original > v.precio 
-            THEN ROUND(((v.precio_original - v.precio) / v.precio_original * 100)::numeric, 2)
-            ELSE NULL
-          END as descuento_porcentaje,
+          stock_precios.precio as precio_min,
+          NULL as precio_original,
+          NULL as descuento_porcentaje,
           iv.url as imagen_principal,
           iv.public_id as imagen_public_id,
           COALESCE(stock_total.total, 0) as stock_disponible
         FROM productos p
         JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+        LEFT JOIN (
+          SELECT 
+            s.id_variante,
+            MIN(s.precio) as precio
+          FROM stock s
+          WHERE s.precio IS NOT NULL
+          GROUP BY s.id_variante
+        ) stock_precios ON v.id_variante = stock_precios.id_variante
         LEFT JOIN imagenes_variante iv ON v.id_variante = iv.id_variante AND iv.orden = 1
         LEFT JOIN (
           SELECT 
@@ -883,7 +896,7 @@ class ProductModel {
           GROUP BY s.id_producto
         ) stock_total ON p.id_producto = stock_total.id_producto
         WHERE p.activo = true AND COALESCE(stock_total.total, 0) > 0
-        ORDER BY p.id_producto, v.precio ASC, p.fecha_creacion DESC
+        ORDER BY p.id_producto, stock_precios.precio ASC, p.fecha_creacion DESC
         LIMIT $1
       `;
 
@@ -1001,13 +1014,21 @@ class ProductModel {
           COUNT(DISTINCT v.id_variante) as total_variantes,
           COUNT(DISTINCT v.id_variante) FILTER (WHERE v.activo = true) as variantes_activas,
           COALESCE(SUM(stock_info.stock_total), 0) as stock_total,
-          MIN(v.precio) as precio_minimo,
-          MAX(v.precio) as precio_maximo,
+          MIN(stock_precios.precio) as precio_minimo,
+          MAX(stock_precios.precio) as precio_maximo,
           iv.url as imagen_principal,
           iv.public_id as imagen_public_id
         FROM productos p
         LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
         LEFT JOIN variantes v ON p.id_producto = v.id_producto
+        LEFT JOIN (
+          SELECT 
+            id_variante,
+            MIN(precio) as precio
+          FROM stock
+          WHERE precio IS NOT NULL
+          GROUP BY id_variante
+        ) stock_precios ON v.id_variante = stock_precios.id_variante
         LEFT JOIN (
           SELECT 
             id_variante,
@@ -1105,16 +1126,14 @@ class ProductModel {
 
       // Crear variante inicial
       const variantQuery = `
-        INSERT INTO variantes (id_producto, nombre, precio, precio_original, activo)
-        VALUES ($1, $2, $3, $4, true)
+        INSERT INTO variantes (id_producto, nombre, activo)
+        VALUES ($1, $2, true)
         RETURNING *
       `;
 
       const variantResult = await client.query(variantQuery, [
         newProduct.id_producto,
-        variante.nombre,
-        variante.precio,
-        variante.precio_original
+        variante.nombre
       ]);
 
       const newVariant = variantResult.rows[0];
@@ -1226,16 +1245,14 @@ class ProductModel {
   static async createVariant(variantData) {
     try {
       const query = `
-        INSERT INTO variantes (producto_id, nombre, descripcion, precio, activo, fecha_creacion)
-        VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+        INSERT INTO variantes (id_producto, nombre, activo, fecha_creacion)
+        VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
         RETURNING *
       `;
 
       const result = await db.query(query, [
-        variantData.producto_id,
+        variantData.id_producto,
         variantData.nombre,
-        variantData.descripcion,
-        variantData.precio,
         variantData.activo
       ]);
 
