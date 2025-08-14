@@ -851,8 +851,12 @@ const updateVariant = async (req, res) => {
       const productResult = await client.query(productQuery, [id]);
       const id_producto = productResult.rows[0].id_producto;
       
+      console.log('📊 [BACKEND] Procesando tallas. Cantidad:', tallas.length);
+      console.log('📊 [BACKEND] Tallas recibidas:', tallas);
+      
       // Si precio_unico es true, usar el precio general para todas las tallas
       if (precio_unico === true && precio !== undefined) {
+        console.log('🔥 [BACKEND] Aplicando PRECIO ÚNICO:', precio);
         // Aplicar precio único a todas las tallas de la variante
         for (const talla of tallas) {
           // Verificar si ya existe stock para esta talla
@@ -896,6 +900,7 @@ const updateVariant = async (req, res) => {
           }
         }
       } else {
+        console.log('🎯 [BACKEND] Aplicando PRECIOS DIFERENCIADOS por talla');
         // Procesar cada talla individualmente con precios diferenciados
         for (const talla of tallas) {
           // Verificar si ya existe stock para esta talla
@@ -907,6 +912,8 @@ const updateVariant = async (req, res) => {
           
           // Determinar el precio a usar: precio específico de la talla o precio general
           const precioFinal = talla.precio !== undefined ? talla.precio : precio;
+          
+          console.log(`💰 [BACKEND] Talla ${talla.id_talla} (${talla.nombre_talla || 'N/A'}): cantidad=${talla.cantidad}, precio_talla=${talla.precio}, precio_final=${precioFinal}`);
           
           if (existingStock.rows.length > 0) {
             // Actualizar stock existente
@@ -922,6 +929,8 @@ const updateVariant = async (req, res) => {
               id,
               talla.id_talla
             ]);
+            
+            console.log(`✅ [BACKEND] Actualizada talla ${talla.id_talla}: cantidad=${talla.cantidad}, precio=${precioFinal}`);
           } else if (talla.cantidad > 0) {
             // Crear nuevo stock solo si la cantidad es mayor a 0
             const stockQuery = `
@@ -936,9 +945,12 @@ const updateVariant = async (req, res) => {
               talla.cantidad,
               precioFinal
             ]);
+            
+            console.log(`✅ [BACKEND] Creada talla ${talla.id_talla}: cantidad=${talla.cantidad}, precio=${precioFinal}`);
           } else {
             // Si la cantidad es 0, eliminar el stock si existe
             await client.query('DELETE FROM stock WHERE id_variante = $1 AND id_talla = $2', [id, talla.id_talla]);
+            console.log(`🗑️ [BACKEND] Eliminada talla ${talla.id_talla} (cantidad 0)`);
           }
         }
       }
