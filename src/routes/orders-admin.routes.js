@@ -2,8 +2,13 @@
 
 const express = require('express');
 const OrdersAdminController = require('../controllers/orders-admin.controller');
+const authMiddleware = require('../middlewares/auth.middleware');
 
 const router = express.Router();
+
+// Middleware para todas las rutas de admin de pedidos
+router.use(authMiddleware.verifyToken);
+router.use(authMiddleware.requireAdmin);
 
 // ===== RUTAS DE PEDIDOS ADMIN =====
 

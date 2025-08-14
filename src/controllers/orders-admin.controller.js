@@ -215,7 +215,7 @@ class OrdersAdminController {
       const { estado, notas } = req.body;
       
       // Validar estado si se proporciona
-      const validStates = ['pendiente', 'procesando', 'en_espera', 'enviado', 'terminado', 'problema'];
+      const validStates = ['no_revisado', 'en_proceso', 'preparado', 'enviado', 'listo'];
       if (estado && !validStates.includes(estado)) {
         return res.status(400).json({
           success: false,
@@ -286,12 +286,11 @@ class OrdersAdminController {
       const statsQuery = `
         SELECT 
           COUNT(*) as total_pedidos,
-          COUNT(CASE WHEN estado = 'pendiente' THEN 1 END) as pendientes,
-          COUNT(CASE WHEN estado = 'procesando' THEN 1 END) as procesando,
-          COUNT(CASE WHEN estado = 'en_espera' THEN 1 END) as en_espera,
-          COUNT(CASE WHEN estado = 'enviado' THEN 1 END) as enviados,
-          COUNT(CASE WHEN estado = 'terminado' THEN 1 END) as terminados,
-          COUNT(CASE WHEN estado = 'problema' THEN 1 END) as problemas,
+          COUNT(CASE WHEN estado = 'no_revisado' THEN 1 END) as no_revisado,
+          COUNT(CASE WHEN estado = 'en_proceso' THEN 1 END) as en_proceso,
+          COUNT(CASE WHEN estado = 'preparado' THEN 1 END) as preparado,
+          COUNT(CASE WHEN estado = 'enviado' THEN 1 END) as enviado,
+          COUNT(CASE WHEN estado = 'listo' THEN 1 END) as listo,
           COALESCE(SUM(total), 0) as ingresos_totales,
           COALESCE(AVG(total), 0) as ticket_promedio,
           COUNT(CASE WHEN fecha_creacion >= CURRENT_DATE THEN 1 END) as pedidos_hoy,
