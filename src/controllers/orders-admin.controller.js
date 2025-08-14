@@ -9,6 +9,8 @@ class OrdersAdminController {
   // Obtener todos los pedidos con filtros y búsqueda
   static async getAllOrders(req, res) {
     try {
+      console.log('🔍 [ORDERS] getAllOrders called with params:', req.query);
+      
       const { 
         page = 1, 
         limit = 10, 
@@ -19,6 +21,10 @@ class OrdersAdminController {
         sort_by = 'fecha_creacion',
         sort_order = 'desc'
       } = req.query;
+      
+      console.log('🔍 [ORDERS] Processed params:', {
+        page, limit, estado, search, fecha_desde, fecha_hasta, sort_by, sort_order
+      });
       
       const offset = (page - 1) * limit;
       
@@ -95,12 +101,19 @@ class OrdersAdminController {
       `;
       
       params.push(limit, offset);
+      console.log('🔍 [ORDERS] Final query:', query);
+      console.log('🔍 [ORDERS] Query params:', params);
+      
       const result = await db.pool.query(query, params);
+      
+      console.log('🔍 [ORDERS] Query result rows:', result.rows.length);
       
       const totalCount = result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0;
       const totalPages = Math.ceil(totalCount / limit);
       
-      res.json({
+      console.log('🔍 [ORDERS] Total count:', totalCount, 'Total pages:', totalPages);
+      
+      const response = {
         success: true,
         data: result.rows.map(row => {
           const { total_count, ...order } = row;
@@ -112,7 +125,10 @@ class OrdersAdminController {
           totalRecords: totalCount,
           limit: parseInt(limit)
         }
-      });
+      };
+      
+      console.log('🔍 [ORDERS] Sending response with', response.data.length, 'orders');
+      res.json(response);
     } catch (error) {
       console.error('Error obteniendo pedidos:', error);
       res.status(500).json({
@@ -283,6 +299,8 @@ class OrdersAdminController {
   // Obtener estadísticas de pedidos
   static async getOrdersStats(req, res) {
     try {
+      console.log('🔍 [ORDERS-STATS] Getting order statistics...');
+      
       const statsQuery = `
         SELECT 
           COUNT(*) as total_pedidos,
@@ -299,6 +317,8 @@ class OrdersAdminController {
       `;
       
       const result = await db.pool.query(statsQuery);
+      
+      console.log('🔍 [ORDERS-STATS] Stats result:', result.rows[0]);
       
       res.json({
         success: true,
