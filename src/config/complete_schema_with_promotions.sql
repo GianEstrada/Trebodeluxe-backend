@@ -233,8 +233,9 @@ CREATE TABLE pedidos (
     id_metodo_envio INTEGER REFERENCES metodos_envio(id_metodo_envio) ON DELETE RESTRICT,
     id_metodo_pago INTEGER REFERENCES metodos_pago(id_metodo_pago) ON DELETE RESTRICT,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    estado VARCHAR(20) DEFAULT 'pendiente', -- pendiente, enviado, entregado, cancelado, etc.
+    estado VARCHAR(20) DEFAULT 'no_revisado', -- no_revisado, en_proceso, preparado, enviado, listo
     total NUMERIC(10,2),
+    notas TEXT, -- Campo para notas administrativas
     token_sesion VARCHAR(100) -- Para pedidos de invitados sin cuenta
 );
 
