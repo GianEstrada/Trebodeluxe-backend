@@ -144,9 +144,30 @@ const createProductWithVariant = async (req, res) => {
       variantes 
     } = req.body;
 
+    // Convertir categoría a ID si es string
+    let id_categoria = categoria;
+    if (typeof categoria === 'string') {
+      // Buscar la categoría por nombre
+      const catResult = await client.query(
+        'SELECT id_categoria FROM categorias WHERE LOWER(nombre) = LOWER($1)',
+        [categoria]
+      );
+      
+      if (catResult.rows.length > 0) {
+        id_categoria = catResult.rows[0].id_categoria;
+      } else {
+        // Si no existe, crear nueva categoría
+        const newCatResult = await client.query(
+          'INSERT INTO categorias (nombre, activo) VALUES ($1, true) RETURNING id_categoria',
+          [categoria]
+        );
+        id_categoria = newCatResult.rows[0].id_categoria;
+      }
+    }
+
     // Crear producto
     const productQuery = `
-      INSERT INTO productos (nombre, descripcion, categoria, marca, id_sistema_talla)
+      INSERT INTO productos (nombre, descripcion, id_categoria, marca, id_sistema_talla)
       VALUES ($1, $2, $3, $4, $5)
       RETURNING id_producto;
     `;
@@ -154,7 +175,7 @@ const createProductWithVariant = async (req, res) => {
     const productResult = await client.query(productQuery, [
       producto_nombre, 
       producto_descripcion, 
-      categoria, 
+      id_categoria, 
       marca, 
       id_sistema_talla
     ]);
@@ -547,7 +568,7 @@ const updateProduct = async (req, res) => {
     // Actualizar producto
     const updateQuery = `
       UPDATE productos 
-      SET nombre = $1, descripcion = $2, categoria = $3, marca = $4, id_sistema_talla = $5
+      SET nombre = $1, descripcion = $2, id_categoria = $3, marca = $4, id_sistema_talla = $5
       WHERE id_producto = $6 AND activo = true
       RETURNING id_producto;
     `;
@@ -782,7 +803,7 @@ const updateVariant = async (req, res) => {
         UPDATE productos 
         SET 
           nombre = COALESCE($1, nombre),
-          categoria = COALESCE($2, categoria),
+          id_categoria = COALESCE($2, id_categoria),
           descripcion = COALESCE($3, descripcion),
           marca = COALESCE($4, marca)
         WHERE id_producto = $5 AND activo = true
