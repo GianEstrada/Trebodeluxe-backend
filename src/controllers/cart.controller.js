@@ -4,6 +4,20 @@ const pool = require('../config/db');
 // Obtener carrito activo del usuario (o crear uno nuevo si no existe)
 const getActiveCart = async (req, res) => {
   try {
+    // Manejar usuarios no autenticados temporalmente
+    if (!req.user || !req.user.id_usuario) {
+      return res.json({
+        success: true,
+        cart: {
+          id_pedido: null,
+          fecha_creacion: null,
+          total: 0,
+          items: []
+        },
+        message: 'Carrito vacío - usuario no autenticado'
+      });
+    }
+
     const { id_usuario } = req.user; // Del middleware de autenticación
     
     // Buscar carrito activo (pedido con estado 'carrito')

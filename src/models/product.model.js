@@ -394,81 +394,47 @@ class ProductModel {
   // Obtener productos recientes por categoría
   static async getRecentByCategory(limit = 4) {
     try {
+      // Versión simplificada temporalmente para evitar errores
       const query = `
         SELECT 
-          categoria,
-          json_agg(
-            json_build_object(
-              'id_producto', p.id_producto,
-              'nombre', p.nombre,
-              'descripcion', p.descripcion,
-              'marca', p.marca,
-              'categoria', p.categoria,
-              'fecha_creacion', p.fecha_creacion,
-              'variantes', productos_variantes.variantes
-            ) ORDER BY p.fecha_creacion DESC
-          ) as productos
+          COALESCE(c.nombre, 'Sin categoría') as categoria,
+          p.id_producto,
+          p.nombre,
+          p.descripcion,
+          p.marca,
+          p.fecha_creacion
         FROM productos p
-        INNER JOIN (
-          SELECT 
-            p.id_producto,
-            json_agg(
-              json_build_object(
-                'id_variante', v.id_variante,
-                'nombre', v.nombre,
-                'precio', stock_precios.precio,
-                'descuento_porcentaje', NULL,
-                'imagenes', COALESCE(img.imagenes, '[]'::json),
-                'stock_total', COALESCE(stock.total_stock, 0),
-                'disponible', COALESCE(stock.total_stock, 0) > 0
-              ) ORDER BY v.id_variante
-            ) as variantes
-          FROM productos p
-          LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
-          LEFT JOIN (
-            SELECT 
-              id_variante,
-              MIN(precio) as precio
-            FROM stock
-            WHERE precio IS NOT NULL
-            GROUP BY id_variante
-          ) stock_precios ON v.id_variante = stock_precios.id_variante
-          LEFT JOIN (
-            SELECT 
-              id_variante,
-              json_agg(
-                json_build_object(
-                  'id_imagen', id_imagen,
-                  'url', url,
-                  'public_id', public_id,
-                  'orden', orden
-                ) ORDER BY orden
-              ) as imagenes
-            FROM imagenes_variante
-            GROUP BY id_variante
-          ) img ON v.id_variante = img.id_variante
-          LEFT JOIN (
-            SELECT 
-              id_variante,
-              SUM(cantidad) as total_stock
-            FROM stock
-            GROUP BY id_variante
-          ) stock ON v.id_variante = stock.id_variante
-          WHERE p.activo = true
-          GROUP BY p.id_producto
-        ) productos_variantes ON p.id_producto = productos_variantes.id_producto
+        LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
         WHERE p.activo = true 
-          AND p.categoria IS NOT NULL
-        GROUP BY categoria
-        ORDER BY categoria
+        ORDER BY p.fecha_creacion DESC
+        LIMIT $1
       `;
       
-      const result = await db.query(query);
+      const result = await db.query(query, [limit * 3]); // Obtener más productos para distribuir por categoría
       
-      // Limitar productos por categoría
-      const limitedResult = result.rows.map(category => ({
-        ...category,
-        productos: category.productos.slice(0, limit)
+      // Agrupar productos por categoría
+      const productsByCategory = {};
+      result.rows.forEach(product => {
+        if (!productsByCategory[product.categoria]) {
+          productsByCategory[product.categoria] = [];
+        }
+        if (productsByCategory[product.categoria].length < limit) {
+          productsByCategory[product.categoria].push({
+            id_producto: product.id_producto,
+            nombre: product.nombre,
+            descripcion: product.descripcion,
+            marca: product.marca,
+            categoria: product.categoria,
+            fecha_creacion: product.fecha_creacion,
+            variantes: [] // Temporalmente vacío
+          });
+        }
+      });
+      
+      // Convertir a array de objetos con formato esperado
+      const limitedResult = Object.keys(productsByCategory).map(categoria => ({
+        categoria,
+        productos: productsByCategory[categoria]
       }));
       
       return limitedResult;
