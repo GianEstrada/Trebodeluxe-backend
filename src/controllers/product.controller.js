@@ -504,12 +504,26 @@ class ProductController {
           v.nombre as nombre_variante,
           v.id_producto,
           p.nombre as nombre_producto,
+          p.descripcion as descripcion_producto,
           COALESCE(c.nombre, 'Sin categoría') as categoria,
           p.marca,
           v.activo,
           v.fecha_creacion,
           COALESCE(MIN(s.precio), 0) as precio_minimo,
-          COALESCE(SUM(s.cantidad), 0) as stock_total
+          COALESCE(SUM(s.cantidad), 0) as stock_total,
+          (
+            SELECT json_agg(
+              json_build_object(
+                'id_imagen', img.id_imagen,
+                'url', img.url,
+                'public_id', img.public_id,
+                'orden', img.orden
+              ) ORDER BY img.orden
+            )
+            FROM imagenes_productos img 
+            WHERE img.id_producto = p.id_producto 
+            AND img.activo = true
+          ) as imagenes
         FROM variantes v
         INNER JOIN productos p ON v.id_producto = p.id_producto
         LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
@@ -527,8 +541,8 @@ class ProductController {
       }
 
       query += `
-        GROUP BY v.id_variante, v.nombre, v.id_producto, p.nombre, c.nombre, p.marca, v.activo, v.fecha_creacion
-        ORDER BY p.nombre, v.nombre
+        GROUP BY v.id_variante, v.nombre, v.id_producto, p.nombre, p.descripcion, c.nombre, p.marca, v.activo, v.fecha_creacion
+        ORDER BY p.nombre, v.id_variante ASC
         LIMIT $${paramCount} OFFSET $${paramCount + 1}
       `;
 
@@ -552,6 +566,108 @@ class ProductController {
       res.status(500).json({
         success: false,
         message: 'Error al obtener variantes',
+        error: error.message
+      });
+    }
+  }
+
+  // Obtener productos para catálogo con solo la primera variante de cada producto
+  static async getProductsForCatalog(req, res) {
+    try {
+      const { limit = 20, offset = 0, categoria, marca, search } = req.query;
+      
+      let query = `
+        WITH first_variants AS (
+          SELECT DISTINCT ON (p.id_producto)
+            v.id_variante,
+            v.nombre as nombre_variante,
+            v.id_producto,
+            p.nombre as nombre_producto,
+            p.descripcion as descripcion_producto,
+            COALESCE(c.nombre, 'Sin categoría') as categoria,
+            p.marca,
+            v.activo as variante_activa,
+            p.activo as producto_activo,
+            v.fecha_creacion,
+            COALESCE(MIN(s.precio), 0) as precio_minimo,
+            COALESCE(SUM(s.cantidad), 0) as stock_total
+          FROM productos p
+          INNER JOIN variantes v ON p.id_producto = v.id_producto
+          LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
+          LEFT JOIN stock s ON v.id_variante = s.id_variante
+          WHERE v.activo = true AND p.activo = true
+          GROUP BY p.id_producto, v.id_variante, v.nombre, p.nombre, p.descripcion, c.nombre, p.marca, v.activo, p.activo, v.fecha_creacion
+          ORDER BY p.id_producto, v.id_variante ASC
+        )
+        SELECT 
+          fv.*,
+          (
+            SELECT json_agg(
+              json_build_object(
+                'id_imagen', img.id_imagen,
+                'url', img.url,
+                'public_id', img.public_id,
+                'orden', img.orden
+              ) ORDER BY img.orden
+            )
+            FROM imagenes_productos img 
+            WHERE img.id_producto = fv.id_producto 
+            AND img.activo = true
+          ) as imagenes
+        FROM first_variants fv
+        WHERE 1=1
+      `;
+
+      const params = [];
+      let paramCount = 1;
+
+      if (categoria) {
+        query += ` AND LOWER(fv.categoria) = LOWER($${paramCount})`;
+        params.push(categoria);
+        paramCount++;
+      }
+
+      if (marca) {
+        query += ` AND LOWER(fv.marca) = LOWER($${paramCount})`;
+        params.push(marca);
+        paramCount++;
+      }
+
+      if (search) {
+        query += ` AND (
+          LOWER(fv.nombre_producto) LIKE LOWER($${paramCount}) OR 
+          LOWER(fv.descripcion_producto) LIKE LOWER($${paramCount}) OR
+          LOWER(fv.marca) LIKE LOWER($${paramCount})
+        )`;
+        params.push(`%${search}%`);
+        paramCount++;
+      }
+
+      query += `
+        ORDER BY fv.nombre_producto
+        LIMIT $${paramCount} OFFSET $${paramCount + 1}
+      `;
+
+      params.push(parseInt(limit), parseInt(offset));
+
+      const result = await pool.query(query, params);
+
+      res.json({
+        success: true,
+        message: 'Productos para catálogo obtenidos exitosamente',
+        products: result.rows,
+        pagination: {
+          limit: parseInt(limit),
+          offset: parseInt(offset),
+          total: result.rows.length
+        }
+      });
+
+    } catch (error) {
+      console.error('Error en getProductsForCatalog:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener productos para catálogo',
         error: error.message
       });
     }

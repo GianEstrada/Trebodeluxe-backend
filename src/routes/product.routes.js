@@ -67,6 +67,12 @@ router.get('/featured', ProductController.getFeatured);
 // @access  Public  
 router.get('/variants', ProductController.getVariants);
 
+// @route   GET /api/products/catalog-items
+// @desc    Obtener productos para catálogo (una variante por producto) con imágenes
+// @query   limit, offset, categoria, marca, search
+// @access  Public
+router.get('/catalog-items', ProductController.getProductsForCatalog);
+
 // === RUTAS PARA ADMINISTRADORES ===
 
 // @route   GET /api/products/admin
