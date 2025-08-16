@@ -1,6 +1,7 @@
 // controllers/product.controller.js - Controlador para productos
 
 const ProductModel = require('../models/product.model');
+const { pool } = require('../config/db');
 
 class ProductController {
   // Obtener todos los productos
@@ -487,6 +488,70 @@ class ProductController {
       res.status(500).json({
         success: false,
         message: 'Error al obtener categorías',
+        error: error.message
+      });
+    }
+  }
+
+  // Obtener todas las variantes de productos (para uso público)
+  static async getVariants(req, res) {
+    try {
+      const { limit = 100, offset = 0, id_producto } = req.query;
+      
+      let query = `
+        SELECT 
+          v.id_variante,
+          v.nombre as nombre_variante,
+          v.id_producto,
+          p.nombre as nombre_producto,
+          COALESCE(c.nombre, 'Sin categoría') as categoria,
+          p.marca,
+          v.activo,
+          v.fecha_creacion,
+          COALESCE(MIN(s.precio), 0) as precio_minimo,
+          COALESCE(SUM(s.cantidad), 0) as stock_total
+        FROM variantes v
+        INNER JOIN productos p ON v.id_producto = p.id_producto
+        LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
+        LEFT JOIN stock s ON v.id_variante = s.id_variante
+        WHERE v.activo = true AND p.activo = true
+      `;
+
+      const params = [];
+      let paramCount = 1;
+
+      if (id_producto) {
+        query += ` AND p.id_producto = $${paramCount}`;
+        params.push(id_producto);
+        paramCount++;
+      }
+
+      query += `
+        GROUP BY v.id_variante, v.nombre, v.id_producto, p.nombre, c.nombre, p.marca, v.activo, v.fecha_creacion
+        ORDER BY p.nombre, v.nombre
+        LIMIT $${paramCount} OFFSET $${paramCount + 1}
+      `;
+
+      params.push(parseInt(limit), parseInt(offset));
+
+      const result = await pool.query(query, params);
+
+      res.json({
+        success: true,
+        message: 'Variantes obtenidas exitosamente',
+        variants: result.rows,
+        pagination: {
+          limit: parseInt(limit),
+          offset: parseInt(offset),
+          total: result.rows.length
+        }
+      });
+
+    } catch (error) {
+      console.error('Error en getVariants:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener variantes',
         error: error.message
       });
     }
