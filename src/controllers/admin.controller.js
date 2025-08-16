@@ -19,7 +19,7 @@ const getAllVariants = async (req, res) => {
         p.id_producto,
         p.nombre as nombre_producto,
         p.descripcion as descripcion_producto,
-        p.categoria,
+        COALESCE(c.nombre, 'Sin categoría') as categoria,
         p.marca,
         st.nombre as sistema_talla,
         iv.url as imagen_url,
@@ -39,13 +39,14 @@ const getAllVariants = async (req, res) => {
         ) as tallas_stock
       FROM variantes v
       INNER JOIN productos p ON v.id_producto = p.id_producto
+      LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
       LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
       LEFT JOIN imagenes_variante iv ON v.id_variante = iv.id_variante AND iv.orden = 1
       LEFT JOIN tallas t ON t.id_sistema_talla = p.id_sistema_talla
       LEFT JOIN stock s ON s.id_variante = v.id_variante AND s.id_talla = t.id_talla
       WHERE p.activo = true AND v.activo = true
       GROUP BY v.id_variante, v.nombre, v.activo,
-               p.id_producto, p.nombre, p.descripcion, p.categoria, p.marca,
+               p.id_producto, p.nombre, p.descripcion, c.nombre, p.marca,
                st.nombre, iv.url, iv.public_id
       ORDER BY p.nombre, v.nombre;
     `;
@@ -71,10 +72,11 @@ const getAllProducts = async (req, res) => {
       SELECT 
         p.id_producto,
         p.nombre,
-        p.categoria,
+        COALESCE(c.nombre, 'Sin categoría') as categoria,
         st.id_sistema_talla,
         st.nombre as sistema_talla
       FROM productos p
+      LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
       LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
       WHERE p.activo = true
       ORDER BY p.nombre;
