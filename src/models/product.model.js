@@ -670,11 +670,12 @@ class ProductModel {
   static async getCategories() {
     try {
       const query = `
-        SELECT DISTINCT categoria, COUNT(*) as total_productos
-        FROM productos 
-        WHERE activo = true AND categoria IS NOT NULL
-        GROUP BY categoria
-        ORDER BY categoria
+        SELECT DISTINCT COALESCE(c.nombre, 'Sin categoría') as categoria, COUNT(*) as total_productos
+        FROM productos p
+        LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
+        WHERE p.activo = true AND p.id_categoria IS NOT NULL
+        GROUP BY c.nombre
+        ORDER BY c.nombre
       `;
       
       const result = await db.query(query);
@@ -919,15 +920,16 @@ class ProductModel {
     try {
       const query = `
         SELECT 
-          p.categoria,
+          COALESCE(c.nombre, 'Sin categoría') as categoria,
           COUNT(DISTINCT p.id_producto) as total_productos,
           COUNT(DISTINCT v.id_variante) FILTER (WHERE v.activo = true) as variantes_activas
         FROM productos p
+        LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
         LEFT JOIN variantes v ON p.id_producto = v.id_producto
-        WHERE p.activo = true AND p.categoria IS NOT NULL
-        GROUP BY p.categoria
+        WHERE p.activo = true AND p.id_categoria IS NOT NULL
+        GROUP BY c.nombre
         HAVING COUNT(DISTINCT p.id_producto) > 0
-        ORDER BY p.categoria ASC
+        ORDER BY c.nombre ASC
       `;
 
       const result = await db.query(query);

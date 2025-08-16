@@ -6,17 +6,43 @@ class MainImagesController {
   // Obtener todas las imágenes principales
   static async getAllImages(req, res) {
     try {
-      // Temporal: devolver estructura vacía para evitar errores
+      const query = `
+        SELECT 
+          id_imagen,
+          nombre,
+          url,
+          public_id,
+          seccion,
+          descripcion,
+          estado,
+          fecha_creacion,
+          fecha_actualizacion
+        FROM imagenes_index 
+        WHERE estado != 'inactivo'
+        ORDER BY seccion, estado, fecha_creacion DESC
+      `;
+      
+      const result = await pool.query(query);
+      
+      // Organizar imágenes por sección
+      const imagesBySection = {
+        principal: [],
+        banner: []
+      };
+      
+      result.rows.forEach(imagen => {
+        if (imagesBySection[imagen.seccion]) {
+          imagesBySection[imagen.seccion].push(imagen);
+        }
+      });
+      
       res.json({
         success: true,
         data: {
-          all: [],
-          bySection: {
-            principal: [],
-            banner: []
-          }
+          all: result.rows,
+          bySection: imagesBySection
         },
-        total: 0
+        total: result.rows.length
       });
     } catch (error) {
       console.error('Error obteniendo imágenes principales:', error);
@@ -31,12 +57,48 @@ class MainImagesController {
   // Obtener imágenes por sección específica
   static async getImagesByType(req, res) {
     try {
-      // Temporal: devolver estructura vacía para evitar errores  
+      const { tipo } = req.params; // Mantenemos el parámetro "tipo" por compatibilidad
+      
+      // Mapear los tipos antiguos a las secciones nuevas
+      let seccion = tipo;
+      if (tipo === 'hero_banner' || tipo === 'promocion_banner') {
+        seccion = 'principal';
+      } else if (tipo === 'categoria_destacada') {
+        seccion = 'banner';
+      }
+      
+      const validSections = ['principal', 'banner'];
+      if (!validSections.includes(seccion)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Sección de imagen no válida',
+          validSections
+        });
+      }
+
+      const query = `
+        SELECT 
+          id_imagen,
+          nombre,
+          url,
+          public_id,
+          seccion,
+          descripcion,
+          estado,
+          fecha_creacion,
+          fecha_actualizacion
+        FROM imagenes_index 
+        WHERE seccion = $1 AND estado != 'inactivo'
+        ORDER BY fecha_creacion DESC
+      `;
+      
+      const result = await pool.query(query, [seccion]);
+      
       res.json({
         success: true,
-        data: [],
-        section: req.params.tipo,
-        total: 0
+        data: result.rows,
+        section: seccion,
+        total: result.rows.length
       });
     } catch (error) {
       console.error(`Error obteniendo imágenes sección ${req.params.tipo}:`, error);

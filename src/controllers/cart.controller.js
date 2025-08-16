@@ -25,13 +25,14 @@ const getActiveCart = async (req, res) => {
       SELECT p.id_pedido, p.fecha_creacion, p.total,
              pd.id_detalle, pd.id_producto, pd.id_variante, pd.id_talla, 
              pd.cantidad, pd.precio_unitario,
-             pr.nombre as nombre_producto, pr.categoria, pr.marca,
+             pr.nombre as nombre_producto, COALESCE(c.nombre, 'Sin categoría') as categoria, pr.marca,
              v.nombre as nombre_variante, 
              iv.url as imagen_url,
              t.id_talla, t.nombre_talla
       FROM pedidos p
       LEFT JOIN pedido_detalle pd ON p.id_pedido = pd.id_pedido
       LEFT JOIN productos pr ON pd.id_producto = pr.id_producto
+      LEFT JOIN categorias c ON pr.id_categoria = c.id_categoria
       LEFT JOIN variantes v ON pd.id_variante = v.id_variante  
       LEFT JOIN imagenes_variante iv ON v.id_variante = iv.id_variante AND iv.orden = 1
       LEFT JOIN tallas t ON pd.id_talla = t.id_talla
