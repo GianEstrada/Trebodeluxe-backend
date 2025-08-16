@@ -80,12 +80,12 @@ async function setupSiteSettings() {
     
     // Insertar imágenes por defecto
     await db.pool.query(`
-      INSERT INTO imagenes_principales (nombre, url, tipo, titulo, subtitulo, enlace, orden, activo) VALUES
-      ('Hero Principal', 'https://res.cloudinary.com/demo/image/upload/sample.jpg', 'hero_banner', 'NUEVA COLECCIÓN', 'Descubre los últimos trends en moda', '/catalogo', 1, true),
-      ('Banner Promoción Verano', 'https://res.cloudinary.com/demo/image/upload/sample2.jpg', 'promocion_banner', 'OFERTAS DE VERANO', '20% de descuento en segunda prenda', '/catalogo?promocion=verano', 1, true),
-      ('Categoría Hombre', 'https://res.cloudinary.com/demo/image/upload/sample3.jpg', 'categoria_destacada', 'MODA MASCULINA', 'Estilo y elegancia para él', '/catalogo?categoria=hombre', 1, true),
-      ('Categoría Mujer', 'https://res.cloudinary.com/demo/image/upload/sample4.jpg', 'categoria_destacada', 'MODA FEMENINA', 'Tendencias que definen tu estilo', '/catalogo?categoria=mujer', 2, true)
-      ON CONFLICT DO NOTHING;
+      INSERT INTO imagenes_index (nombre, url, seccion, descripcion, estado) VALUES
+      ('Hero Principal', 'https://res.cloudinary.com/demo/image/upload/sample.jpg', 'principal', 'Imagen principal del sitio web', 'activo'),
+      ('Banner Promoción Verano', 'https://res.cloudinary.com/demo/image/upload/sample2.jpg', 'principal', 'Banner promocional de ofertas de verano', 'activo'),
+      ('Categoría Destacada 1', 'https://res.cloudinary.com/demo/image/upload/sample3.jpg', 'banner', 'Banner para categoría destacada', 'activo'),
+      ('Categoría Destacada 2', 'https://res.cloudinary.com/demo/image/upload/sample4.jpg', 'banner', 'Banner para categoría destacada', 'activo')
+      ON CONFLICT (nombre) DO NOTHING;
     `);
     
     console.log('✅ Configuraciones del sitio configuradas correctamente');

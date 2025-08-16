@@ -31,7 +31,7 @@ class NotesController {
       
       // Filtro por activo
       if (activo !== null) {
-        whereConditions.push(`n.activo = $${paramCount++}`);
+        whereConditions.push(`n.activa = $${paramCount++}`);
         params.push(activo === 'true');
       }
       
@@ -410,10 +410,10 @@ class NotesController {
           COUNT(CASE WHEN prioridad = 'alta' THEN 1 END) as altas,
           COUNT(CASE WHEN prioridad = 'normal' THEN 1 END) as normales,
           COUNT(CASE WHEN prioridad = 'baja' THEN 1 END) as bajas,
-          COUNT(CASE WHEN fecha_vencimiento < CURRENT_TIMESTAMP AND fecha_vencimiento IS NOT NULL AND activo = true THEN 1 END) as vencidas,
+          COUNT(CASE WHEN fecha_vencimiento < CURRENT_TIMESTAMP AND fecha_vencimiento IS NOT NULL AND activa = true THEN 1 END) as vencidas,
           COUNT(CASE WHEN fecha_creacion >= CURRENT_DATE THEN 1 END) as notas_hoy,
           COUNT(CASE WHEN fecha_creacion >= CURRENT_DATE - INTERVAL '7 days' THEN 1 END) as notas_semana,
-          COUNT(CASE WHEN fecha_vencimiento BETWEEN CURRENT_TIMESTAMP AND CURRENT_TIMESTAMP + INTERVAL '7 days' AND activo = true THEN 1 END) as vencen_pronto
+          COUNT(CASE WHEN fecha_vencimiento BETWEEN CURRENT_TIMESTAMP AND CURRENT_TIMESTAMP + INTERVAL '7 days' AND activa = true THEN 1 END) as vencen_pronto
         FROM notas_generales
       `;
       

@@ -30,10 +30,11 @@ class PromotionsController {
           p.*,
           px.cantidad_comprada,
           px.cantidad_pagada,
-          pp.porcentaje,
+          pp.porcentaje_descuento,
+          pp.monto_minimo,
           pc.codigo,
-          pc.descuento,
-          pc.tipo_descuento,
+          pc.usos_maximos,
+          pc.usos_actuales,
           COUNT(*) OVER() as total_count
         FROM promociones p
         LEFT JOIN promo_x_por_y px ON p.id_promocion = px.id_promocion
