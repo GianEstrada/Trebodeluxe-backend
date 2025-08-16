@@ -258,6 +258,24 @@ CREATE TABLE seguimiento_envio (
     estado_envio VARCHAR(50) -- Ej: en tránsito, entregado, etc.
 );
 
+-- ==== NOTAS GENERALES ====
+
+CREATE TABLE notas_generales (
+    id_nota SERIAL PRIMARY KEY,
+    titulo VARCHAR(255) NOT NULL,
+    contenido TEXT NOT NULL,
+    prioridad VARCHAR(20) DEFAULT 'normal' CHECK (prioridad IN ('baja', 'normal', 'alta', 'urgente')),
+    id_usuario_creador INTEGER REFERENCES usuarios(id_usuario) ON DELETE SET NULL,
+    nombre_usuario_creador VARCHAR(200),
+    rol_usuario_creador VARCHAR(50),
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_vencimiento TIMESTAMP,
+    etiquetas TEXT[],
+    color VARCHAR(20) DEFAULT 'default',
+    activa BOOLEAN DEFAULT true
+);
+
 -- ==== ÍNDICES PARA RENDIMIENTO ====
 
 CREATE INDEX idx_usuarios_correo ON usuarios(correo);
@@ -285,7 +303,7 @@ CREATE INDEX idx_imagenes_index_seccion ON imagenes_index(seccion);
 CREATE INDEX idx_imagenes_index_estado ON imagenes_index(estado);
 CREATE INDEX idx_notas_generales_prioridad ON notas_generales(prioridad);
 CREATE INDEX idx_notas_generales_fecha_creacion ON notas_generales(fecha_creacion);
-CREATE INDEX idx_notas_generales_activo ON notas_generales(activo);
+CREATE INDEX idx_notas_generales_activa ON notas_generales(activa);
 CREATE INDEX idx_notas_generales_usuario_creador ON notas_generales(id_usuario_creador);
 CREATE INDEX idx_notas_generales_fecha_vencimiento ON notas_generales(fecha_vencimiento);
 
