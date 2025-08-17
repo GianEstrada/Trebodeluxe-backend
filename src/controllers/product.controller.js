@@ -520,9 +520,8 @@ class ProductController {
                 'orden', img.orden
               ) ORDER BY img.orden
             )
-            FROM imagenes_productos img 
-            WHERE img.id_producto = p.id_producto 
-            AND img.activo = true
+            FROM imagenes_variante img 
+            WHERE img.id_variante = v.id_variante
           ) as imagenes
         FROM variantes v
         INNER JOIN productos p ON v.id_producto = p.id_producto
@@ -610,9 +609,8 @@ class ProductController {
                 'orden', img.orden
               ) ORDER BY img.orden
             )
-            FROM imagenes_productos img 
-            WHERE img.id_producto = fv.id_producto 
-            AND img.activo = true
+            FROM imagenes_variante img 
+            WHERE img.id_variante = fv.id_variante
           ) as imagenes
         FROM first_variants fv
         WHERE 1=1
