@@ -2,6 +2,7 @@ const express = require('express');
 const { check, validationResult } = require('express-validator');
 const { registerUser, loginUser, getUserProfile, logoutUser } = require('../controllers/auth.controller');
 const authMiddleware = require('../middlewares/auth.middleware');
+const activityAuth = require('../middlewares/auth-activity.middleware');
 
 const router = express.Router();
 
@@ -69,5 +70,49 @@ router.get('/profile', authMiddleware.verifyToken, getUserProfile);
 // @desc    Cerrar sesión del usuario
 // @access  Private
 router.post('/logout', authMiddleware.verifyToken, logoutUser);
+
+// @route   GET /api/auth/verify
+// @desc    Verificar token con renovación automática
+// @access  Private
+router.get('/verify', activityAuth.verifyToken, (req, res) => {
+  try {
+    res.json({
+      success: true,
+      message: 'Token válido',
+      user: {
+        id_usuario: req.user.id_usuario,
+        usuario: req.user.usuario,
+        nombres: req.user.nombres,
+        apellidos: req.user.apellidos,
+        correo: req.user.correo,
+        rol: req.user.rol
+      }
+    });
+  } catch (error) {
+    console.error('Error en verificación de token:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+});
+
+// @route   GET /api/auth/verify-admin
+// @desc    Verificar token y permisos de admin
+// @access  Private (Admin only)
+router.get('/verify-admin', activityAuth.verifyToken, activityAuth.requireAdmin, (req, res) => {
+  res.json({
+    success: true,
+    message: 'Token y permisos de admin válidos',
+    user: {
+      id_usuario: req.user.id_usuario,
+      usuario: req.user.usuario,
+      nombres: req.user.nombres,
+      apellidos: req.user.apellidos,
+      correo: req.user.correo,
+      rol: req.user.rol
+    }
+  });
+});
 
 module.exports = router;

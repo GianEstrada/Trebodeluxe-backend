@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/admin.controller');
-const authMiddleware = require('../middlewares/auth.middleware');
+const authMiddleware = require('../middlewares/auth-activity.middleware');
 const { upload, handleMulterError } = require('../middlewares/upload.middleware');
 
 // Middleware para todas las rutas de admin

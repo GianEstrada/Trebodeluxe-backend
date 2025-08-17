@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { verifyToken, requireAdmin } = require('../middlewares/auth.middleware');
+const { verifyToken, requireAdmin } = require('../middlewares/auth-activity.middleware');
 const AdminVariantController = require('../controllers/admin.variant.controller');
 
 // Middleware para todas las rutas de admin

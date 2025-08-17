@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
 const UserModel = require('../models/user.model');
 const ShippingInfoModel = require('../models/shipping.model');
+const { generateToken } = require('../middlewares/auth-activity.middleware');
 
 // Controlador de usuarios
 const UserController = {
@@ -107,17 +108,8 @@ const UserController = {
         });
       }
 
-      // Generar token JWT con todos los datos del usuario
-      const token = jwt.sign(
-        { 
-          id_usuario: user.id_usuario,
-          nombres: user.nombres,
-          apellidos: user.apellidos,
-          correo: user.correo
-        },
-        process.env.JWT_SECRET,
-        { expiresIn: '24h' }
-      );
+      // Generar token JWT con sistema de actividad
+      const token = generateToken(user.id_usuario);
 
       res.json({
         success: true,
