@@ -262,7 +262,35 @@ class ProductModel {
               'precios_distintos', precios_info.precios_distintos,
               'precio_unico', precios_info.precio_unico
             ) ORDER BY v.id_variante
-          ) FILTER (WHERE v.id_variante IS NOT NULL) as variantes
+          ) FILTER (WHERE v.id_variante IS NOT NULL) as variantes,
+          (
+            SELECT json_agg(
+              json_build_object(
+                'id_talla', tallas_info.id_talla,
+                'nombre_talla', tallas_info.nombre_talla,
+                'orden', tallas_info.orden,
+                'cantidad', tallas_info.total_cantidad
+              ) ORDER BY tallas_info.orden, tallas_info.id_talla
+            )
+            FROM (
+              SELECT DISTINCT 
+                t.id_talla,
+                t.nombre_talla,
+                t.orden,
+                COALESCE(stock_sum.total_cantidad, 0) as total_cantidad
+              FROM tallas t
+              LEFT JOIN (
+                SELECT 
+                  s.id_talla,
+                  SUM(s.cantidad) as total_cantidad
+                FROM stock s
+                INNER JOIN variantes v2 ON s.id_variante = v2.id_variante
+                WHERE v2.id_producto = p.id_producto AND v2.activo = true
+                GROUP BY s.id_talla
+              ) stock_sum ON t.id_talla = stock_sum.id_talla
+              WHERE stock_sum.total_cantidad > 0
+            ) tallas_info
+          ) as tallas_disponibles
         FROM productos p
         LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
         LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
