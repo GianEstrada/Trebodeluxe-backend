@@ -178,13 +178,14 @@ class OrdersAdminController {
         SELECT 
           pd.*,
           pr.nombre as producto_nombre,
-          pr.categoria as producto_categoria,
+          cat.nombre as producto_categoria,
           v.nombre as variante_nombre,
           COALESCE(s.precio, pd.precio_unitario) as variante_precio,
           t.nombre_talla,
           st.nombre as sistema_talla
         FROM pedido_detalle pd
         JOIN productos pr ON pd.id_producto = pr.id_producto
+        LEFT JOIN categorias cat ON pr.id_categoria = cat.id_categoria
         JOIN variantes v ON pd.id_variante = v.id_variante
         LEFT JOIN tallas t ON pd.id_talla = t.id_talla
         LEFT JOIN sistemas_talla st ON t.id_sistema_talla = st.id_sistema_talla
