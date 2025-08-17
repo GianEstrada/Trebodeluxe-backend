@@ -5,21 +5,29 @@ const db = require('../config/db');
 class PromotionsController {
   // ===== PROMOCIONES GENERALES =====
   
-  // Obtener todas las promociones con paginación
+  // Obtener todas las promociones con paginación, búsqueda y filtros
   static async getAllPromotions(req, res) {
     try {
-      const { page = 1, limit = 10, active = null, tipo = null } = req.query;
+      const { page = 1, limit = 10, active = null, tipo = null, search = '' } = req.query;
       const offset = (page - 1) * limit;
       
       let whereClause = '';
       const params = [];
       let paramCount = 1;
       
+      // Filtro de búsqueda
+      if (search && search.trim()) {
+        whereClause += ` WHERE (LOWER(p.nombre) LIKE LOWER($${paramCount++}) OR LOWER(pc.codigo) LIKE LOWER($${paramCount++}))`;
+        params.push(`%${search.trim()}%`, `%${search.trim()}%`);
+      }
+      
+      // Filtro de activo/inactivo
       if (active !== null) {
-        whereClause += ` WHERE p.activo = $${paramCount++}`;
+        whereClause += whereClause ? ` AND p.activo = $${paramCount++}` : ` WHERE p.activo = $${paramCount++}`;
         params.push(active === 'true');
       }
       
+      // Filtro por tipo
       if (tipo) {
         whereClause += whereClause ? ` AND p.tipo = $${paramCount++}` : ` WHERE p.tipo = $${paramCount++}`;
         params.push(tipo);
@@ -523,6 +531,63 @@ class PromotionsController {
       });
     } catch (error) {
       console.error('Error aplicando promoción:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+
+  // ===== MÉTODOS AUXILIARES =====
+  
+  // Obtener productos para dropdown con búsqueda
+  static async getProductsForDropdown(req, res) {
+    try {
+      const { search = '', limit = 50 } = req.query;
+      
+      let whereClause = '';
+      const params = [];
+      let paramCount = 1;
+      
+      if (search && search.trim()) {
+        whereClause = ` WHERE LOWER(nombre) LIKE LOWER($${paramCount++})`;
+        params.push(`%${search.trim()}%`);
+      }
+      
+      const query = `
+        SELECT 
+          id_producto,
+          nombre,
+          descripcion,
+          marca,
+          activo
+        FROM productos
+        ${whereClause}
+        ORDER BY nombre ASC
+        LIMIT $${paramCount}
+      `;
+      
+      params.push(limit);
+      const result = await db.pool.query(query, params);
+      
+      // Formatear la respuesta para el dropdown
+      const formattedProducts = result.rows.map(product => ({
+        id: product.id_producto,
+        label: `${product.id_producto} - ${product.nombre}`,
+        nombre: product.nombre,
+        descripcion: product.descripcion,
+        marca: product.marca,
+        activo: product.activo
+      }));
+      
+      res.json({
+        success: true,
+        data: formattedProducts,
+        total: result.rows.length
+      });
+    } catch (error) {
+      console.error('Error obteniendo productos para dropdown:', error);
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor',

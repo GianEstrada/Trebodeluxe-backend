@@ -8,6 +8,9 @@ const PromotionsController = require('../controllers/promotions-admin.controller
 // GET /api/admin/promotions - Obtener todas las promociones con paginación y filtros
 router.get('/', PromotionsController.getAllPromotions);
 
+// GET /api/admin/promotions/products/dropdown - Obtener productos para dropdown
+router.get('/products/dropdown', PromotionsController.getProductsForDropdown);
+
 // GET /api/admin/promotions/:id - Obtener promoción específica por ID
 router.get('/:id', PromotionsController.getPromotionById);
 
