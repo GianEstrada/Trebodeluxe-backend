@@ -49,6 +49,7 @@ class ProductModel {
         SELECT 
           p.*,
           st.nombre as sistema_talla_nombre,
+          c.nombre_categoria as categoria_nombre,
           CASE 
             WHEN COUNT(v.id_variante) > 0 THEN 
               json_agg(
@@ -75,6 +76,7 @@ class ProductModel {
           END as tiene_stock
         FROM productos p
         LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
+        LEFT JOIN categorias c ON p.categoria = c.id_categoria
         LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
         LEFT JOIN (
           SELECT 
@@ -130,7 +132,8 @@ class ProductModel {
         ) precios_info ON v.id_variante = precios_info.id_variante
         ${whereClause}
         GROUP BY p.id_producto, p.nombre, p.descripcion, p.categoria, p.marca, 
-                 p.id_sistema_talla, p.activo, p.fecha_creacion, st.nombre
+                 p.id_sistema_talla, p.activo, p.fecha_creacion, st.nombre, 
+                 c.nombre_categoria
         ORDER BY p.${sortBy} ${sortOrder}
         LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
       `;
@@ -333,20 +336,23 @@ class ProductModel {
       const query = `
         SELECT 
           p.*,
-          json_agg(
-            json_build_object(
-              'id_variante', v.id_variante,
-              'nombre', v.nombre,
-              'precio', stock_precios.precio,
-              'descuento_porcentaje', NULL,
-              'imagenes', COALESCE(img.imagenes, '[]'::json),
-              'stock_total', COALESCE(stock.total_stock, 0),
-              'disponible', COALESCE(stock.total_stock, 0) > 0
-            ) ORDER BY v.id_variante
-          ) FILTER (WHERE v.id_variante IS NOT NULL) as variantes,
-          COALESCE(MAX(stock.total_stock), 0) as stock_total_producto,
-          COALESCE(MAX(stock.total_stock), 0) > 0 as producto_disponible
+          c.nombre as categoria_nombre,
+          COALESCE(
+            json_agg(
+              json_build_object(
+                'id_variante', v.id_variante,
+                'nombre', v.nombre,
+                'precio', stock_precios.precio,
+                'descuento_porcentaje', NULL,
+                'imagenes', COALESCE(img.imagenes, '[]'::json),
+                'stock_total', COALESCE(stock.total_stock, 0),
+                'disponible', COALESCE(stock.total_stock, 0) > 0
+              )
+            ) FILTER (WHERE v.id_variante IS NOT NULL), 
+            '[]'::json
+          ) as variantes
         FROM productos p
+        LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
         LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
         LEFT JOIN (
           SELECT 
@@ -365,7 +371,7 @@ class ProductModel {
                 'url', url,
                 'public_id', public_id,
                 'orden', orden
-              ) ORDER BY orden
+              )
             ) as imagenes
           FROM imagenes_variante
           GROUP BY id_variante
@@ -378,7 +384,8 @@ class ProductModel {
           GROUP BY id_variante
         ) stock ON v.id_variante = stock.id_variante
         WHERE p.activo = true
-        GROUP BY p.id_producto
+        GROUP BY p.id_producto, p.nombre, p.descripcion, p.id_categoria, p.marca, 
+                 p.id_sistema_talla, p.activo, p.fecha_creacion, c.nombre
         ORDER BY p.fecha_creacion DESC
         LIMIT $1
       `;
