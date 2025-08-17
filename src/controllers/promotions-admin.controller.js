@@ -84,7 +84,7 @@ class PromotionsController {
           p.*,
           px.cantidad_comprada,
           px.cantidad_pagada,
-          pp.porcentaje,
+          pp.porcentaje_descuento,
           pc.codigo,
           pc.descuento,
           pc.tipo_descuento
@@ -207,7 +207,7 @@ class PromotionsController {
         }
         
         await client.query(
-          'INSERT INTO promo_porcentaje (id_promocion, porcentaje) VALUES ($1, $2)',
+          'INSERT INTO promo_porcentaje (id_promocion, porcentaje_descuento) VALUES ($1, $2)',
           [promotionId, porcentaje]
         );
       } else if (tipo === 'codigo') {
@@ -362,7 +362,7 @@ class PromotionsController {
       } else if (newType === 'porcentaje' && porcentaje !== undefined) {
         await client.query('DELETE FROM promo_porcentaje WHERE id_promocion = $1', [id]);
         await client.query(
-          'INSERT INTO promo_porcentaje (id_promocion, porcentaje) VALUES ($1, $2)',
+          'INSERT INTO promo_porcentaje (id_promocion, porcentaje_descuento) VALUES ($1, $2)',
           [id, porcentaje]
         );
       } else if (newType === 'codigo' && (codigo !== undefined || descuento !== undefined)) {
@@ -459,7 +459,7 @@ class PromotionsController {
           p.*,
           px.cantidad_comprada,
           px.cantidad_pagada,
-          pp.porcentaje,
+          pp.porcentaje_descuento,
           pc.codigo,
           pc.descuento,
           pc.tipo_descuento
