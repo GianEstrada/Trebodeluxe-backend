@@ -17,22 +17,24 @@ const optionalAuth = (req, res, next) => {
   }
 };
 
+// TODAS LAS RUTAS DEL CARRITO SON PÚBLICAS (SOPORTAN USUARIOS INVITADOS)
+
 // GET /api/cart - Obtener carrito activo (con autenticación opcional)
 router.get('/', optionalAuth, cartController.getActiveCart);
 
-// Las demás rutas siguen requiriendo autenticación
-router.use(verifyToken);
+// POST /api/cart/guest - Crear/obtener carrito para invitado
+router.post('/guest', cartController.createGuestCart);
 
-// POST /api/cart/add - Agregar producto al carrito
-router.post('/add', cartController.addToCart);
+// POST /api/cart/add - Añadir producto al carrito
+router.post('/add', optionalAuth, cartController.addToCart);
 
-// PUT /api/cart/update - Actualizar cantidad de un item
-router.put('/update', cartController.updateCartItem);
+// PUT /api/cart/update/:id - Actualizar cantidad de producto en carrito
+router.put('/update/:id', optionalAuth, cartController.updateCartItem);
 
-// DELETE /api/cart/remove/:id_detalle - Eliminar item del carrito
-router.delete('/remove/:id_detalle', cartController.removeFromCart);
+// DELETE /api/cart/remove/:id - Remover producto del carrito
+router.delete('/remove/:id', optionalAuth, cartController.removeFromCart);
 
-// DELETE /api/cart/clear - Limpiar carrito
-router.delete('/clear', cartController.clearCart);
+// DELETE /api/cart/clear - Limpiar carrito completamente
+router.delete('/clear', optionalAuth, cartController.clearCart);
 
 module.exports = router;

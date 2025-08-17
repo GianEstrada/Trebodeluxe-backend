@@ -1,359 +1,500 @@
-// controllers/cart.controller.js
 const pool = require('../config/db');
+const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid');
 
-// Obtener carrito activo del usuario (o crear uno nuevo si no existe)
+// Generar token de sesión para usuarios invitados
+const generateSessionToken = () => {
+    return uuidv4();
+};
+
+// Obtener carrito activo (usuarios registrados o invitados)
 const getActiveCart = async (req, res) => {
-  try {
-    // Manejar usuarios no autenticados temporalmente
-    if (!req.user || !req.user.id_usuario) {
-      return res.json({
-        success: true,
-        cart: {
-          id_pedido: null,
-          fecha_creacion: null,
-          total: 0,
-          items: []
-        },
-        message: 'Carrito vacío - usuario no autenticado'
-      });
-    }
+    try {
+        const { sessionToken } = req.query;
+        let cartQuery;
+        let queryParams;
 
-    const { id_usuario } = req.user; // Del middleware de autenticación
-    
-    // Buscar carrito activo (pedido con estado 'carrito')
-    let cartQuery = `
-      SELECT p.id_pedido, p.fecha_creacion, p.total,
-             pd.id_detalle, pd.id_producto, pd.id_variante, pd.id_talla, 
-             pd.cantidad, pd.precio_unitario,
-             pr.nombre as nombre_producto, COALESCE(c.nombre, 'Sin categoría') as categoria, pr.marca,
-             v.nombre as nombre_variante, 
-             iv.url as imagen_url,
-             t.id_talla, t.nombre_talla
-      FROM pedidos p
-      LEFT JOIN pedido_detalle pd ON p.id_pedido = pd.id_pedido
-      LEFT JOIN productos pr ON pd.id_producto = pr.id_producto
-      LEFT JOIN categorias c ON pr.id_categoria = c.id_categoria
-      LEFT JOIN variantes v ON pd.id_variante = v.id_variante  
-      LEFT JOIN imagenes_variante iv ON v.id_variante = iv.id_variante AND iv.orden = 1
-      LEFT JOIN tallas t ON pd.id_talla = t.id_talla
-      WHERE p.id_usuario = $1 AND p.estado = 'carrito'
-      ORDER BY pd.id_detalle ASC
-    `;
-    
-    const cartResult = await pool.query(cartQuery, [id_usuario]);
-    
-    if (cartResult.rows.length === 0) {
-      // No hay carrito activo, crear uno nuevo
-      const newCartQuery = `
-        INSERT INTO pedidos (id_usuario, estado, total, fecha_creacion)
-        VALUES ($1, 'carrito', 0.00, NOW())
-        RETURNING id_pedido, fecha_creacion, total
-      `;
-      
-      const newCart = await pool.query(newCartQuery, [id_usuario]);
-      
-      return res.json({
-        success: true,
-        cart: {
-          id_pedido: newCart.rows[0].id_pedido,
-          fecha_creacion: newCart.rows[0].fecha_creacion,
-          total: 0,
-          items: []
+        if (req.user && req.user.id) {
+            // Usuario registrado
+            cartQuery = `
+                SELECT p.*, pp.cantidad, pp.precio_unitario, pp.talla, pp.color, pp.precio_total,
+                       pr.nombre AS producto_nombre, pr.precio, pr.categoria,
+                       img.url AS imagen_url
+                FROM pedidos p
+                LEFT JOIN productos_pedidos pp ON p.id = pp.pedido_id
+                LEFT JOIN productos pr ON pp.producto_id = pr.id
+                LEFT JOIN product_images img ON pr.id = img.product_id AND img.is_main = true
+                WHERE p.user_id = $1 AND p.estado = 'carrito'
+                ORDER BY pp.id
+            `;
+            queryParams = [req.user.id];
+        } else if (sessionToken) {
+            // Usuario invitado
+            cartQuery = `
+                SELECT p.*, pp.cantidad, pp.precio_unitario, pp.talla, pp.color, pp.precio_total,
+                       pr.nombre AS producto_nombre, pr.precio, pr.categoria,
+                       img.url AS imagen_url
+                FROM pedidos p
+                LEFT JOIN productos_pedidos pp ON p.id = pp.pedido_id
+                LEFT JOIN productos pr ON pp.producto_id = pr.id
+                LEFT JOIN product_images img ON pr.id = img.product_id AND img.is_main = true
+                WHERE p.token_sesion = $1 AND p.estado = 'carrito'
+                ORDER BY pp.id
+            `;
+            queryParams = [sessionToken];
+        } else {
+            return res.status(400).json({
+                success: false,
+                error: 'Se requiere token de sesión o usuario registrado'
+            });
         }
-      });
+
+        const result = await pool.query(cartQuery, queryParams);
+
+        if (result.rows.length === 0) {
+            return res.json({
+                success: true,
+                cart: {
+                    id: null,
+                    items: [],
+                    total: 0,
+                    itemCount: 0
+                }
+            });
+        }
+
+        // Procesar items del carrito
+        const cartInfo = result.rows[0];
+        const items = result.rows
+            .filter(row => row.cantidad !== null)
+            .map(row => ({
+                id: row.id,
+                producto_id: row.producto_id,
+                producto_nombre: row.producto_nombre,
+                cantidad: row.cantidad,
+                precio_unitario: row.precio_unitario,
+                precio_total: row.precio_total,
+                talla: row.talla,
+                color: row.color,
+                imagen_url: row.imagen_url
+            }));
+
+        const total = items.reduce((sum, item) => sum + parseFloat(item.precio_total || 0), 0);
+        const itemCount = items.reduce((sum, item) => sum + parseInt(item.cantidad || 0), 0);
+
+        res.json({
+            success: true,
+            cart: {
+                id: cartInfo.id,
+                sessionToken: cartInfo.token_sesion,
+                items: items,
+                total: parseFloat(total.toFixed(2)),
+                itemCount: itemCount,
+                fechaCreacion: cartInfo.fecha_creacion
+            }
+        });
+
+    } catch (error) {
+        console.error('Error obteniendo carrito activo:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error interno del servidor'
+        });
     }
-    
-    // Formatear items del carrito
-    const items = cartResult.rows
-      .filter(row => row.id_detalle !== null) // Filtrar items nulos
-      .map(row => ({
-        id_detalle: row.id_detalle,
-        id_producto: row.id_producto,
-        id_variante: row.id_variante,
-        id_talla: row.id_talla,
-        nombre_producto: row.nombre_producto,
-        nombre_variante: row.nombre_variante,
-        nombre_talla: row.nombre_talla,
-        imagen_url: row.imagen_url,
-        precio: parseFloat(row.precio_unitario),
-        cantidad: row.cantidad,
-        categoria: row.categoria,
-        marca: row.marca
-      }));
-    
-    res.json({
-      success: true,
-      cart: {
-        id_pedido: cartResult.rows[0].id_pedido,
-        fecha_creacion: cartResult.rows[0].fecha_creacion,
-        total: parseFloat(cartResult.rows[0].total || 0),
-        items: items
-      }
-    });
-    
-  } catch (error) {
-    console.error('Error getting active cart:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener el carrito'
-    });
-  }
 };
 
-// Agregar item al carrito
+// Crear carrito para usuario invitado
+const createGuestCart = async (req, res) => {
+    try {
+        const sessionToken = generateSessionToken();
+
+        const result = await pool.query(
+            `INSERT INTO pedidos (token_sesion, estado, total, fecha_creacion) 
+             VALUES ($1, 'carrito', 0, NOW()) RETURNING *`,
+            [sessionToken]
+        );
+
+        res.json({
+            success: true,
+            message: 'Carrito creado exitosamente',
+            cart: {
+                id: result.rows[0].id,
+                sessionToken: result.rows[0].token_sesion,
+                items: [],
+                total: 0,
+                itemCount: 0
+            }
+        });
+
+    } catch (error) {
+        console.error('Error creando carrito invitado:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error interno del servidor'
+        });
+    }
+};
+
+// Añadir producto al carrito
 const addToCart = async (req, res) => {
-  try {
-    const { id_usuario } = req.user;
-    const { id_producto, id_variante, id_talla, cantidad, precio_unitario } = req.body;
-    
-    // Validar datos requeridos
-    if (!id_producto || !id_variante || !id_talla || !cantidad || !precio_unitario) {
-      return res.status(400).json({
-        success: false,
-        message: 'Faltan datos requeridos'
-      });
+    try {
+        const { producto_id, cantidad, talla, color } = req.body;
+        const { sessionToken } = req.query;
+
+        if (!producto_id || !cantidad) {
+            return res.status(400).json({
+                success: false,
+                error: 'Se requiere producto_id y cantidad'
+            });
+        }
+
+        // Verificar que el producto existe
+        const productResult = await pool.query(
+            'SELECT id, nombre, precio FROM productos WHERE id = $1',
+            [producto_id]
+        );
+
+        if (productResult.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Producto no encontrado'
+            });
+        }
+
+        const producto = productResult.rows[0];
+        let pedidoId;
+
+        if (req.user && req.user.id) {
+            // Usuario registrado
+            let cartResult = await pool.query(
+                'SELECT id FROM pedidos WHERE user_id = $1 AND estado = $2',
+                [req.user.id, 'carrito']
+            );
+
+            if (cartResult.rows.length === 0) {
+                // Crear nuevo carrito para usuario registrado
+                const newCartResult = await pool.query(
+                    `INSERT INTO pedidos (user_id, estado, total, fecha_creacion) 
+                     VALUES ($1, 'carrito', 0, NOW()) RETURNING id`,
+                    [req.user.id]
+                );
+                pedidoId = newCartResult.rows[0].id;
+            } else {
+                pedidoId = cartResult.rows[0].id;
+            }
+        } else if (sessionToken) {
+            // Usuario invitado
+            let cartResult = await pool.query(
+                'SELECT id FROM pedidos WHERE token_sesion = $1 AND estado = $2',
+                [sessionToken, 'carrito']
+            );
+
+            if (cartResult.rows.length === 0) {
+                // Crear nuevo carrito para invitado
+                const newCartResult = await pool.query(
+                    `INSERT INTO pedidos (token_sesion, estado, total, fecha_creacion) 
+                     VALUES ($1, 'carrito', 0, NOW()) RETURNING id`,
+                    [sessionToken]
+                );
+                pedidoId = newCartResult.rows[0].id;
+            } else {
+                pedidoId = cartResult.rows[0].id;
+            }
+        } else {
+            return res.status(400).json({
+                success: false,
+                error: 'Se requiere token de sesión o usuario registrado'
+            });
+        }
+
+        // Verificar si el producto ya está en el carrito
+        const existingItemResult = await pool.query(
+            `SELECT id, cantidad FROM productos_pedidos 
+             WHERE pedido_id = $1 AND producto_id = $2 AND talla = $3 AND color = $4`,
+            [pedidoId, producto_id, talla || '', color || '']
+        );
+
+        const precioUnitario = parseFloat(producto.precio);
+        let productoId;
+
+        if (existingItemResult.rows.length > 0) {
+            // Actualizar cantidad si ya existe
+            const nuevaCantidad = existingItemResult.rows[0].cantidad + parseInt(cantidad);
+            const precioTotal = precioUnitario * nuevaCantidad;
+
+            await pool.query(
+                `UPDATE productos_pedidos 
+                 SET cantidad = $1, precio_total = $2 
+                 WHERE id = $3`,
+                [nuevaCantidad, precioTotal, existingItemResult.rows[0].id]
+            );
+            productoId = existingItemResult.rows[0].id;
+        } else {
+            // Añadir nuevo item
+            const precioTotal = precioUnitario * parseInt(cantidad);
+            
+            const insertResult = await pool.query(
+                `INSERT INTO productos_pedidos 
+                 (pedido_id, producto_id, cantidad, precio_unitario, precio_total, talla, color) 
+                 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+                [pedidoId, producto_id, cantidad, precioUnitario, precioTotal, talla || '', color || '']
+            );
+            productoId = insertResult.rows[0].id;
+        }
+
+        // Actualizar total del pedido
+        const totalResult = await pool.query(
+            `SELECT SUM(precio_total) as total FROM productos_pedidos WHERE pedido_id = $1`,
+            [pedidoId]
+        );
+
+        await pool.query(
+            'UPDATE pedidos SET total = $1 WHERE id = $2',
+            [totalResult.rows[0].total || 0, pedidoId]
+        );
+
+        res.json({
+            success: true,
+            message: 'Producto añadido al carrito exitosamente',
+            item: {
+                id: productoId,
+                producto_id: producto_id,
+                producto_nombre: producto.nombre,
+                cantidad: cantidad,
+                precio_unitario: precioUnitario,
+                precio_total: precioUnitario * parseInt(cantidad),
+                talla: talla || '',
+                color: color || ''
+            }
+        });
+
+    } catch (error) {
+        console.error('Error añadiendo al carrito:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error interno del servidor'
+        });
     }
-    
-    // Obtener o crear carrito activo
-    let cartQuery = `
-      SELECT id_pedido FROM pedidos 
-      WHERE id_usuario = $1 AND estado = 'carrito'
-      ORDER BY fecha_creacion DESC
-      LIMIT 1
-    `;
-    
-    let cartResult = await pool.query(cartQuery, [id_usuario]);
-    let id_pedido;
-    
-    if (cartResult.rows.length === 0) {
-      // Crear nuevo carrito
-      const newCartQuery = `
-        INSERT INTO pedidos (id_usuario, estado, total, fecha_creacion)
-        VALUES ($1, 'carrito', 0.00, NOW())
-        RETURNING id_pedido
-      `;
-      const newCart = await pool.query(newCartQuery, [id_usuario]);
-      id_pedido = newCart.rows[0].id_pedido;
-    } else {
-      id_pedido = cartResult.rows[0].id_pedido;
-    }
-    
-    // Verificar si el item ya existe en el carrito
-    const existingItemQuery = `
-      SELECT id_detalle, cantidad 
-      FROM pedido_detalle 
-      WHERE id_pedido = $1 AND id_variante = $2 AND id_talla = $3
-    `;
-    
-    const existingItem = await pool.query(existingItemQuery, [id_pedido, id_variante, id_talla]);
-    
-    if (existingItem.rows.length > 0) {
-      // Actualizar cantidad existente
-      const newQuantity = existingItem.rows[0].cantidad + cantidad;
-      const updateQuery = `
-        UPDATE pedido_detalle 
-        SET cantidad = $1, precio_unitario = $2
-        WHERE id_detalle = $3
-        RETURNING *
-      `;
-      
-      await pool.query(updateQuery, [newQuantity, precio_unitario, existingItem.rows[0].id_detalle]);
-    } else {
-      // Agregar nuevo item
-      const insertQuery = `
-        INSERT INTO pedido_detalle (id_pedido, id_producto, id_variante, id_talla, cantidad, precio_unitario)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING *
-      `;
-      
-      await pool.query(insertQuery, [id_pedido, id_producto, id_variante, id_talla, cantidad, precio_unitario]);
-    }
-    
-    // Recalcular total del carrito
-    await updateCartTotal(id_pedido);
-    
-    res.json({
-      success: true,
-      message: 'Producto agregado al carrito'
-    });
-    
-  } catch (error) {
-    console.error('Error adding to cart:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al agregar producto al carrito'
-    });
-  }
 };
 
-// Actualizar cantidad de un item
+// Actualizar cantidad de producto en carrito
 const updateCartItem = async (req, res) => {
-  try {
-    const { id_usuario } = req.user;
-    const { id_detalle, cantidad } = req.body;
-    
-    if (!id_detalle || cantidad < 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Datos inválidos'
-      });
+    try {
+        const { id } = req.params;
+        const { cantidad } = req.body;
+        const { sessionToken } = req.query;
+
+        if (!cantidad || cantidad < 1) {
+            return res.status(400).json({
+                success: false,
+                error: 'La cantidad debe ser mayor a 0'
+            });
+        }
+
+        let whereClause;
+        let queryParams;
+
+        if (req.user && req.user.id) {
+            whereClause = `pp.id = $1 AND p.user_id = $2 AND p.estado = 'carrito'`;
+            queryParams = [id, req.user.id];
+        } else if (sessionToken) {
+            whereClause = `pp.id = $1 AND p.token_sesion = $2 AND p.estado = 'carrito'`;
+            queryParams = [id, sessionToken];
+        } else {
+            return res.status(400).json({
+                success: false,
+                error: 'Se requiere token de sesión o usuario registrado'
+            });
+        }
+
+        // Verificar que el item existe y pertenece al usuario/sesión
+        const itemResult = await pool.query(
+            `SELECT pp.id, pp.precio_unitario, pp.pedido_id 
+             FROM productos_pedidos pp
+             JOIN pedidos p ON pp.pedido_id = p.id
+             WHERE ${whereClause}`,
+            queryParams
+        );
+
+        if (itemResult.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Item del carrito no encontrado'
+            });
+        }
+
+        const item = itemResult.rows[0];
+        const precioTotal = parseFloat(item.precio_unitario) * parseInt(cantidad);
+
+        // Actualizar cantidad y precio total
+        await pool.query(
+            'UPDATE productos_pedidos SET cantidad = $1, precio_total = $2 WHERE id = $3',
+            [cantidad, precioTotal, id]
+        );
+
+        // Actualizar total del pedido
+        const totalResult = await pool.query(
+            `SELECT SUM(precio_total) as total FROM productos_pedidos WHERE pedido_id = $1`,
+            [item.pedido_id]
+        );
+
+        await pool.query(
+            'UPDATE pedidos SET total = $1 WHERE id = $2',
+            [totalResult.rows[0].total || 0, item.pedido_id]
+        );
+
+        res.json({
+            success: true,
+            message: 'Item actualizado exitosamente',
+            item: {
+                id: id,
+                cantidad: cantidad,
+                precio_total: precioTotal
+            }
+        });
+
+    } catch (error) {
+        console.error('Error actualizando item del carrito:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error interno del servidor'
+        });
     }
-    
-    // Verificar que el item pertenece al usuario
-    const verifyQuery = `
-      SELECT pd.id_detalle, p.id_pedido
-      FROM pedido_detalle pd
-      JOIN pedidos p ON pd.id_pedido = p.id_pedido
-      WHERE pd.id_detalle = $1 AND p.id_usuario = $2 AND p.estado = 'carrito'
-    `;
-    
-    const verifyResult = await pool.query(verifyQuery, [id_detalle, id_usuario]);
-    
-    if (verifyResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Item no encontrado'
-      });
-    }
-    
-    const id_pedido = verifyResult.rows[0].id_pedido;
-    
-    if (cantidad === 0) {
-      // Eliminar item si cantidad es 0
-      await pool.query('DELETE FROM pedido_detalle WHERE id_detalle = $1', [id_detalle]);
-    } else {
-      // Actualizar cantidad
-      await pool.query(
-        'UPDATE pedido_detalle SET cantidad = $1 WHERE id_detalle = $2',
-        [cantidad, id_detalle]
-      );
-    }
-    
-    // Recalcular total
-    await updateCartTotal(id_pedido);
-    
-    res.json({
-      success: true,
-      message: 'Carrito actualizado'
-    });
-    
-  } catch (error) {
-    console.error('Error updating cart item:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al actualizar el carrito'
-    });
-  }
 };
 
-// Eliminar item del carrito
+// Remover producto del carrito
 const removeFromCart = async (req, res) => {
-  try {
-    const { id_usuario } = req.user;
-    const { id_detalle } = req.params;
-    
-    // Verificar que el item pertenece al usuario
-    const verifyQuery = `
-      SELECT pd.id_detalle, p.id_pedido
-      FROM pedido_detalle pd
-      JOIN pedidos p ON pd.id_pedido = p.id_pedido
-      WHERE pd.id_detalle = $1 AND p.id_usuario = $2 AND p.estado = 'carrito'
-    `;
-    
-    const verifyResult = await pool.query(verifyQuery, [id_detalle, id_usuario]);
-    
-    if (verifyResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Item no encontrado'
-      });
+    try {
+        const { id } = req.params;
+        const { sessionToken } = req.query;
+
+        let whereClause;
+        let queryParams;
+
+        if (req.user && req.user.id) {
+            whereClause = `pp.id = $1 AND p.user_id = $2 AND p.estado = 'carrito'`;
+            queryParams = [id, req.user.id];
+        } else if (sessionToken) {
+            whereClause = `pp.id = $1 AND p.token_sesion = $2 AND p.estado = 'carrito'`;
+            queryParams = [id, sessionToken];
+        } else {
+            return res.status(400).json({
+                success: false,
+                error: 'Se requiere token de sesión o usuario registrado'
+            });
+        }
+
+        // Verificar que el item existe y obtener pedido_id
+        const itemResult = await pool.query(
+            `SELECT pp.pedido_id 
+             FROM productos_pedidos pp
+             JOIN pedidos p ON pp.pedido_id = p.id
+             WHERE ${whereClause}`,
+            queryParams
+        );
+
+        if (itemResult.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Item del carrito no encontrado'
+            });
+        }
+
+        const pedidoId = itemResult.rows[0].pedido_id;
+
+        // Eliminar item
+        await pool.query('DELETE FROM productos_pedidos WHERE id = $1', [id]);
+
+        // Actualizar total del pedido
+        const totalResult = await pool.query(
+            `SELECT SUM(precio_total) as total FROM productos_pedidos WHERE pedido_id = $1`,
+            [pedidoId]
+        );
+
+        await pool.query(
+            'UPDATE pedidos SET total = $1 WHERE id = $2',
+            [totalResult.rows[0].total || 0, pedidoId]
+        );
+
+        res.json({
+            success: true,
+            message: 'Producto eliminado del carrito exitosamente'
+        });
+
+    } catch (error) {
+        console.error('Error eliminando item del carrito:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error interno del servidor'
+        });
     }
-    
-    const id_pedido = verifyResult.rows[0].id_pedido;
-    
-    // Eliminar item
-    await pool.query('DELETE FROM pedido_detalle WHERE id_detalle = $1', [id_detalle]);
-    
-    // Recalcular total
-    await updateCartTotal(id_pedido);
-    
-    res.json({
-      success: true,
-      message: 'Producto eliminado del carrito'
-    });
-    
-  } catch (error) {
-    console.error('Error removing from cart:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al eliminar producto del carrito'
-    });
-  }
 };
 
 // Limpiar carrito
 const clearCart = async (req, res) => {
-  try {
-    const { id_usuario } = req.user;
-    
-    // Obtener carrito activo
-    const cartQuery = `
-      SELECT id_pedido FROM pedidos 
-      WHERE id_usuario = $1 AND estado = 'carrito'
-    `;
-    
-    const cartResult = await pool.query(cartQuery, [id_usuario]);
-    
-    if (cartResult.rows.length > 0) {
-      const id_pedido = cartResult.rows[0].id_pedido;
-      
-      // Eliminar todos los items
-      await pool.query('DELETE FROM pedido_detalle WHERE id_pedido = $1', [id_pedido]);
-      
-      // Actualizar total a 0
-      await pool.query('UPDATE pedidos SET total = 0.00 WHERE id_pedido = $1', [id_pedido]);
-    }
-    
-    res.json({
-      success: true,
-      message: 'Carrito limpiado'
-    });
-    
-  } catch (error) {
-    console.error('Error clearing cart:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al limpiar el carrito'
-    });
-  }
-};
+    try {
+        const { sessionToken } = req.query;
 
-// Función auxiliar para recalcular el total del carrito
-const updateCartTotal = async (id_pedido) => {
-  try {
-    const totalQuery = `
-      SELECT COALESCE(SUM(cantidad * precio_unitario), 0) as total
-      FROM pedido_detalle 
-      WHERE id_pedido = $1
-    `;
-    
-    const totalResult = await pool.query(totalQuery, [id_pedido]);
-    const total = totalResult.rows[0].total;
-    
-    await pool.query(
-      'UPDATE pedidos SET total = $1 WHERE id_pedido = $2',
-      [total, id_pedido]
-    );
-    
-  } catch (error) {
-    console.error('Error updating cart total:', error);
-  }
+        let whereClause;
+        let queryParams;
+
+        if (req.user && req.user.id) {
+            whereClause = `user_id = $1 AND estado = 'carrito'`;
+            queryParams = [req.user.id];
+        } else if (sessionToken) {
+            whereClause = `token_sesion = $1 AND estado = 'carrito'`;
+            queryParams = [sessionToken];
+        } else {
+            return res.status(400).json({
+                success: false,
+                error: 'Se requiere token de sesión o usuario registrado'
+            });
+        }
+
+        // Obtener ID del pedido
+        const cartResult = await pool.query(
+            `SELECT id FROM pedidos WHERE ${whereClause}`,
+            queryParams
+        );
+
+        if (cartResult.rows.length === 0) {
+            return res.json({
+                success: true,
+                message: 'Carrito ya está vacío'
+            });
+        }
+
+        const pedidoId = cartResult.rows[0].id;
+
+        // Eliminar todos los productos del carrito
+        await pool.query('DELETE FROM productos_pedidos WHERE pedido_id = $1', [pedidoId]);
+
+        // Actualizar total del pedido a 0
+        await pool.query(
+            'UPDATE pedidos SET total = 0 WHERE id = $1',
+            [pedidoId]
+        );
+
+        res.json({
+            success: true,
+            message: 'Carrito vaciado exitosamente'
+        });
+
+    } catch (error) {
+        console.error('Error vaciando carrito:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error interno del servidor'
+        });
+    }
 };
 
 module.exports = {
-  getActiveCart,
-  addToCart,
-  updateCartItem,
-  removeFromCart,
-  clearCart
+    getActiveCart,
+    createGuestCart,
+    addToCart,
+    updateCartItem,
+    removeFromCart,
+    clearCart,
+    generateSessionToken
 };
