@@ -211,25 +211,33 @@ class PromotionsController {
           [promotionId, porcentaje]
         );
       } else if (tipo === 'codigo') {
-        if (!codigo || !descuento || !tipo_descuento) {
+        if (!codigo) {
           await client.query('ROLLBACK');
           return res.status(400).json({
             success: false,
-            message: 'codigo, descuento y tipo_descuento son requeridos para promociones de código'
+            message: 'codigo es requerido para promociones de código'
           });
         }
         
         await client.query(
-          'INSERT INTO promo_codigo (id_promocion, codigo, descuento, tipo_descuento) VALUES ($1, $2, $3, $4)',
-          [promotionId, codigo, descuento, tipo_descuento]
+          'INSERT INTO promo_codigo (id_promocion, codigo, activo) VALUES ($1, $2, $3)',
+          [promotionId, codigo, true]
         );
+        
+        // Si es porcentaje, insertar en promo_porcentaje
+        if (tipo_descuento === 'percentage' && descuento) {
+          await client.query(
+            'INSERT INTO promo_porcentaje (id_promocion, porcentaje_descuento) VALUES ($1, $2)',
+            [promotionId, descuento]
+          );
+        }
       }
 
       // Insertar aplicaciones
       for (const app of applications) {
         await client.query(
-          'INSERT INTO promocion_aplicacion (id_promocion, tipo_objetivo, id_categoria, id_producto) VALUES ($1, $2, $3, $4)',
-          [promotionId, app.tipo_objetivo, app.id_categoria || null, app.id_producto || null]
+          'INSERT INTO promocion_aplicacion (id_promocion, aplica_a, id_categoria, id_producto) VALUES ($1, $2, $3, $4)',
+          [promotionId, app.tipo_objetivo || app.aplica_a, app.id_categoria || null, app.id_producto || null]
         );
       }
 
@@ -359,11 +367,20 @@ class PromotionsController {
         );
       } else if (newType === 'codigo' && (codigo !== undefined || descuento !== undefined)) {
         await client.query('DELETE FROM promo_codigo WHERE id_promocion = $1', [id]);
-        if (codigo && descuento && tipo_descuento) {
+        if (codigo) {
           await client.query(
-            'INSERT INTO promo_codigo (id_promocion, codigo, descuento, tipo_descuento) VALUES ($1, $2, $3, $4)',
-            [id, codigo, descuento, tipo_descuento]
+            'INSERT INTO promo_codigo (id_promocion, codigo, activo) VALUES ($1, $2, $3)',
+            [id, codigo, true]
           );
+          
+          // Si es porcentaje, insertar en promo_porcentaje
+          if (tipo_descuento === 'percentage' && descuento) {
+            await client.query('DELETE FROM promo_porcentaje WHERE id_promocion = $1', [id]);
+            await client.query(
+              'INSERT INTO promo_porcentaje (id_promocion, porcentaje_descuento) VALUES ($1, $2)',
+              [id, descuento]
+            );
+          }
         }
       }
 
@@ -373,8 +390,8 @@ class PromotionsController {
         
         for (const app of applications) {
           await client.query(
-            'INSERT INTO promocion_aplicacion (id_promocion, tipo_objetivo, id_categoria, id_producto) VALUES ($1, $2, $3, $4)',
-            [id, app.tipo_objetivo, app.id_categoria || null, app.id_producto || null]
+            'INSERT INTO promocion_aplicacion (id_promocion, aplica_a, id_categoria, id_producto) VALUES ($1, $2, $3, $4)',
+            [id, app.tipo_objetivo || app.aplica_a, app.id_categoria || null, app.id_producto || null]
           );
         }
       }
