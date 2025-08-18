@@ -908,43 +908,101 @@ class ProductModel {
     }
   }
 
-  // Obtener productos destacados para página principal
+  // Obtener productos destacados para página principal CON variantes completas
   static async getFeatured(limit = 12) {
     try {
       const query = `
-        SELECT DISTINCT ON (p.id_producto)
-          p.id_producto,
-          p.nombre,
-          p.descripcion,
-          p.categoria,
-          p.marca,
-          stock_precios.precio as precio_min,
-          NULL as precio_original,
-          NULL as descuento_porcentaje,
-          iv.url as imagen_principal,
-          iv.public_id as imagen_public_id,
-          COALESCE(stock_total.total, 0) as stock_disponible
+        WITH productos_destacados AS (
+          SELECT DISTINCT p.id_producto
+          FROM productos p
+          JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+          LEFT JOIN stock s ON v.id_variante = s.id_variante
+          WHERE p.activo = true AND COALESCE(s.cantidad, 0) > 0
+          ORDER BY p.fecha_creacion DESC
+          LIMIT $1
+        )
+        SELECT 
+          p.*,
+          c.nombre as categoria_nombre,
+          m.nombre as marca_nombre,
+          st.nombre as sistema_talla_nombre,
+          json_agg(
+            json_build_object(
+              'id_variante', v.id_variante,
+              'nombre', v.nombre,
+              'precio', stock_precios.precio,
+              'descuento_porcentaje', NULL,
+              'activo', v.activo,
+              'imagenes', COALESCE(img.imagenes, '[]'::json),
+              'stock_disponible', COALESCE(stock_info.stock_total, 0),
+              'tallas_disponibles', COALESCE(stock_info.tallas, '[]'::json),
+              'precio_minimo', precios_info.precio_minimo,
+              'precio_maximo', precios_info.precio_maximo,
+              'precios_distintos', precios_info.precios_distintos,
+              'precio_unico', precios_info.precio_unico
+            ) ORDER BY v.id_variante
+          ) FILTER (WHERE v.id_variante IS NOT NULL) as variantes
         FROM productos p
-        JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+        INNER JOIN productos_destacados pd ON p.id_producto = pd.id_producto
+        LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
+        LEFT JOIN marcas m ON p.id_marca = m.id_marca
+        LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
+        LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
         LEFT JOIN (
           SELECT 
-            s.id_variante,
-            MIN(s.precio) as precio
-          FROM stock s
-          WHERE s.precio IS NOT NULL
-          GROUP BY s.id_variante
+            id_variante,
+            MIN(precio) as precio
+          FROM stock
+          WHERE precio IS NOT NULL
+          GROUP BY id_variante
         ) stock_precios ON v.id_variante = stock_precios.id_variante
-        LEFT JOIN imagenes_variante iv ON v.id_variante = iv.id_variante AND iv.orden = 1
+        LEFT JOIN (
+          SELECT 
+            id_variante,
+            json_agg(
+              json_build_object(
+                'id_imagen', id_imagen,
+                'url', url,
+                'public_id', public_id,
+                'orden', orden
+              ) ORDER BY orden
+            ) as imagenes
+          FROM imagenes_variante
+          GROUP BY id_variante
+        ) img ON v.id_variante = img.id_variante
         LEFT JOIN (
           SELECT 
             s.id_variante,
-            SUM(s.cantidad) as total
+            SUM(s.cantidad) as stock_total,
+            json_agg(
+              json_build_object(
+                'id_talla', t.id_talla,
+                'nombre_talla', t.nombre_talla,
+                'orden', t.orden,
+                'cantidad', s.cantidad,
+                'precio', s.precio
+              )
+            ) FILTER (WHERE s.cantidad > 0) as tallas
+          FROM stock s
+          INNER JOIN tallas t ON s.id_talla = t.id_talla
+          GROUP BY s.id_variante
+        ) stock_info ON v.id_variante = stock_info.id_variante
+        LEFT JOIN (
+          SELECT 
+            s.id_variante,
+            MIN(s.precio) as precio_minimo,
+            MAX(s.precio) as precio_maximo,
+            COUNT(DISTINCT s.precio) FILTER (WHERE s.precio IS NOT NULL) as precios_distintos,
+            CASE 
+              WHEN COUNT(DISTINCT s.precio) FILTER (WHERE s.precio IS NOT NULL) <= 1 THEN true
+              ELSE false
+            END as precio_unico
           FROM stock s
           GROUP BY s.id_variante
-        ) stock_total ON v.id_variante = stock_total.id_variante
-        WHERE p.activo = true AND COALESCE(stock_total.total, 0) > 0
-        ORDER BY p.id_producto, stock_precios.precio ASC, p.fecha_creacion DESC
-        LIMIT $1
+        ) precios_info ON v.id_variante = precios_info.id_variante
+        WHERE p.activo = true
+        GROUP BY p.id_producto, c.nombre, m.nombre, st.nombre
+        ORDER BY p.fecha_creacion DESC
       `;
 
       const result = await db.query(query, [limit]);
