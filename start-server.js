@@ -3,15 +3,15 @@ const cors = require('cors');
 const path = require('path');
 
 // Importar middlewares
-const authMiddleware = require('./src/middlewares/auth');
+const authMiddleware = require('./src/middlewares/auth.middleware');
 
 // Importar rutas
 const authRoutes = require('./src/routes/auth');
 const adminRoutes = require('./src/routes/admin');
 const productRoutes = require('./src/routes/products');
-const orderRoutes = require('./src/routes/orders');
 const userRoutes = require('./src/routes/users');
 const siteSettingsRoutes = require('./src/routes/siteSettings');
+const cartRoutes = require('./src/routes/cart.routes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -28,9 +28,9 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', authMiddleware, adminRoutes);
 app.use('/api/products', productRoutes);
-app.use('/api/orders', authMiddleware, orderRoutes);
 app.use('/api/users', authMiddleware, userRoutes);
 app.use('/api/site-settings', siteSettingsRoutes);
+app.use('/api/cart', cartRoutes);
 
 // Ruta de prueba
 app.get('/api/health', (req, res) => {
