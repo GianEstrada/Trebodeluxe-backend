@@ -11,7 +11,9 @@ const PORT = 5000;
 // Middlewares
 app.use(cors({
   origin: ['https://trebodeluxe-front.onrender.com', 'http://localhost:3000'],
-  credentials: true
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-Token'],
+  exposedHeaders: ['X-Session-Token']
 }));
 app.use(express.json({ limit: '50mb' }));
 

@@ -47,7 +47,7 @@ app.use(cors({
   origin: true, // Esto permite solicitudes de cualquier origen
   credentials: true, // Permite credenciales
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'X-Session-Token'],
   exposedHeaders: ['Access-Control-Allow-Origin']
 }));
 app.use(express.json()); // Parsear cuerpo de solicitudes JSON
