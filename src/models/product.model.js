@@ -1001,7 +1001,8 @@ class ProductModel {
           GROUP BY s.id_variante
         ) precios_info ON v.id_variante = precios_info.id_variante
         WHERE p.activo = true
-        GROUP BY p.id_producto, c.nombre, m.nombre, st.nombre
+        GROUP BY p.id_producto, p.nombre, p.descripcion, p.id_categoria, p.id_marca, 
+                 p.id_sistema_talla, p.activo, p.fecha_creacion, c.nombre, m.nombre, st.nombre
         ORDER BY p.fecha_creacion DESC
       `;
 
