@@ -459,7 +459,7 @@ class ProductController {
       res.json({
         success: true,
         message: 'Productos destacados obtenidos exitosamente',
-        data: products
+        products: products
       });
 
     } catch (error) {
