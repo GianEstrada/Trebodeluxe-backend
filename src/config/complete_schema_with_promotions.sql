@@ -10,6 +10,10 @@ DROP TABLE IF EXISTS pedidos CASCADE;
 DROP TABLE IF EXISTS metodos_pago CASCADE;
 DROP TABLE IF EXISTS metodos_envio CASCADE;
 
+-- Tablas del carrito
+DROP TABLE IF EXISTS contenido_carrito CASCADE;
+DROP TABLE IF EXISTS carritos CASCADE;
+
 DROP TABLE IF EXISTS promocion_aplicacion CASCADE;
 DROP TABLE IF EXISTS promo_codigo CASCADE;
 DROP TABLE IF EXISTS promo_porcentaje CASCADE;
@@ -212,6 +216,33 @@ CREATE TABLE promocion_aplicacion (
     id_producto INTEGER REFERENCES productos(id_producto) ON DELETE CASCADE
 );
 
+-- ==== SISTEMA DE CARRITO DE COMPRAS ====
+
+-- Tabla principal del carrito
+CREATE TABLE carritos (
+    id_carrito SERIAL PRIMARY KEY,
+    id_usuario INTEGER REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+    token_sesion VARCHAR(100), -- Para usuarios no logueados
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- Solo uno de los dos debe tener valor (usuario logueado o token de sesión)
+    CHECK ((id_usuario IS NOT NULL AND token_sesion IS NULL) OR (id_usuario IS NULL AND token_sesion IS NOT NULL))
+);
+
+-- Tabla de contenido del carrito
+CREATE TABLE contenido_carrito (
+    id_contenido SERIAL PRIMARY KEY,
+    id_carrito INTEGER NOT NULL REFERENCES carritos(id_carrito) ON DELETE CASCADE,
+    id_producto INTEGER NOT NULL REFERENCES productos(id_producto) ON DELETE CASCADE,
+    id_variante INTEGER NOT NULL REFERENCES variantes(id_variante) ON DELETE CASCADE,
+    id_talla INTEGER NOT NULL REFERENCES tallas(id_talla) ON DELETE CASCADE,
+    cantidad INTEGER NOT NULL DEFAULT 1 CHECK (cantidad > 0),
+    fecha_agregado TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- Evitar duplicados del mismo producto/variante/talla en el mismo carrito
+    UNIQUE(id_carrito, id_producto, id_variante, id_talla)
+);
+
 -- ==== NUEVAS TABLAS PARA PEDIDOS Y ENVÍOS ====
 
 CREATE TABLE metodos_envio (
@@ -301,10 +332,61 @@ CREATE INDEX idx_promocion_aplicacion_categoria ON promocion_aplicacion(id_categ
 CREATE INDEX idx_promocion_aplicacion_producto ON promocion_aplicacion(id_producto);
 CREATE INDEX idx_imagenes_index_seccion ON imagenes_index(seccion);
 CREATE INDEX idx_imagenes_index_estado ON imagenes_index(estado);
+-- Índices del carrito
+CREATE INDEX idx_carritos_usuario ON carritos(id_usuario);
+CREATE INDEX idx_carritos_token ON carritos(token_sesion);
+CREATE INDEX idx_carritos_fecha_actualizacion ON carritos(fecha_actualizacion);
+CREATE INDEX idx_contenido_carrito_carrito ON contenido_carrito(id_carrito);
+CREATE INDEX idx_contenido_carrito_producto ON contenido_carrito(id_producto);
+CREATE INDEX idx_contenido_carrito_variante ON contenido_carrito(id_variante);
+CREATE INDEX idx_contenido_carrito_talla ON contenido_carrito(id_talla);
 CREATE INDEX idx_notas_generales_prioridad ON notas_generales(prioridad);
 CREATE INDEX idx_notas_generales_fecha_creacion ON notas_generales(fecha_creacion);
 CREATE INDEX idx_notas_generales_activa ON notas_generales(activa);
 CREATE INDEX idx_notas_generales_usuario_creador ON notas_generales(id_usuario_creador);
 CREATE INDEX idx_notas_generales_fecha_vencimiento ON notas_generales(fecha_vencimiento);
+
+-- ==== FUNCIONES Y TRIGGERS DEL CARRITO ====
+
+-- Función para actualizar fecha de modificación del carrito
+CREATE OR REPLACE FUNCTION actualizar_fecha_carrito()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Actualizar la fecha del carrito cuando se modifica el contenido
+    UPDATE carritos 
+    SET fecha_actualizacion = CURRENT_TIMESTAMP 
+    WHERE id_carrito = COALESCE(NEW.id_carrito, OLD.id_carrito);
+    
+    -- Si es UPDATE del contenido, actualizar su propia fecha
+    IF TG_OP = 'UPDATE' THEN
+        NEW.fecha_actualizacion = CURRENT_TIMESTAMP;
+        RETURN NEW;
+    END IF;
+    
+    RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Triggers para mantener las fechas actualizadas
+DROP TRIGGER IF EXISTS trigger_actualizar_fecha_contenido_carrito ON contenido_carrito;
+CREATE TRIGGER trigger_actualizar_fecha_contenido_carrito
+    AFTER INSERT OR UPDATE OR DELETE ON contenido_carrito
+    FOR EACH ROW EXECUTE FUNCTION actualizar_fecha_carrito();
+
+-- Función para limpiar carritos antiguos (ejecutar periódicamente)
+CREATE OR REPLACE FUNCTION limpiar_carritos_antiguos()
+RETURNS void AS $$
+BEGIN
+    -- Eliminar carritos de usuarios no logueados que no se han actualizado en 30 días
+    DELETE FROM carritos 
+    WHERE token_sesion IS NOT NULL 
+    AND fecha_actualizacion < CURRENT_TIMESTAMP - INTERVAL '30 days';
+    
+    -- Eliminar carritos vacíos (sin contenido) que tengan más de 7 días
+    DELETE FROM carritos 
+    WHERE id_carrito NOT IN (SELECT DISTINCT id_carrito FROM contenido_carrito)
+    AND fecha_creacion < CURRENT_TIMESTAMP - INTERVAL '7 days';
+END;
+$$ LANGUAGE plpgsql;
 
 COMMIT;
