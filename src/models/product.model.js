@@ -970,6 +970,22 @@ class ProductModel {
       `;
       
       const result = await db.query(query, [limit]);
+      
+      // Obtener tallas disponibles para cada producto por separado
+      for (let product of result.rows) {
+        const tallasQuery = `
+          SELECT DISTINCT t.id_talla, t.nombre_talla
+          FROM variantes v
+          JOIN stock s ON v.id_variante = s.id_variante
+          JOIN tallas t ON s.id_talla = t.id_talla
+          WHERE v.id_producto = $1 AND v.activo = true AND s.cantidad > 0
+          ORDER BY t.id_talla
+        `;
+        
+        const tallasResult = await db.query(tallasQuery, [product.id_producto]);
+        product.tallas_disponibles = tallasResult.rows;
+      }
+      
       return result.rows;
 
     } catch (error) {
