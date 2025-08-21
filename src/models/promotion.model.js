@@ -206,7 +206,7 @@ class PromotionModel {
           p.activo,
           p.fecha_inicio,
           p.fecha_fin,
-          pp.porcentaje,
+          COALESCE(pp.porcentaje, 0) as porcentaje,
           pa.tipo_objetivo,
           pa.id_categoria,
           pa.id_producto
@@ -260,7 +260,7 @@ class PromotionModel {
                 'cantidad_pagada', pxy.cantidad_pagada
               )
             WHEN p.tipo = 'porcentaje' THEN
-              json_build_object('porcentaje', pp.porcentaje)
+              json_build_object('porcentaje', COALESCE(pp.porcentaje, 0))
             WHEN p.tipo = 'codigo' THEN
               json_build_object(
                 'codigo', pc.codigo,
@@ -284,7 +284,7 @@ class PromotionModel {
           AND p.fecha_inicio <= NOW() 
           AND p.fecha_fin >= NOW()
         GROUP BY p.id_promocion, pxy.cantidad_comprada, pxy.cantidad_pagada, 
-                 pp.porcentaje, pc.codigo, pc.descuento, pc.tipo_descuento
+                 COALESCE(pp.porcentaje, 0), pc.codigo, pc.descuento, pc.tipo_descuento
         ORDER BY p.fecha_creacion DESC
       `;
       
@@ -309,7 +309,7 @@ class PromotionModel {
                 'cantidad_pagada', pxy.cantidad_pagada
               )
             WHEN p.tipo = 'porcentaje' THEN
-              json_build_object('porcentaje', pp.porcentaje)
+              json_build_object('porcentaje', COALESCE(pp.porcentaje, 0))
             WHEN p.tipo = 'codigo' THEN
               json_build_object(
                 'codigo', pc.codigo,
@@ -425,7 +425,7 @@ class PromotionModel {
                 'cantidad_pagada', pxy.cantidad_pagada
               )
             WHEN p.tipo = 'porcentaje' THEN
-              json_build_object('porcentaje', pp.porcentaje)
+              json_build_object('porcentaje', COALESCE(pp.porcentaje, 0))
             WHEN p.tipo = 'codigo' THEN
               json_build_object(
                 'codigo', pc.codigo,
@@ -446,7 +446,7 @@ class PromotionModel {
         LEFT JOIN promo_codigo pc ON p.id_promocion = pc.id_promocion
         LEFT JOIN promocion_aplicacion pa ON p.id_promocion = pa.id_promocion
         GROUP BY p.id_promocion, pxy.cantidad_comprada, pxy.cantidad_pagada, 
-                 pp.porcentaje, pc.codigo, pc.descuento, pc.tipo_descuento
+                 COALESCE(pp.porcentaje, 0), pc.codigo, pc.descuento, pc.tipo_descuento
         ORDER BY p.fecha_creacion DESC
       `;
       
@@ -595,7 +595,7 @@ class PromotionModel {
               )
             WHEN p.tipo = 'porcentaje' THEN 
               json_build_object(
-                'porcentaje', pp.porcentaje
+                'porcentaje', COALESCE(pp.porcentaje, 0)
               )
             WHEN p.tipo = 'codigo' THEN 
               json_build_object(
@@ -699,7 +699,7 @@ class PromotionModel {
               )
             WHEN p.tipo = 'porcentaje' THEN 
               json_build_object(
-                'porcentaje', pp.porcentaje
+                'porcentaje', COALESCE(pp.porcentaje, 0)
               )
           END as detalles,
           iv.url as imagen_ejemplo,
