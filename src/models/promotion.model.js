@@ -65,22 +65,22 @@ class PromotionModel {
           pa.id_producto as producto_id,
           pa.id_categoria,
           CASE 
-            WHEN pa.id_categoria = '1' OR LOWER(pa.id_categoria) = 'playeras' THEN 'Playeras'
-            WHEN pa.id_categoria = '2' OR LOWER(pa.id_categoria) = 'hoodies' OR LOWER(pa.id_categoria) = 'hoodie' THEN 'Hoodies'
-            WHEN pa.id_categoria = '3' OR LOWER(pa.id_categoria) = 'pantalones' THEN 'Pantalones'
-            WHEN pa.id_categoria = '4' OR LOWER(pa.id_categoria) = 'zapatos' THEN 'Zapatos'
-            WHEN pa.id_categoria = '5' OR LOWER(pa.id_categoria) = 'accesorios' THEN 'Accesorios'
-            WHEN pa.id_categoria = '6' OR LOWER(pa.id_categoria) = 'goodies' THEN 'Goodies'
-            ELSE pa.id_categoria
+            WHEN pa.id_categoria::text = '1' OR LOWER(pa.id_categoria::text) = 'playeras' THEN 'Playeras'
+            WHEN pa.id_categoria::text = '2' OR LOWER(pa.id_categoria::text) = 'hoodies' OR LOWER(pa.id_categoria::text) = 'hoodie' THEN 'Hoodies'
+            WHEN pa.id_categoria::text = '3' OR LOWER(pa.id_categoria::text) = 'pantalones' THEN 'Pantalones'
+            WHEN pa.id_categoria::text = '4' OR LOWER(pa.id_categoria::text) = 'zapatos' THEN 'Zapatos'
+            WHEN pa.id_categoria::text = '5' OR LOWER(pa.id_categoria::text) = 'accesorios' THEN 'Accesorios'
+            WHEN pa.id_categoria::text = '6' OR LOWER(pa.id_categoria::text) = 'goodies' THEN 'Goodies'
+            ELSE pa.id_categoria::text
           END as categoria,
           -- Prioridad: 1=Producto específico, 2=Categoría, 3=General
           CASE 
             WHEN pa.aplica_a = 'producto' AND pa.id_producto = $1 THEN 1
             WHEN pa.aplica_a = 'categoria' AND (
-              pa.id_categoria = $2 OR 
-              LOWER(pa.id_categoria) = LOWER($2) OR
-              (LOWER($2) = 'hoodie' AND LOWER(pa.id_categoria) = 'hoodies') OR
-              (LOWER($2) = 'hoodies' AND LOWER(pa.id_categoria) = 'hoodie')
+              pa.id_categoria::text = $2 OR 
+              LOWER(pa.id_categoria::text) = LOWER($2) OR
+              (LOWER($2) = 'hoodie' AND LOWER(pa.id_categoria::text) = 'hoodies') OR
+              (LOWER($2) = 'hoodies' AND LOWER(pa.id_categoria::text) = 'hoodie')
             ) THEN 2
             WHEN pa.aplica_a = 'todos' THEN 3
             ELSE 4
@@ -98,12 +98,12 @@ class PromotionModel {
             (pa.aplica_a = 'producto' AND pa.id_producto = $1) OR
             -- Promociones por categoría (múltiples variantes)
             (pa.aplica_a = 'categoria' AND (
-              pa.id_categoria = $2 OR 
-              LOWER(pa.id_categoria) = LOWER($2) OR
-              (LOWER($2) = 'hoodie' AND LOWER(pa.id_categoria) = 'hoodies') OR
-              (LOWER($2) = 'hoodies' AND LOWER(pa.id_categoria) = 'hoodie') OR
-              (LOWER($2) = 'playeras' AND pa.id_categoria = '1') OR
-              (LOWER($2) = 'goodies' AND pa.id_categoria = '6')
+              pa.id_categoria::text = $2 OR 
+              LOWER(pa.id_categoria::text) = LOWER($2) OR
+              (LOWER($2) = 'hoodie' AND LOWER(pa.id_categoria::text) = 'hoodies') OR
+              (LOWER($2) = 'hoodies' AND LOWER(pa.id_categoria::text) = 'hoodie') OR
+              (LOWER($2) = 'playeras' AND pa.id_categoria::text = '1') OR
+              (LOWER($2) = 'goodies' AND pa.id_categoria::text = '6')
             ))
           )
         ORDER BY 
@@ -544,8 +544,8 @@ class PromotionModel {
           AND (
             pa.aplica_a = 'todos' OR
             (pa.aplica_a = 'categoria' AND (
-              pa.id_categoria = $1 OR 
-              LOWER(pa.id_categoria) = LOWER($1)
+              pa.id_categoria::text = $1 OR 
+              LOWER(pa.id_categoria::text) = LOWER($1)
             ))
           )
         ORDER BY p.fecha_inicio DESC
