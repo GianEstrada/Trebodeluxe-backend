@@ -268,8 +268,10 @@ class PromotionModel {
         WHERE p.activo = true 
           AND p.fecha_inicio <= NOW() 
           AND p.fecha_fin >= NOW()
-        GROUP BY p.id_promocion, pxy.cantidad_comprada, pxy.cantidad_pagada, 
-                 COALESCE(pp.porcentaje_descuento, 0), pc.codigo, pc.descuento, pc.tipo_descuento
+        GROUP BY p.id_promocion, p.nombre, p.tipo, p.fecha_inicio, p.fecha_fin, p.activo,
+                 p.uso_maximo, p.veces_usado,
+                 pxy.cantidad_comprada, pxy.cantidad_pagada, 
+                 pp.porcentaje_descuento, pc.codigo, pc.descuento, pc.tipo_descuento
         ORDER BY p.fecha_inicio DESC
       `;
       
@@ -327,8 +329,10 @@ class PromotionModel {
         LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion
         LEFT JOIN promo_codigo pc ON p.id_promocion = pc.id_promocion
         LEFT JOIN promocion_aplicacion pa ON p.id_promocion = pa.id_promocion
-        GROUP BY p.id_promocion, pxy.cantidad_comprada, pxy.cantidad_pagada, 
-                 COALESCE(pp.porcentaje_descuento, 0), pc.codigo, pc.descuento, pc.tipo_descuento
+        GROUP BY p.id_promocion, p.nombre, p.tipo, p.fecha_inicio, p.fecha_fin, p.activo,
+                 p.uso_maximo, p.veces_usado,
+                 pxy.cantidad_comprada, pxy.cantidad_pagada, 
+                 pp.porcentaje_descuento, pc.codigo, pc.descuento, pc.tipo_descuento
         ORDER BY p.fecha_inicio DESC
       `;
       
