@@ -355,10 +355,13 @@ class PromotionController {
       
       console.log(`🔍 [DEBUG ADMIN] Parámetros - page: ${page}, limit: ${limit}, active: ${active}`);
       
-      // Usar la función correcta según si necesitamos todas o solo activas
+      // TEMPORAL: Usar getAll() para debug en lugar de getAllActive()
       let promotions;
       if (active === 'true') {
-        promotions = await PromotionModel.getAllActive();
+        // promotions = await PromotionModel.getAllActive();
+        const allPromotions = await PromotionModel.getAll();
+        promotions = allPromotions.filter(p => p.activo === true);
+        console.log(`🔧 [DEBUG ADMIN] Usando getAll() filtrado: ${promotions.length} activas de ${allPromotions.length} totales`);
       } else if (active === 'false') {
         // Para inactivas, necesitaríamos filtrar las de getAll()
         const allPromotions = await PromotionModel.getAll();
