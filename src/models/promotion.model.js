@@ -176,7 +176,7 @@ class PromotionModel {
           )
         ORDER BY 
           prioridad ASC,  -- Producto específico primero, luego categoría, luego general
-          pp.porcentaje DESC NULLS LAST
+          COALESCE(pp.porcentaje, 0) DESC
         LIMIT 5
       `;
       
