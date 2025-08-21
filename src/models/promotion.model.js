@@ -18,25 +18,47 @@ class PromotionModel {
       const availableColumns = columnsResult.rows.map(row => row.column_name);
       console.log('✅ Columnas disponibles en promociones:', availableColumns);
       
-      // Usar solo columnas básicas que probablemente existen
+      // Usar consulta que incluye aplicaciones reales de la tabla promocion_aplicacion
       const query = `
         SELECT 
-          id_promocion,
-          nombre,
-          tipo,
-          activo,
+          p.id_promocion,
+          p.nombre,
+          p.tipo,
+          p.activo,
           'porcentaje' as tipo_promocion,
           25 as valor_descuento,
-          'todos' as aplicable_a,
-          null as producto_id,
-          null as categoria
-        FROM promociones 
-        WHERE activo = true
+          CASE 
+            WHEN pa.tipo_objetivo = 'todos' THEN 'todos'
+            WHEN pa.tipo_objetivo = 'categoria' THEN 'categoria'
+            WHEN pa.tipo_objetivo = 'producto' THEN 'producto_especifico'
+            ELSE 'todos'
+          END as aplicable_a,
+          pa.id_producto as producto_id,
+          pa.id_categoria,
+          CASE 
+            WHEN pa.id_categoria = 1 THEN 'Playeras'
+            WHEN pa.id_categoria = 2 THEN 'Hoodies'
+            WHEN pa.id_categoria = 3 THEN 'Pantalones'
+            WHEN pa.id_categoria = 4 THEN 'Zapatos'
+            WHEN pa.id_categoria = 5 THEN 'Accesorios'
+            WHEN pa.id_categoria = 6 THEN 'Goodies'
+            ELSE null
+          END as categoria
+        FROM promociones p
+        LEFT JOIN promocion_aplicacion pa ON p.id_promocion = pa.id_promocion
+        WHERE p.activo = true
+        ORDER BY p.id_promocion DESC
         LIMIT 10
       `;
       
       const result = await db.query(query);
-      console.log('✅ Consulta simple exitosa, promociones encontradas:', result.rows.length);
+      console.log('✅ Consulta con aplicaciones reales exitosa, promociones encontradas:', result.rows.length);
+      
+      // Log para debug de categorías
+      result.rows.forEach(promo => {
+        console.log(`🎯 Promoción ${promo.nombre}: aplicable_a=${promo.aplicable_a}, categoria=${promo.categoria}, id_categoria=${promo.id_categoria}`);
+      });
+      
       return result.rows;
     } catch (error) {
       console.error('Error en getActiveSimple:', error);
