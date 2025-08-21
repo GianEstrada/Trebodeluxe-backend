@@ -135,6 +135,21 @@ class PromotionModel {
     try {
       console.log('🔍 === INICIANDO DEBUG DE PROMOCIONES ===');
       
+      // Verificar estructura exacta de promo_porcentaje
+      const columnsQuery = `
+        SELECT column_name, data_type, numeric_precision, numeric_scale
+        FROM information_schema.columns 
+        WHERE table_name = 'promo_porcentaje' 
+        AND table_schema = 'public'
+        ORDER BY ordinal_position
+      `;
+      
+      const columnsResult = await db.query(columnsQuery);
+      console.log('🏗️ Estructura de tabla promo_porcentaje:');
+      columnsResult.rows.forEach(row => {
+        console.log(`  - ${row.column_name}: ${row.data_type} (${row.numeric_precision || 'N/A'}${row.numeric_scale ? ',' + row.numeric_scale : ''})`);
+      });
+      
       // Primero verificamos qué tablas existen
       const tablesQuery = `
         SELECT table_name 
@@ -159,19 +174,44 @@ class PromotionModel {
       const result = await db.query(promocionesQuery);
       console.log(`📈 Total promociones base: ${result.rows.length}`);
       
-      // Verificar promociones con porcentajes
-      const porcentajeQuery = `
-        SELECT p.id_promocion, p.nombre, COALESCE(pp.porcentaje_descuento, 0) as porcentaje
-        FROM promociones p
-        LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion
-        WHERE p.activo = true
-      `;
+      // Verificar promociones con porcentajes - probando ambos nombres de columna
+      console.log('🧪 Probando diferentes nombres de columna...');
       
-      const porcentajeResult = await db.query(porcentajeQuery);
-      console.log(`📊 Promociones con porcentaje: ${porcentajeResult.rows.length}`);
-      porcentajeResult.rows.forEach(row => {
-        console.log(`  - ${row.nombre}: ${row.porcentaje}%`);
-      });
+      try {
+        const porcentajeQuery1 = `
+          SELECT p.id_promocion, p.nombre, pp.porcentaje_descuento as porcentaje
+          FROM promociones p
+          LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion
+          WHERE p.activo = true
+          LIMIT 3
+        `;
+        
+        const porcentajeResult1 = await db.query(porcentajeQuery1);
+        console.log(`✅ Con 'porcentaje_descuento': ${porcentajeResult1.rows.length} resultados`);
+        porcentajeResult1.rows.forEach(row => {
+          console.log(`  - ${row.nombre}: ${row.porcentaje}% (tipo: ${typeof row.porcentaje})`);
+        });
+      } catch (err) {
+        console.log('❌ Error con porcentaje_descuento:', err.message);
+      }
+      
+      try {
+        const porcentajeQuery2 = `
+          SELECT p.id_promocion, p.nombre, pp.porcentaje as porcentaje
+          FROM promociones p
+          LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion
+          WHERE p.activo = true
+          LIMIT 3
+        `;
+        
+        const porcentajeResult2 = await db.query(porcentajeQuery2);
+        console.log(`✅ Con 'porcentaje': ${porcentajeResult2.rows.length} resultados`);
+        porcentajeResult2.rows.forEach(row => {
+          console.log(`  - ${row.nombre}: ${row.porcentaje}% (tipo: ${typeof row.porcentaje})`);
+        });
+      } catch (err) {
+        console.log('❌ Error con porcentaje:', err.message);
+      }
       
       return result.rows;
       
