@@ -377,7 +377,7 @@ class PromotionModel {
       // Insertar detalles específicos según el tipo
       if (promotionData.tipo === 'porcentaje' && promotionData.porcentaje) {
         await client.query(
-          'INSERT INTO promo_porcentaje (id_promocion, porcentaje) VALUES ($1, $2)',
+          'INSERT INTO promo_porcentaje (id_promocion, porcentaje_descuento) VALUES ($1, $2)',
           [promotionId, promotionData.porcentaje]
         );
       }
@@ -512,10 +512,10 @@ class PromotionModel {
       
       if (promocion.tipo === 'porcentaje' && promotionData.porcentaje !== undefined) {
         await client.query(
-          `INSERT INTO promo_porcentaje (id_promocion, porcentaje) 
+          `INSERT INTO promo_porcentaje (id_promocion, porcentaje_descuento) 
            VALUES ($1, $2) 
            ON CONFLICT (id_promocion) 
-           DO UPDATE SET porcentaje = $2`,
+           DO UPDATE SET porcentaje_descuento = $2`,
           [id, promotionData.porcentaje]
         );
       }
