@@ -57,9 +57,9 @@ class PromotionModel {
           COALESCE(pp.porcentaje_descuento, 0) as valor_descuento,
           'porcentaje' as tipo_promocion,
           CASE 
-            WHEN pa.tipo_objetivo = 'todos' THEN 'todos'
-            WHEN pa.tipo_objetivo = 'categoria' THEN 'categoria'
-            WHEN pa.tipo_objetivo = 'producto' THEN 'producto_especifico'
+            WHEN pa.aplica_a = 'todos' THEN 'todos'
+            WHEN pa.aplica_a = 'categoria' THEN 'categoria'
+            WHEN pa.aplica_a = 'producto' THEN 'producto_especifico'
             ELSE 'todos'
           END as aplicable_a,
           pa.id_producto as producto_id,
@@ -75,14 +75,14 @@ class PromotionModel {
           END as categoria,
           -- Prioridad: 1=Producto específico, 2=Categoría, 3=General
           CASE 
-            WHEN pa.tipo_objetivo = 'producto' AND pa.id_producto = $1 THEN 1
-            WHEN pa.tipo_objetivo = 'categoria' AND (
+            WHEN pa.aplica_a = 'producto' AND pa.id_producto = $1 THEN 1
+            WHEN pa.aplica_a = 'categoria' AND (
               pa.id_categoria = $2 OR 
               LOWER(pa.id_categoria) = LOWER($2) OR
               (LOWER($2) = 'hoodie' AND LOWER(pa.id_categoria) = 'hoodies') OR
               (LOWER($2) = 'hoodies' AND LOWER(pa.id_categoria) = 'hoodie')
             ) THEN 2
-            WHEN pa.tipo_objetivo = 'todos' THEN 3
+            WHEN pa.aplica_a = 'todos' THEN 3
             ELSE 4
           END as prioridad
         FROM promociones p
@@ -93,11 +93,11 @@ class PromotionModel {
           AND p.fecha_fin >= NOW()
           AND (
             -- Promociones generales (todos)
-            pa.tipo_objetivo = 'todos' OR
+            pa.aplica_a = 'todos' OR
             -- Promociones por producto específico
-            (pa.tipo_objetivo = 'producto' AND pa.id_producto = $1) OR
+            (pa.aplica_a = 'producto' AND pa.id_producto = $1) OR
             -- Promociones por categoría (múltiples variantes)
-            (pa.tipo_objetivo = 'categoria' AND (
+            (pa.aplica_a = 'categoria' AND (
               pa.id_categoria = $2 OR 
               LOWER(pa.id_categoria) = LOWER($2) OR
               (LOWER($2) = 'hoodie' AND LOWER(pa.id_categoria) = 'hoodies') OR
@@ -214,7 +214,7 @@ class PromotionModel {
           END as detalles,
           array_agg(
             DISTINCT json_build_object(
-              'tipo_objetivo', pa.tipo_objetivo,
+              'aplica_a', pa.aplica_a,
               'id_categoria', pa.id_categoria,
               'id_producto', pa.id_producto
             )
@@ -296,8 +296,8 @@ class PromotionModel {
       if (promotionData.aplicaciones && Array.isArray(promotionData.aplicaciones)) {
         for (const aplicacion of promotionData.aplicaciones) {
           await client.query(
-            'INSERT INTO promocion_aplicacion (id_promocion, tipo_objetivo, id_categoria, id_producto) VALUES ($1, $2, $3, $4)',
-            [promotionId, aplicacion.tipo_objetivo, aplicacion.id_categoria || null, aplicacion.id_producto || null]
+            'INSERT INTO promocion_aplicacion (id_promocion, aplica_a, id_categoria, id_producto) VALUES ($1, $2, $3, $4)',
+            [promotionId, aplicacion.aplica_a, aplicacion.id_categoria || null, aplicacion.id_producto || null]
           );
         }
       }
@@ -354,7 +354,7 @@ class PromotionModel {
       
       // Obtener aplicaciones
       const aplicacionesQuery = `
-        SELECT tipo_objetivo, id_categoria, id_producto
+        SELECT aplica_a, id_categoria, id_producto
         FROM promocion_aplicacion
         WHERE id_promocion = $1
       `;
@@ -533,7 +533,7 @@ class PromotionModel {
           json_build_object(
             'porcentaje', COALESCE(pp.porcentaje_descuento, 0)
           ) as detalles,
-          pa.tipo_objetivo,
+          pa.aplica_a,
           pa.id_categoria
         FROM promociones p
         LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion
@@ -542,8 +542,8 @@ class PromotionModel {
           AND p.fecha_inicio <= NOW() 
           AND p.fecha_fin >= NOW()
           AND (
-            pa.tipo_objetivo = 'todos' OR
-            (pa.tipo_objetivo = 'categoria' AND (
+            pa.aplica_a = 'todos' OR
+            (pa.aplica_a = 'categoria' AND (
               pa.id_categoria = $1 OR 
               LOWER(pa.id_categoria) = LOWER($1)
             ))
