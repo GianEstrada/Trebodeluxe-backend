@@ -355,6 +355,27 @@ class PromotionController {
       
       console.log(`🔍 [DEBUG ADMIN] Parámetros - page: ${page}, limit: ${limit}, active: ${active}`);
       
+      // DEBUGGER SIMPLE: Query directo SQL para verificar porcentaje
+      console.log('🧪 [DEBUG SIMPLE] Ejecutando query directo...');
+      
+      const testQuery = `
+        SELECT 
+          p.id_promocion,
+          p.nombre,
+          p.tipo,
+          pp.porcentaje_descuento,
+          COALESCE(pp.porcentaje_descuento, 0) as porcentaje_coalesced
+        FROM promociones p
+        LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion
+        WHERE p.nombre = 'ea'
+      `;
+      
+      const db = require('../config/db');
+      const testResult = await db.query(testQuery);
+      
+      console.log('🔍 [DEBUG SIMPLE] Resultado directo SQL:');
+      console.log(JSON.stringify(testResult.rows, null, 2));
+      
       // TEMPORAL: Usar getAll() para debug en lugar de getAllActive()
       let promotions;
       if (active === 'true') {
