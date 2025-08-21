@@ -342,6 +342,77 @@ class PromotionController {
     }
   }
 
+  /**
+   * Debug específico para admin panel - sin autenticación
+   * Para verificar exactamente qué estructura de datos se envía al frontend
+   */
+  static async debugAdminResponse(req, res) {
+    try {
+      console.log('🔍 [DEBUG ADMIN] Simulando respuesta del admin panel...');
+      
+      // Simular exactamente la misma lógica que getAllPromotions
+      const { page = 1, limit = 10, active = 'true' } = req.query;
+      
+      console.log(`🔍 [DEBUG ADMIN] Parámetros - page: ${page}, limit: ${limit}, active: ${active}`);
+      
+      // Usar la función correcta según si necesitamos todas o solo activas
+      let promotions;
+      if (active === 'true') {
+        promotions = await PromotionModel.getAllActive();
+      } else if (active === 'false') {
+        // Para inactivas, necesitaríamos filtrar las de getAll()
+        const allPromotions = await PromotionModel.getAll();
+        promotions = allPromotions.filter(p => !p.activo);
+      } else {
+        // Sin filtro, obtener todas
+        promotions = await PromotionModel.getAll();
+      }
+      
+      // Aplicar paginación manualmente si es necesario
+      const startIndex = (parseInt(page) - 1) * parseInt(limit);
+      const endIndex = startIndex + parseInt(limit);
+      const paginatedPromotions = promotions.slice(startIndex, endIndex);
+      
+      console.log(`✅ [DEBUG ADMIN] ${paginatedPromotions.length} promociones obtenidas`);
+      
+      // Mostrar la estructura exacta de cada promoción
+      paginatedPromotions.forEach((promo, index) => {
+        console.log(`📊 [DEBUG ADMIN] Promoción ${index + 1}:`);
+        console.log(`  - ID: ${promo.id_promocion}`);
+        console.log(`  - Nombre: ${promo.nombre}`);
+        console.log(`  - Tipo: ${promo.tipo}`);
+        console.log(`  - Porcentaje: ${promo.porcentaje} (tipo: ${typeof promo.porcentaje})`);
+        console.log(`  - Detalles: ${JSON.stringify(promo.detalles)}`);
+        console.log(`  - Activo: ${promo.activo}`);
+        console.log('  ---');
+      });
+      
+      const response = {
+        success: true,
+        message: 'DEBUG: Todas las promociones obtenidas exitosamente',
+        data: paginatedPromotions,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: promotions.length,
+          pages: Math.ceil(promotions.length / parseInt(limit))
+        }
+      };
+      
+      console.log(`🔍 [DEBUG ADMIN] Estructura de respuesta:`, JSON.stringify(response, null, 2));
+      
+      res.status(200).json(response);
+      
+    } catch (error) {
+      console.error('❌ [DEBUG ADMIN] Error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error en debug de admin panel',
+        error: error.message
+      });
+    }
+  }
+
 }
 
 module.exports = PromotionController;
