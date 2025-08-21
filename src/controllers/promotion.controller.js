@@ -386,6 +386,30 @@ class PromotionController {
       });
     }
   }
+
+  // Debug: Obtener todas las promociones para debugging
+  static async debugAllPromotions(req, res) {
+    try {
+      console.log('🔍 Iniciando debug de promociones...');
+      
+      const promotions = await PromotionModel.debugAllPromotions();
+
+      res.json({
+        success: true,
+        message: 'Debug de promociones completado',
+        data: promotions,
+        total: promotions.length
+      });
+
+    } catch (error) {
+      console.error('Error en debugAllPromotions:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al hacer debug de promociones',
+        error: error.message
+      });
+    }
+  }
 }
 
 module.exports = PromotionController;

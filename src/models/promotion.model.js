@@ -74,25 +74,36 @@ class PromotionModel {
       return [
         {
           id_promocion: 1,
-          nombre: 'Promoción General',
+          nombre: 'Promoción General de Prueba',
           tipo: 'porcentaje',
-          activo: true,
-          tipo_promocion: 'porcentaje',
-          valor_descuento: 15,
-          aplicable_a: 'todos',
-          producto_id: null,
-          categoria: null
-        },
-        {
-          id_promocion: 2,
-          nombre: 'Oferta Especial',
-          tipo: 'porcentaje', 
           activo: true,
           tipo_promocion: 'porcentaje',
           valor_descuento: 20,
           aplicable_a: 'todos',
           producto_id: null,
           categoria: null
+        },
+        {
+          id_promocion: 2,
+          nombre: 'Descuento Hoodies',
+          tipo: 'porcentaje', 
+          activo: true,
+          tipo_promocion: 'porcentaje',
+          valor_descuento: 25,
+          aplicable_a: 'categoria',
+          producto_id: null,
+          categoria: 'Hoodies'
+        },
+        {
+          id_promocion: 3,
+          nombre: 'Oferta Goodies',
+          tipo: 'porcentaje',
+          activo: true,
+          tipo_promocion: 'porcentaje',
+          valor_descuento: 15,
+          aplicable_a: 'categoria',
+          producto_id: null,
+          categoria: 'Goodies'
         }
       ];
     }
@@ -122,14 +133,26 @@ class PromotionModel {
           pa.id_producto as producto_id,
           pa.id_categoria,
           CASE 
-            WHEN pa.id_categoria = '1' OR pa.id_categoria = 'Playeras' THEN 'Playeras'
-            WHEN pa.id_categoria = '2' OR pa.id_categoria = 'Hoodies' THEN 'Hoodies'
-            WHEN pa.id_categoria = '3' OR pa.id_categoria = 'Pantalones' THEN 'Pantalones'
-            WHEN pa.id_categoria = '4' OR pa.id_categoria = 'Zapatos' THEN 'Zapatos'
-            WHEN pa.id_categoria = '5' OR pa.id_categoria = 'Accesorios' THEN 'Accesorios'
-            WHEN pa.id_categoria = '6' OR pa.id_categoria = 'Goodies' THEN 'Goodies'
+            WHEN pa.id_categoria = '1' OR LOWER(pa.id_categoria) = 'playeras' THEN 'Playeras'
+            WHEN pa.id_categoria = '2' OR LOWER(pa.id_categoria) = 'hoodies' OR LOWER(pa.id_categoria) = 'hoodie' THEN 'Hoodies'
+            WHEN pa.id_categoria = '3' OR LOWER(pa.id_categoria) = 'pantalones' THEN 'Pantalones'
+            WHEN pa.id_categoria = '4' OR LOWER(pa.id_categoria) = 'zapatos' THEN 'Zapatos'
+            WHEN pa.id_categoria = '5' OR LOWER(pa.id_categoria) = 'accesorios' THEN 'Accesorios'
+            WHEN pa.id_categoria = '6' OR LOWER(pa.id_categoria) = 'goodies' THEN 'Goodies'
             ELSE pa.id_categoria
-          END as categoria
+          END as categoria,
+          -- Prioridad: 1=Producto específico, 2=Categoría, 3=General
+          CASE 
+            WHEN pa.tipo_objetivo = 'producto' AND pa.id_producto = $1 THEN 1
+            WHEN pa.tipo_objetivo = 'categoria' AND (
+              pa.id_categoria = $2 OR 
+              LOWER(pa.id_categoria) = LOWER($2) OR
+              (LOWER($2) = 'hoodie' AND LOWER(pa.id_categoria) = 'hoodies') OR
+              (LOWER($2) = 'hoodies' AND LOWER(pa.id_categoria) = 'hoodie')
+            ) THEN 2
+            WHEN pa.tipo_objetivo = 'todos' THEN 3
+            ELSE 4
+          END as prioridad
         FROM promociones p
         LEFT JOIN promocion_aplicacion pa ON p.id_promocion = pa.id_promocion
         LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion
@@ -137,14 +160,22 @@ class PromotionModel {
           AND p.fecha_inicio <= NOW() 
           AND p.fecha_fin >= NOW()
           AND (
+            -- Promociones generales (todos)
             pa.tipo_objetivo = 'todos' OR
+            -- Promociones por producto específico
             (pa.tipo_objetivo = 'producto' AND pa.id_producto = $1) OR
-            (pa.tipo_objetivo = 'categoria' AND (pa.id_categoria = $2 OR pa.id_categoria = 'Goodies' OR pa.id_categoria = 'Playeras'))
+            -- Promociones por categoría (múltiples variantes)
+            (pa.tipo_objetivo = 'categoria' AND (
+              pa.id_categoria = $2 OR 
+              LOWER(pa.id_categoria) = LOWER($2) OR
+              (LOWER($2) = 'hoodie' AND LOWER(pa.id_categoria) = 'hoodies') OR
+              (LOWER($2) = 'hoodies' AND LOWER(pa.id_categoria) = 'hoodie') OR
+              (LOWER($2) = 'playeras' AND pa.id_categoria = '1') OR
+              (LOWER($2) = 'goodies' AND pa.id_categoria = '6')
+            ))
           )
         ORDER BY 
-          CASE WHEN pa.tipo_objetivo = 'producto' THEN 1
-               WHEN pa.tipo_objetivo = 'categoria' THEN 2
-               ELSE 3 END,
+          prioridad ASC,  -- Producto específico primero, luego categoría, luego general
           pp.porcentaje DESC NULLS LAST
         LIMIT 5
       `;
@@ -153,13 +184,65 @@ class PromotionModel {
       
       console.log(`🎯 Promociones encontradas para producto ${productId}: ${result.rows.length}`);
       result.rows.forEach(promo => {
-        console.log(`  - ${promo.nombre}: ${promo.valor_descuento}% (${promo.aplicable_a})`);
+        console.log(`  - ${promo.nombre}: ${promo.valor_descuento}% (${promo.aplicable_a}, prioridad: ${promo.prioridad})`);
       });
       
       return result.rows;
       
     } catch (error) {
       console.error('Error en getPromotionsForProduct:', error);
+      return [];
+    }
+  }
+
+  // Función de debug para ver todas las promociones y aplicaciones
+  static async debugAllPromotions() {
+    try {
+      const query = `
+        SELECT 
+          p.id_promocion,
+          p.nombre,
+          p.tipo,
+          p.activo,
+          p.fecha_inicio,
+          p.fecha_fin,
+          pp.porcentaje,
+          pa.tipo_objetivo,
+          pa.id_categoria,
+          pa.id_producto
+        FROM promociones p
+        LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion
+        LEFT JOIN promocion_aplicacion pa ON p.id_promocion = pa.id_promocion
+        ORDER BY p.id_promocion, pa.id_aplicacion
+      `;
+      
+      const result = await db.query(query);
+      
+      console.log('🔍 === DEBUG: TODAS LAS PROMOCIONES EN BD ===');
+      console.log(`Total promociones: ${result.rows.length}`);
+      
+      result.rows.forEach(row => {
+        const status = row.activo ? '✅' : '❌';
+        const now = new Date();
+        const inicio = new Date(row.fecha_inicio);
+        const fin = new Date(row.fecha_fin);
+        const vigente = now >= inicio && now <= fin ? '📅 VIGENTE' : '📅 EXPIRADA';
+        
+        console.log(`${status} ${row.nombre} (ID: ${row.id_promocion})`);
+        console.log(`   • Descuento: ${row.porcentaje}%`);
+        console.log(`   • Aplicable a: ${row.tipo_objetivo || 'N/A'}`);
+        console.log(`   • Categoría: ${row.id_categoria || 'N/A'}`);
+        console.log(`   • Producto: ${row.id_producto || 'N/A'}`);
+        console.log(`   • Estado: ${vigente}`);
+        console.log(`   • Fecha inicio: ${row.fecha_inicio}`);
+        console.log(`   • Fecha fin: ${row.fecha_fin}`);
+        console.log('---');
+      });
+      
+      return result.rows;
+      
+    } catch (error) {
+      console.error('Error en debugAllPromotions:', error);
       return [];
     }
   }
