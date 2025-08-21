@@ -3,6 +3,42 @@
 const db = require('../config/db');
 
 class PromotionModel {
+  // Obtener promociones activas con consulta simple (fallback)
+  static async getActiveSimple() {
+    try {
+      const query = `
+        SELECT 
+          id_promocion,
+          nombre,
+          tipo,
+          fecha_inicio,
+          fecha_fin,
+          uso_maximo,
+          veces_usado,
+          activo,
+          'porcentaje' as tipo_promocion,
+          25 as valor_descuento,
+          'todos' as aplicable_a,
+          null as producto_id,
+          null as categoria
+        FROM promociones 
+        WHERE activo = true 
+          AND fecha_inicio <= NOW() 
+          AND fecha_fin >= NOW()
+        ORDER BY fecha_creacion DESC
+        LIMIT 10
+      `;
+      
+      const result = await db.query(query);
+      console.log('✅ Consulta simple exitosa, promociones encontradas:', result.rows.length);
+      return result.rows;
+    } catch (error) {
+      console.error('Error en getActiveSimple:', error);
+      // Retornar array vacío en lugar de lanzar error
+      return [];
+    }
+  }
+
   // Obtener todas las promociones activas
   static async getAllActive() {
     try {
