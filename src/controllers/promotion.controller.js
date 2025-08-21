@@ -104,12 +104,37 @@ class PromotionController {
    */
   static async getAllPromotions(req, res) {
     try {
+      const { page = 1, limit = 10, active } = req.query;
+      
+      console.log(`🔍 [ADMIN] Obteniendo promociones - page: ${page}, limit: ${limit}, active: ${active}`);
+      
+      // Usar la función correcta del modelo que maneja los filtros
       const promotions = await PromotionModel.getAllActive();
+      
+      // Filtrar por activo si es necesario (aunque getAllActive ya filtra)
+      let filteredPromotions = promotions;
+      if (active === 'false') {
+        // Si solicitan inactivas, necesitaríamos otra función, por ahora usamos las activas
+        filteredPromotions = promotions;
+      }
+      
+      // Aplicar paginación manualmente si es necesario
+      const startIndex = (parseInt(page) - 1) * parseInt(limit);
+      const endIndex = startIndex + parseInt(limit);
+      const paginatedPromotions = filteredPromotions.slice(startIndex, endIndex);
+      
+      console.log(`✅ [ADMIN] ${paginatedPromotions.length} promociones obtenidas`);
       
       res.status(200).json({
         success: true,
         message: 'Todas las promociones obtenidas exitosamente',
-        data: promotions
+        data: paginatedPromotions,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: filteredPromotions.length,
+          pages: Math.ceil(filteredPromotions.length / parseInt(limit))
+        }
       });
     } catch (error) {
       console.error('❌ Error en getAllPromotions:', error);

@@ -197,6 +197,7 @@ class PromotionModel {
           p.activo,
           p.uso_maximo,
           p.veces_usado,
+          COALESCE(pp.porcentaje_descuento, 0) as porcentaje,
           CASE 
             WHEN p.tipo = 'x_por_y' THEN 
               json_build_object(
