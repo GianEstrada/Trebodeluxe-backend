@@ -284,6 +284,65 @@ class PromotionModel {
   }
 
   /**
+   * Obtener TODAS las promociones (activas e inactivas) para admin panel
+   * Incluye el campo porcentaje directamente accesible
+   */
+  static async getAll() {
+    try {
+      const query = `
+        SELECT 
+          p.id_promocion,
+          p.nombre,
+          p.tipo,
+          p.fecha_inicio,
+          p.fecha_fin,
+          p.activo,
+          p.uso_maximo,
+          p.veces_usado,
+          COALESCE(pp.porcentaje_descuento, 0) as porcentaje,
+          CASE 
+            WHEN p.tipo = 'x_por_y' THEN 
+              json_build_object(
+                'cantidad_comprada', pxy.cantidad_comprada,
+                'cantidad_pagada', pxy.cantidad_pagada
+              )
+            WHEN p.tipo = 'porcentaje' THEN
+              json_build_object('porcentaje', COALESCE(pp.porcentaje_descuento, 0))
+            WHEN p.tipo = 'codigo' THEN
+              json_build_object(
+                'codigo', pc.codigo,
+                'descuento', pc.descuento,
+                'tipo_descuento', pc.tipo_descuento
+              )
+          END as detalles,
+          array_agg(
+            DISTINCT json_build_object(
+              'aplica_a', pa.aplica_a,
+              'id_categoria', pa.id_categoria,
+              'id_producto', pa.id_producto
+            )
+          ) FILTER (WHERE pa.id_aplicacion IS NOT NULL) as aplicaciones
+        FROM promociones p
+        LEFT JOIN promo_x_por_y pxy ON p.id_promocion = pxy.id_promocion
+        LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion
+        LEFT JOIN promo_codigo pc ON p.id_promocion = pc.id_promocion
+        LEFT JOIN promocion_aplicacion pa ON p.id_promocion = pa.id_promocion
+        GROUP BY p.id_promocion, pxy.cantidad_comprada, pxy.cantidad_pagada, 
+                 COALESCE(pp.porcentaje_descuento, 0), pc.codigo, pc.descuento, pc.tipo_descuento
+        ORDER BY p.fecha_inicio DESC
+      `;
+      
+      const result = await db.query(query);
+      return result.rows;
+      
+    } catch (error) {
+      console.error('❌ Error en getAll promociones:', error);
+      // Fallback a consulta simple en caso de error
+      return await this.getActiveSimple();
+    }
+  }
+
+  /**
    * Crear una nueva promoción
    * Maneja la creación de promoción base y sus detalles específicos
    */

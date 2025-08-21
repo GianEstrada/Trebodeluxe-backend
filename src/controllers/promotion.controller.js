@@ -108,20 +108,23 @@ class PromotionController {
       
       console.log(`🔍 [ADMIN] Obteniendo promociones - page: ${page}, limit: ${limit}, active: ${active}`);
       
-      // Usar la función correcta del modelo que maneja los filtros
-      const promotions = await PromotionModel.getAllActive();
-      
-      // Filtrar por activo si es necesario (aunque getAllActive ya filtra)
-      let filteredPromotions = promotions;
-      if (active === 'false') {
-        // Si solicitan inactivas, necesitaríamos otra función, por ahora usamos las activas
-        filteredPromotions = promotions;
+      // Usar la función correcta según si necesitamos todas o solo activas
+      let promotions;
+      if (active === 'true') {
+        promotions = await PromotionModel.getAllActive();
+      } else if (active === 'false') {
+        // Para inactivas, necesitaríamos filtrar las de getAll()
+        const allPromotions = await PromotionModel.getAll();
+        promotions = allPromotions.filter(p => !p.activo);
+      } else {
+        // Sin filtro, obtener todas
+        promotions = await PromotionModel.getAll();
       }
       
       // Aplicar paginación manualmente si es necesario
       const startIndex = (parseInt(page) - 1) * parseInt(limit);
       const endIndex = startIndex + parseInt(limit);
-      const paginatedPromotions = filteredPromotions.slice(startIndex, endIndex);
+      const paginatedPromotions = promotions.slice(startIndex, endIndex);
       
       console.log(`✅ [ADMIN] ${paginatedPromotions.length} promociones obtenidas`);
       
@@ -132,8 +135,8 @@ class PromotionController {
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
-          total: filteredPromotions.length,
-          pages: Math.ceil(filteredPromotions.length / parseInt(limit))
+          total: promotions.length,
+          pages: Math.ceil(promotions.length / parseInt(limit))
         }
       });
     } catch (error) {
