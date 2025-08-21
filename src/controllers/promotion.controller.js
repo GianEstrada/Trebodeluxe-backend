@@ -437,6 +437,84 @@ class PromotionController {
     }
   }
 
+  /**
+   * ENDPOINT TEMPORAL: Reparar promoción "ea" insertando registro faltante
+   */
+  static async repairPromocionEa(req, res) {
+    const client = await require('../config/db').connect();
+    
+    try {
+      console.log('🔧 [REPAIR] Reparando promoción "ea"...');
+      
+      // Verificar la promoción actual
+      const checkQuery = `
+        SELECT 
+          p.id_promocion, p.nombre, p.tipo,
+          pp.porcentaje_descuento
+        FROM promociones p
+        LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion
+        WHERE p.nombre = 'ea'
+      `;
+      
+      const checkResult = await client.query(checkQuery);
+      console.log('📊 [REPAIR] Estado actual:', JSON.stringify(checkResult.rows, null, 2));
+      
+      if (checkResult.rows.length > 0) {
+        const promo = checkResult.rows[0];
+        
+        if (!promo.porcentaje_descuento) {
+          console.log('⚠️ [REPAIR] Falta registro en promo_porcentaje. Insertando...');
+          
+          // Insertar el registro con 30% de descuento
+          const insertQuery = `
+            INSERT INTO promo_porcentaje (id_promocion, porcentaje_descuento) 
+            VALUES ($1, $2)
+            ON CONFLICT (id_promocion) 
+            DO UPDATE SET porcentaje_descuento = $2
+          `;
+          
+          await client.query(insertQuery, [promo.id_promocion, 30.00]);
+          console.log('✅ [REPAIR] Registro insertado con 30% de descuento');
+          
+          // Verificar que se insertó correctamente
+          const verifyResult = await client.query(checkQuery);
+          console.log('🔍 [REPAIR] Verificación post-inserción:', JSON.stringify(verifyResult.rows, null, 2));
+          
+          res.json({
+            success: true,
+            message: 'Promoción "ea" reparada exitosamente',
+            data: {
+              antes: checkResult.rows[0],
+              despues: verifyResult.rows[0]
+            }
+          });
+        } else {
+          console.log('ℹ️ [REPAIR] La promoción ya tiene porcentaje_descuento:', promo.porcentaje_descuento);
+          res.json({
+            success: true,
+            message: 'La promoción ya está correcta',
+            data: promo
+          });
+        }
+      } else {
+        res.status(404).json({
+          success: false,
+          message: 'No se encontró la promoción "ea"'
+        });
+      }
+      
+    } catch (error) {
+      console.error('❌ [REPAIR] Error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error reparando promoción',
+        error: error.message
+      });
+    } finally {
+      client.release();
+    }
+  }
+
 }
 
 module.exports = PromotionController;

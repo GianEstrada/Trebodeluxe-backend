@@ -15,6 +15,7 @@ router.get('/applicable/:productId/:categoria', PromotionController.getApplicabl
 router.get('/product/:productId', PromotionController.getPromotionsForProduct); // Nueva ruta
 router.get('/debug/all', PromotionController.debugAllPromotions); // Debug ruta
 router.get('/debug/admin', PromotionController.debugAdminResponse); // Debug admin sin auth
+router.post('/debug/repair-ea', PromotionController.repairPromocionEa); // Repair promocion "ea"
 
 // Rutas protegidas (solo admin)
 router.use(authMiddleware.verifyToken);
