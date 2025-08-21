@@ -198,46 +198,46 @@ class PromotionModel {
   // Función de debug para ver todas las promociones y aplicaciones
   static async debugAllPromotions() {
     try {
-      const query = `
-        SELECT 
-          p.id_promocion,
-          p.nombre,
-          p.tipo,
-          p.activo,
-          p.fecha_inicio,
-          p.fecha_fin,
-          COALESCE(pp.porcentaje, 0) as porcentaje,
-          pa.tipo_objetivo,
-          pa.id_categoria,
-          pa.id_producto
-        FROM promociones p
-        LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion
-        LEFT JOIN promocion_aplicacion pa ON p.id_promocion = pa.id_promocion
-        ORDER BY p.id_promocion
+      console.log('🔍 === INICIANDO DEBUG DE PROMOCIONES ===');
+      
+      // Primero verificamos qué tablas existen
+      const tablesQuery = `
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name LIKE '%promo%'
       `;
       
-      const result = await db.query(query);
-      
-      console.log('🔍 === DEBUG: TODAS LAS PROMOCIONES EN BD ===');
-      console.log(`Total promociones: ${result.rows.length}`);
-      
-      result.rows.forEach(row => {
-        const status = row.activo ? '✅' : '❌';
-        const now = new Date();
-        const inicio = new Date(row.fecha_inicio);
-        const fin = new Date(row.fecha_fin);
-        const vigente = now >= inicio && now <= fin ? '📅 VIGENTE' : '📅 EXPIRADA';
-        
-        console.log(`${status} ${row.nombre} (ID: ${row.id_promocion})`);
-        console.log(`   • Descuento: ${row.porcentaje}%`);
-        console.log(`   • Aplicable a: ${row.tipo_objetivo || 'N/A'}`);
-        console.log(`   • Categoría: ${row.id_categoria || 'N/A'}`);
-        console.log(`   • Producto: ${row.id_producto || 'N/A'}`);
-        console.log(`   • Estado: ${vigente}`);
-        console.log(`   • Fecha inicio: ${row.fecha_inicio}`);
-        console.log(`   • Fecha fin: ${row.fecha_fin}`);
-        console.log('---');
+      const tablesResult = await db.query(tablesQuery);
+      console.log('📋 Tablas relacionadas con promociones:');
+      tablesResult.rows.forEach(row => {
+        console.log(`  - ${row.table_name}`);
       });
+      
+      // Verificamos la estructura de la tabla promociones
+      const promocionesQuery = `SELECT * FROM promociones LIMIT 1`;
+      const promocionesResult = await db.query(promocionesQuery);
+      console.log('🏷️ Promociones encontradas:', promocionesResult.rows.length);
+      
+      // Verificamos la estructura de promo_porcentaje
+      const porcentajeQuery = `SELECT * FROM promo_porcentaje LIMIT 1`;
+      const porcentajeResult = await db.query(porcentajeQuery);
+      console.log('📊 Registros de porcentaje:', porcentajeResult.rows.length);
+      
+      // Verificamos promocion_aplicacion
+      const aplicacionQuery = `SELECT * FROM promocion_aplicacion LIMIT 1`;
+      const aplicacionResult = await db.query(aplicacionQuery);
+      console.log('🎯 Registros de aplicación:', aplicacionResult.rows.length);
+      
+      // Consulta simple sin JOINs
+      const simpleQuery = `
+        SELECT id_promocion, nombre, tipo, activo, fecha_inicio, fecha_fin
+        FROM promociones
+        ORDER BY id_promocion
+      `;
+      
+      const result = await db.query(simpleQuery);
+      console.log(`📈 Total promociones base: ${result.rows.length}`);
       
       return result.rows;
       
