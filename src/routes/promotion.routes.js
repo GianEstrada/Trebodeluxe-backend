@@ -12,6 +12,7 @@ router.get('/category/:categoria', PromotionController.getPromotionsByCategory);
 router.get('/:id_promocion/products', PromotionController.getPromotionProducts);
 router.get('/validate/:codigo', PromotionController.validatePromotionCode);
 router.get('/applicable/:productId/:categoria', PromotionController.getApplicablePromotions);
+router.get('/product/:productId', PromotionController.getPromotionsForProduct); // Nueva ruta
 
 // Rutas protegidas (solo admin)
 router.use(authMiddleware.verifyToken);

@@ -358,6 +358,34 @@ class PromotionController {
       });
     }
   }
+
+  // Obtener promociones aplicables a un producto específico
+  static async getPromotionsForProduct(req, res) {
+    try {
+      const { productId } = req.params;
+      const { categoria } = req.query;
+
+      console.log(`🔍 Solicitando promociones para producto: ${productId}, categoría: ${categoria}`);
+
+      const promotions = await PromotionModel.getPromotionsForProduct(productId, categoria);
+
+      res.json({
+        success: true,
+        message: 'Promociones para producto obtenidas exitosamente',
+        data: promotions,
+        product_id: productId,
+        categoria: categoria
+      });
+
+    } catch (error) {
+      console.error('Error en getPromotionsForProduct:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener promociones para producto',
+        error: error.message
+      });
+    }
+  }
 }
 
 module.exports = PromotionController;
