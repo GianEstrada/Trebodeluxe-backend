@@ -213,7 +213,7 @@ class PromotionModel {
         FROM promociones p
         LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion
         LEFT JOIN promocion_aplicacion pa ON p.id_promocion = pa.id_promocion
-        ORDER BY p.id_promocion, pa.id_aplicacion
+        ORDER BY p.id_promocion
       `;
       
       const result = await db.query(query);
