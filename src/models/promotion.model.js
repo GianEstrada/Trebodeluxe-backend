@@ -224,22 +224,12 @@ class PromotionModel {
           p.activo,
           p.uso_maximo,
           p.veces_usado,
-          COALESCE(pp.porcentaje_descuento, 0) as porcentaje,
-          CASE 
-            WHEN p.tipo = 'x_por_y' THEN 
-              json_build_object(
-                'cantidad_comprada', pxy.cantidad_comprada,
-                'cantidad_pagada', pxy.cantidad_pagada
-              )
-            WHEN p.tipo = 'porcentaje' THEN
-              json_build_object('porcentaje', COALESCE(pp.porcentaje_descuento, 0))
-            WHEN p.tipo = 'codigo' THEN
-              json_build_object(
-                'codigo', pc.codigo,
-                'descuento', pc.descuento,
-                'tipo_descuento', pc.tipo_descuento
-              )
-          END as detalles,
+          -- Solo para promociones de porcentaje
+          pp.porcentaje_descuento,
+          -- Solo para promociones x por y
+          pxy.cantidad_comprada,
+          pxy.cantidad_pagada,
+          -- Aplicaciones de la promoción
           array_agg(
             DISTINCT json_build_object(
               'aplica_a', pa.aplica_a,
@@ -248,17 +238,17 @@ class PromotionModel {
             )
           ) FILTER (WHERE pa.id_aplicacion IS NOT NULL) as aplicaciones
         FROM promociones p
-        LEFT JOIN promo_x_por_y pxy ON p.id_promocion = pxy.id_promocion
-        LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion
-        LEFT JOIN promo_codigo pc ON p.id_promocion = pc.id_promocion
+        LEFT JOIN promo_x_por_y pxy ON p.id_promocion = pxy.id_promocion AND p.tipo = 'x_por_y'
+        LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion AND p.tipo = 'porcentaje'
         LEFT JOIN promocion_aplicacion pa ON p.id_promocion = pa.id_promocion
         WHERE p.activo = true 
           AND p.fecha_inicio <= NOW() 
           AND p.fecha_fin >= NOW()
+          AND p.tipo IN ('porcentaje', 'x_por_y')  -- Solo promociones de productos
         GROUP BY p.id_promocion, p.nombre, p.tipo, p.fecha_inicio, p.fecha_fin, p.activo,
                  p.uso_maximo, p.veces_usado,
                  pxy.cantidad_comprada, pxy.cantidad_pagada, 
-                 pp.porcentaje_descuento, pc.codigo, pc.descuento, pc.tipo_descuento
+                 pp.porcentaje_descuento
         ORDER BY p.fecha_inicio DESC
       `;
       
@@ -288,22 +278,12 @@ class PromotionModel {
           p.activo,
           p.uso_maximo,
           p.veces_usado,
-          COALESCE(pp.porcentaje_descuento, 0) as porcentaje,
-          CASE 
-            WHEN p.tipo = 'x_por_y' THEN 
-              json_build_object(
-                'cantidad_comprada', pxy.cantidad_comprada,
-                'cantidad_pagada', pxy.cantidad_pagada
-              )
-            WHEN p.tipo = 'porcentaje' THEN
-              json_build_object('porcentaje', COALESCE(pp.porcentaje_descuento, 0))
-            WHEN p.tipo = 'codigo' THEN
-              json_build_object(
-                'codigo', pc.codigo,
-                'descuento', pc.descuento,
-                'tipo_descuento', pc.tipo_descuento
-              )
-          END as detalles,
+          -- Solo para promociones de porcentaje
+          pp.porcentaje_descuento,
+          -- Solo para promociones x por y
+          pxy.cantidad_comprada,
+          pxy.cantidad_pagada,
+          -- Aplicaciones de la promoción
           array_agg(
             DISTINCT json_build_object(
               'aplica_a', pa.aplica_a,
@@ -312,14 +292,14 @@ class PromotionModel {
             )
           ) FILTER (WHERE pa.id_aplicacion IS NOT NULL) as aplicaciones
         FROM promociones p
-        LEFT JOIN promo_x_por_y pxy ON p.id_promocion = pxy.id_promocion
-        LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion
-        LEFT JOIN promo_codigo pc ON p.id_promocion = pc.id_promocion
+        LEFT JOIN promo_x_por_y pxy ON p.id_promocion = pxy.id_promocion AND p.tipo = 'x_por_y'
+        LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion AND p.tipo = 'porcentaje'
         LEFT JOIN promocion_aplicacion pa ON p.id_promocion = pa.id_promocion
+        WHERE p.tipo IN ('porcentaje', 'x_por_y')  -- Solo promociones de productos
         GROUP BY p.id_promocion, p.nombre, p.tipo, p.fecha_inicio, p.fecha_fin, p.activo,
                  p.uso_maximo, p.veces_usado,
                  pxy.cantidad_comprada, pxy.cantidad_pagada, 
-                 pp.porcentaje_descuento, pc.codigo, pc.descuento, pc.tipo_descuento
+                 pp.porcentaje_descuento
         ORDER BY p.fecha_inicio DESC
       `;
       
@@ -415,26 +395,15 @@ class PromotionModel {
       const query = `
         SELECT 
           p.*,
-          CASE 
-            WHEN p.tipo = 'x_por_y' THEN 
-              json_build_object(
-                'cantidad_comprada', pxy.cantidad_comprada,
-                'cantidad_pagada', pxy.cantidad_pagada
-              )
-            WHEN p.tipo = 'porcentaje' THEN
-              json_build_object('porcentaje', COALESCE(pp.porcentaje_descuento, 0))
-            WHEN p.tipo = 'codigo' THEN
-              json_build_object(
-                'codigo', pc.codigo,
-                'descuento', pc.descuento,
-                'tipo_descuento', pc.tipo_descuento
-              )
-          END as detalles
+          -- Solo para promociones de porcentaje
+          pp.porcentaje_descuento,
+          -- Solo para promociones x por y
+          pxy.cantidad_comprada,
+          pxy.cantidad_pagada
         FROM promociones p
-        LEFT JOIN promo_x_por_y pxy ON p.id_promocion = pxy.id_promocion
-        LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion
-        LEFT JOIN promo_codigo pc ON p.id_promocion = pc.id_promocion
-        WHERE p.id_promocion = $1
+        LEFT JOIN promo_x_por_y pxy ON p.id_promocion = pxy.id_promocion AND p.tipo = 'x_por_y'
+        LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion AND p.tipo = 'porcentaje'
+        WHERE p.id_promocion = $1 AND p.tipo IN ('porcentaje', 'x_por_y')
       `;
       
       const result = await db.query(query, [id]);
@@ -539,40 +508,6 @@ class PromotionModel {
     } catch (error) {
       console.error('❌ Error eliminando promoción:', error);
       throw error;
-    }
-  }
-
-  /**
-   * Validar código promocional
-   */
-  static async validateCode(codigo) {
-    try {
-      const query = `
-        SELECT p.*, pc.descuento, pc.tipo_descuento
-        FROM promociones p
-        JOIN promo_codigo pc ON p.id_promocion = pc.id_promocion
-        WHERE pc.codigo = $1 
-          AND p.activo = true
-          AND p.fecha_inicio <= NOW()
-          AND p.fecha_fin >= NOW()
-          AND (p.uso_maximo IS NULL OR p.veces_usado < p.uso_maximo)
-      `;
-      
-      const result = await db.query(query, [codigo]);
-      
-      if (result.rows.length === 0) {
-        return { valid: false, message: 'Código no válido o expirado' };
-      }
-      
-      return {
-        valid: true,
-        promotion: result.rows[0],
-        message: 'Código válido'
-      };
-      
-    } catch (error) {
-      console.error('❌ Error validando código:', error);
-      return { valid: false, message: 'Error validando código' };
     }
   }
 
