@@ -215,7 +215,7 @@ class PromotionModel {
   static async getAllActive() {
     try {
       const query = `
-        SELECT 
+        SELECT DISTINCT
           p.id_promocion,
           p.nombre,
           p.tipo,
@@ -228,27 +228,14 @@ class PromotionModel {
           pp.porcentaje_descuento,
           -- Solo para promociones x por y
           pxy.cantidad_comprada,
-          pxy.cantidad_pagada,
-          -- Aplicaciones de la promoción
-          array_agg(
-            DISTINCT json_build_object(
-              'aplica_a', pa.aplica_a,
-              'id_categoria', pa.id_categoria,
-              'id_producto', pa.id_producto
-            )
-          ) FILTER (WHERE pa.id_aplicacion IS NOT NULL) as aplicaciones
+          pxy.cantidad_pagada
         FROM promociones p
         LEFT JOIN promo_x_por_y pxy ON p.id_promocion = pxy.id_promocion AND p.tipo = 'x_por_y'
         LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion AND p.tipo = 'porcentaje'
-        LEFT JOIN promocion_aplicacion pa ON p.id_promocion = pa.id_promocion
         WHERE p.activo = true 
           AND p.fecha_inicio <= NOW() 
           AND p.fecha_fin >= NOW()
           AND p.tipo IN ('porcentaje', 'x_por_y')  -- Solo promociones de productos
-        GROUP BY p.id_promocion, p.nombre, p.tipo, p.fecha_inicio, p.fecha_fin, p.activo,
-                 p.uso_maximo, p.veces_usado,
-                 pxy.cantidad_comprada, pxy.cantidad_pagada, 
-                 pp.porcentaje_descuento
         ORDER BY p.fecha_inicio DESC
       `;
       
@@ -269,7 +256,7 @@ class PromotionModel {
   static async getAll() {
     try {
       const query = `
-        SELECT 
+        SELECT DISTINCT
           p.id_promocion,
           p.nombre,
           p.tipo,
@@ -282,24 +269,11 @@ class PromotionModel {
           pp.porcentaje_descuento,
           -- Solo para promociones x por y
           pxy.cantidad_comprada,
-          pxy.cantidad_pagada,
-          -- Aplicaciones de la promoción
-          array_agg(
-            DISTINCT json_build_object(
-              'aplica_a', pa.aplica_a,
-              'id_categoria', pa.id_categoria,
-              'id_producto', pa.id_producto
-            )
-          ) FILTER (WHERE pa.id_aplicacion IS NOT NULL) as aplicaciones
+          pxy.cantidad_pagada
         FROM promociones p
         LEFT JOIN promo_x_por_y pxy ON p.id_promocion = pxy.id_promocion AND p.tipo = 'x_por_y'
         LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion AND p.tipo = 'porcentaje'
-        LEFT JOIN promocion_aplicacion pa ON p.id_promocion = pa.id_promocion
         WHERE p.tipo IN ('porcentaje', 'x_por_y')  -- Solo promociones de productos
-        GROUP BY p.id_promocion, p.nombre, p.tipo, p.fecha_inicio, p.fecha_fin, p.activo,
-                 p.uso_maximo, p.veces_usado,
-                 pxy.cantidad_comprada, pxy.cantidad_pagada, 
-                 pp.porcentaje_descuento
         ORDER BY p.fecha_inicio DESC
       `;
       
