@@ -1,4 +1,4 @@
-const pool = require('../config/database');
+const db = require('../config/db');
 
 class DiscountCodeModel {
   
@@ -25,7 +25,7 @@ class DiscountCodeModel {
         );
       `;
       
-      await pool.query(query);
+      await db.query(query);
       console.log('✅ Tabla codigos_descuento creada exitosamente');
       return true;
     } catch (error) {
@@ -58,7 +58,7 @@ class DiscountCodeModel {
         ORDER BY created_at DESC
       `;
       
-      const result = await pool.query(query);
+      const result = await db.query(query);
       return result.rows;
     } catch (error) {
       console.error('❌ Error obteniendo códigos de descuento:', error);
@@ -92,7 +92,7 @@ class DiscountCodeModel {
         ORDER BY created_at DESC
       `;
       
-      const result = await pool.query(query);
+      const result = await db.query(query);
       return result.rows;
     } catch (error) {
       console.error('❌ Error obteniendo códigos activos:', error);
@@ -127,7 +127,7 @@ class DiscountCodeModel {
           AND (monto_minimo <= $2)
       `;
       
-      const result = await pool.query(query, [codigo, montoCompra]);
+      const result = await db.query(query, [codigo, montoCompra]);
       
       if (result.rows.length === 0) {
         return {
@@ -172,7 +172,7 @@ class DiscountCodeModel {
         RETURNING *
       `;
       
-      const result = await pool.query(query, [codigo]);
+      const result = await db.query(query, [codigo]);
       return result.rows[0];
     } catch (error) {
       console.error('❌ Error usando código:', error);
@@ -210,7 +210,7 @@ class DiscountCodeModel {
         monto_minimo, usos_maximos, activo, fecha_inicio, fecha_fin
       ];
       
-      const result = await pool.query(query, values);
+      const result = await db.query(query, values);
       return result.rows[0];
     } catch (error) {
       console.error('❌ Error creando código de descuento:', error);
@@ -256,7 +256,7 @@ class DiscountCodeModel {
         monto_minimo, usos_maximos, activo, fecha_inicio, fecha_fin
       ];
       
-      const result = await pool.query(query, values);
+      const result = await db.query(query, values);
       return result.rows[0];
     } catch (error) {
       console.error('❌ Error actualizando código:', error);
@@ -270,7 +270,7 @@ class DiscountCodeModel {
   static async delete(id) {
     try {
       const query = 'DELETE FROM codigos_descuento WHERE id_codigo = $1 RETURNING *';
-      const result = await pool.query(query, [id]);
+      const result = await db.query(query, [id]);
       return result.rows[0];
     } catch (error) {
       console.error('❌ Error eliminando código:', error);
@@ -284,7 +284,7 @@ class DiscountCodeModel {
   static async getById(id) {
     try {
       const query = 'SELECT * FROM codigos_descuento WHERE id_codigo = $1';
-      const result = await pool.query(query, [id]);
+      const result = await db.query(query, [id]);
       return result.rows[0];
     } catch (error) {
       console.error('❌ Error obteniendo código por ID:', error);
