@@ -1578,51 +1578,36 @@ class ProductModel {
   // Buscar productos por nombre o descripción
   static async searchProducts(searchTerm, limit = 10, offset = 0) {
     try {
+      // Consulta simplificada para debug
       const query = `
         SELECT 
           p.id_producto,
           p.nombre,
           p.descripcion,
-          p.categoria,
+          p.id_categoria,
           p.marca,
-          p.precio_base,
           p.activo,
-          c.nombre as categoria_nombre,
           (
-            SELECT url_imagen
-            FROM imagenes_variantes iv
-            JOIN variantes_producto vp ON iv.id_variante = vp.id_variante
-            WHERE vp.id_producto = p.id_producto
-            AND iv.activo = true
-            ORDER BY iv.orden ASC
-            LIMIT 1
-          ) as imagen_principal
+            SELECT MIN(s.precio)
+            FROM stock s
+            JOIN variantes v ON s.id_variante = v.id_variante
+            WHERE v.id_producto = p.id_producto
+          ) as precio_desde
         FROM productos p
-        LEFT JOIN categorias c ON p.categoria = c.id_categoria
         WHERE p.activo = true
         AND (
           p.nombre ILIKE $1 
           OR p.descripcion ILIKE $1 
-          OR c.nombre ILIKE $1
           OR p.marca ILIKE $1
         )
-        ORDER BY 
-          CASE 
-            WHEN p.nombre ILIKE $2 THEN 1
-            WHEN p.descripcion ILIKE $2 THEN 2
-            WHEN c.nombre ILIKE $2 THEN 3
-            ELSE 4
-          END,
-          p.nombre ASC
-        LIMIT $3 OFFSET $4
+        ORDER BY p.nombre ASC
+        LIMIT $2 OFFSET $3
       `;
 
       const searchPattern = `%${searchTerm}%`;
-      const exactPattern = `${searchTerm}%`;
       
       const result = await db.query(query, [
         searchPattern, 
-        exactPattern, 
         limit, 
         offset
       ]);
