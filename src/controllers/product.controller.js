@@ -839,6 +839,62 @@ class ProductController {
       });
     }
   }
+
+  // Buscar productos
+  static async searchProducts(req, res) {
+    try {
+      const { q, limit = 10, offset = 0 } = req.query;
+
+      // Validar parámetros
+      if (!q || q.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          message: 'El parámetro de búsqueda "q" es requerido'
+        });
+      }
+
+      const searchTerm = q.trim();
+      const limitNum = parseInt(limit);
+      const offsetNum = parseInt(offset);
+
+      // Validar que limit y offset sean números válidos
+      if (isNaN(limitNum) || limitNum <= 0 || limitNum > 50) {
+        return res.status(400).json({
+          success: false,
+          message: 'El parámetro "limit" debe ser un número entre 1 y 50'
+        });
+      }
+
+      if (isNaN(offsetNum) || offsetNum < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'El parámetro "offset" debe ser un número mayor o igual a 0'
+        });
+      }
+
+      // Buscar productos usando el modelo
+      const products = await ProductModel.searchProducts(searchTerm, limitNum, offsetNum);
+
+      res.status(200).json({
+        success: true,
+        message: `Se encontraron ${products.length} productos`,
+        products: products,
+        query: searchTerm,
+        pagination: {
+          limit: limitNum,
+          offset: offsetNum,
+          total: products.length
+        }
+      });
+    } catch (error) {
+      console.error('Error en searchProducts:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor al buscar productos',
+        error: error.message
+      });
+    }
+  }
 }
 
 module.exports = ProductController;
