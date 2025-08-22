@@ -1618,6 +1618,33 @@ class ProductModel {
       throw error;
     }
   }
+
+  // Obtener todas las categorías disponibles
+  static async getCategories() {
+    try {
+      const query = `
+        SELECT 
+          c.id_categoria as id,
+          c.nombre as name,
+          LOWER(REPLACE(c.nombre, ' ', '-')) as slug,
+          c.descripcion as description,
+          c.activo,
+          COUNT(p.id_producto) as total_productos
+        FROM categorias c
+        LEFT JOIN productos p ON c.id_categoria = p.id_categoria AND p.activo = true
+        WHERE c.activo = true
+        GROUP BY c.id_categoria, c.nombre, c.descripcion, c.activo, c.orden
+        HAVING COUNT(p.id_producto) > 0
+        ORDER BY c.orden ASC, c.nombre ASC
+      `;
+      
+      const result = await db.query(query);
+      return result.rows;
+    } catch (error) {
+      console.error('Error en getCategories:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = ProductModel;
