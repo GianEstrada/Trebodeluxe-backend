@@ -47,6 +47,7 @@ try {
   const adminRoutes = require('./src/routes/admin.routes');
   const adminProductRoutes = require('./src/routes/admin.product.routes');
   const promotionRoutes = require('./src/routes/promotion.routes');
+  const discountCodeRoutes = require('./src/routes/discountCode.routes');
   const imageRoutes = require('./src/routes/image.routes');
   const sizeSystemRoutes = require('./src/routes/size-system.routes');
   const siteSettingsRoutes = require('./src/routes/site-settings.routes');
@@ -130,6 +131,7 @@ try {
   app.use('/api/products', require('./src/routes/product.routes'));
   app.use('/api/admin/products', adminProductRoutes);
   app.use('/api/promotions', promotionRoutes);
+  app.use('/api/discount-codes', discountCodeRoutes);
   app.use('/api/images', imageRoutes);
   app.use('/api/size-systems', sizeSystemRoutes);
   app.use('/api/site-settings', siteSettingsRoutes);
