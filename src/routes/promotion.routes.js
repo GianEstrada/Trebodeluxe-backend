@@ -13,6 +13,7 @@ router.get('/:id_promocion/products', PromotionController.getPromotionProducts);
 router.get('/validate/:codigo', PromotionController.validatePromotionCode);
 router.get('/applicable/:productId/:categoria', PromotionController.getApplicablePromotions);
 router.get('/product/:productId', PromotionController.getPromotionsForProduct); // Nueva ruta
+router.get('/producto/:productId', PromotionController.getPromotionsForProduct); // Alias para compatibilidad con frontend
 router.get('/debug/all', PromotionController.debugAllPromotions); // Debug ruta
 router.get('/debug/admin', PromotionController.debugAdminResponse); // Debug admin sin auth
 router.post('/debug/repair-ea', PromotionController.repairPromocionEa); // Repair promocion "ea"

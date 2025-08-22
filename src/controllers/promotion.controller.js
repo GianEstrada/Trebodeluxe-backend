@@ -57,7 +57,7 @@ class PromotionController {
       res.status(200).json({
         success: true,
         message: 'Promociones para producto obtenidas exitosamente',
-        data: promotions,
+        promotions: promotions, // Cambiado de 'data' a 'promotions' para coincidir con el frontend
         product_id: productId,
         categoria: categoria
       });
@@ -67,7 +67,8 @@ class PromotionController {
       res.status(500).json({
         success: false,
         message: 'Error obteniendo promociones del producto',
-        error: error.message
+        error: error.message,
+        promotions: [] // Retornar array vacío en caso de error
       });
     }
   }

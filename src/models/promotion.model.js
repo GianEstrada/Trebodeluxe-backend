@@ -40,54 +40,40 @@ class PromotionModel {
 
   /**
    * Obtener promociones específicas para un producto
-   * Implementa sistema de prioridades: producto específico > categoría > general
+   * Busca promociones por producto específico o categoría, incluyendo tipos porcentaje y x_por_y
    */
   static async getPromotionsForProduct(productId, categoria = null) {
     try {
       console.log(`🎯 Buscando promociones para producto ${productId}, categoría: ${categoria}`);
       
       const query = `
-        SELECT 
+        SELECT DISTINCT
           p.id_promocion,
           p.nombre,
           p.tipo,
           p.activo,
           p.fecha_inicio,
           p.fecha_fin,
-          COALESCE(pp.porcentaje_descuento, 0) as valor_descuento,
-          'porcentaje' as tipo_promocion,
-          CASE 
-            WHEN pa.aplica_a = 'todos' THEN 'todos'
-            WHEN pa.aplica_a = 'categoria' THEN 'categoria'
-            WHEN pa.aplica_a = 'producto' THEN 'producto_especifico'
-            ELSE 'todos'
-          END as aplicable_a,
-          pa.id_producto as producto_id,
-          pa.id_categoria,
-          CASE 
-            WHEN pa.id_categoria::text = '1' OR LOWER(pa.id_categoria::text) = 'playeras' THEN 'Playeras'
-            WHEN pa.id_categoria::text = '2' OR LOWER(pa.id_categoria::text) = 'hoodies' OR LOWER(pa.id_categoria::text) = 'hoodie' THEN 'Hoodies'
-            WHEN pa.id_categoria::text = '3' OR LOWER(pa.id_categoria::text) = 'pantalones' THEN 'Pantalones'
-            WHEN pa.id_categoria::text = '4' OR LOWER(pa.id_categoria::text) = 'zapatos' THEN 'Zapatos'
-            WHEN pa.id_categoria::text = '5' OR LOWER(pa.id_categoria::text) = 'accesorios' THEN 'Accesorios'
-            WHEN pa.id_categoria::text = '6' OR LOWER(pa.id_categoria::text) = 'goodies' THEN 'Goodies'
-            ELSE pa.id_categoria::text
-          END as categoria,
+          -- Datos para promociones de porcentaje
+          pp.porcentaje_descuento,
+          -- Datos para promociones x_por_y
+          pxy.cantidad_comprada,
+          pxy.cantidad_pagada,
+          -- Información de aplicación
+          pa.aplica_a,
+          pa.id_producto as producto_aplicacion_id,
+          pa.id_categoria as categoria_aplicacion_id,
           -- Prioridad: 1=Producto específico, 2=Categoría, 3=General
           CASE 
             WHEN pa.aplica_a = 'producto' AND pa.id_producto = $1 THEN 1
-            WHEN pa.aplica_a = 'categoria' AND (
-              pa.id_categoria::text = $2 OR 
-              LOWER(pa.id_categoria::text) = LOWER($2) OR
-              (LOWER($2) = 'hoodie' AND LOWER(pa.id_categoria::text) = 'hoodies') OR
-              (LOWER($2) = 'hoodies' AND LOWER(pa.id_categoria::text) = 'hoodie')
-            ) THEN 2
+            WHEN pa.aplica_a = 'categoria' AND pa.id_categoria::text = $2 THEN 2
             WHEN pa.aplica_a = 'todos' THEN 3
             ELSE 4
           END as prioridad
-        FROM promociones p
-        LEFT JOIN promocion_aplicacion pa ON p.id_promocion = pa.id_promocion
-        LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion
+        FROM promocion_aplicacion pa
+        INNER JOIN promociones p ON pa.id_promocion = p.id_promocion
+        LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion AND p.tipo = 'porcentaje'
+        LEFT JOIN promo_x_por_y pxy ON p.id_promocion = pxy.id_promocion AND p.tipo = 'x_por_y'
         WHERE p.activo = true
           AND p.fecha_inicio <= NOW() 
           AND p.fecha_fin >= NOW()
@@ -96,27 +82,28 @@ class PromotionModel {
             pa.aplica_a = 'todos' OR
             -- Promociones por producto específico
             (pa.aplica_a = 'producto' AND pa.id_producto = $1) OR
-            -- Promociones por categoría (múltiples variantes)
-            (pa.aplica_a = 'categoria' AND (
-              pa.id_categoria::text = $2 OR 
-              LOWER(pa.id_categoria::text) = LOWER($2) OR
-              (LOWER($2) = 'hoodie' AND LOWER(pa.id_categoria::text) = 'hoodies') OR
-              (LOWER($2) = 'hoodies' AND LOWER(pa.id_categoria::text) = 'hoodie') OR
-              (LOWER($2) = 'playeras' AND pa.id_categoria::text = '1') OR
-              (LOWER($2) = 'goodies' AND pa.id_categoria::text = '6')
-            ))
+            -- Promociones por categoría
+            (pa.aplica_a = 'categoria' AND pa.id_categoria::text = $2)
           )
         ORDER BY 
           prioridad ASC,  -- Producto específico primero, luego categoría, luego general
-          COALESCE(pp.porcentaje_descuento, 0) DESC
-        LIMIT 5
+          CASE 
+            WHEN p.tipo = 'porcentaje' THEN COALESCE(pp.porcentaje_descuento, 0)
+            ELSE 0
+          END DESC
+        LIMIT 10
       `;
       
       const result = await db.query(query, [productId, categoria]);
       
       console.log(`🎯 Promociones encontradas para producto ${productId}: ${result.rows.length}`);
       result.rows.forEach(promo => {
-        console.log(`  - ${promo.nombre}: ${promo.valor_descuento}% (${promo.aplicable_a}, prioridad: ${promo.prioridad})`);
+        const detalle = promo.tipo === 'porcentaje' 
+          ? `${promo.porcentaje_descuento}% descuento` 
+          : promo.tipo === 'x_por_y' 
+          ? `${promo.cantidad_comprada} por ${promo.cantidad_pagada}` 
+          : 'Sin detalles';
+        console.log(`  - ${promo.nombre}: ${detalle} (${promo.aplica_a}, prioridad: ${promo.prioridad})`);
       });
       
       return result.rows;

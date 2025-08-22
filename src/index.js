@@ -104,6 +104,7 @@ console.log('✅ Rutas shipping registradas');
 app.use('/api/products', productRoutes);
 console.log('✅ Rutas products registradas');
 app.use('/api/promotions', promotionRoutes);
+app.use('/api/promociones', promotionRoutes); // Alias para compatibilidad con frontend
 console.log('✅ Rutas promotions registradas');
 app.use('/api/images', imageRoutes);
 console.log('✅ Rutas images registradas');
