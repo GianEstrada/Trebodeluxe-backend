@@ -46,6 +46,27 @@ class PromotionModel {
     try {
       console.log(`🎯 Buscando promociones para producto ${productId}, categoría: ${categoria}`);
       
+      let categoriaId = categoria;
+      
+      // Si categoria no es numérica, buscar el ID por nombre
+      if (categoria && isNaN(categoria)) {
+        console.log(`🔍 Convirtiendo nombre de categoría "${categoria}" a ID...`);
+        const categoryQuery = `
+          SELECT id_categoria 
+          FROM categorias 
+          WHERE LOWER(nombre) = LOWER($1) AND activo = true
+        `;
+        const categoryResult = await db.query(categoryQuery, [categoria]);
+        
+        if (categoryResult.rows.length > 0) {
+          categoriaId = categoryResult.rows[0].id_categoria;
+          console.log(`✅ Categoría "${categoria}" convertida a ID: ${categoriaId}`);
+        } else {
+          console.log(`❌ No se encontró categoría con nombre: ${categoria}`);
+          categoriaId = null;
+        }
+      }
+      
       const query = `
         SELECT 
           p.id_promocion,
@@ -66,7 +87,7 @@ class PromotionModel {
           -- Prioridad: 1=Producto específico, 2=Categoría, 3=General
           CASE 
             WHEN pa.aplica_a = 'producto' AND pa.id_producto = $1 THEN 1
-            WHEN pa.aplica_a = 'categoria' AND pa.id_categoria::text = $2 THEN 2
+            WHEN pa.aplica_a = 'categoria' AND pa.id_categoria = $2 THEN 2
             WHEN pa.aplica_a = 'todos' THEN 3
             ELSE 4
           END as prioridad,
@@ -89,7 +110,7 @@ class PromotionModel {
             -- Promociones por producto específico
             (pa.aplica_a = 'producto' AND pa.id_producto = $1) OR
             -- Promociones por categoría
-            (pa.aplica_a = 'categoria' AND pa.id_categoria::text = $2)
+            (pa.aplica_a = 'categoria' AND pa.id_categoria = $2)
           )
         ORDER BY 
           prioridad ASC,  -- Producto específico primero, luego categoría, luego general
@@ -97,7 +118,7 @@ class PromotionModel {
         LIMIT 10
       `;
       
-      const result = await db.query(query, [productId, categoria]);
+      const result = await db.query(query, [productId, categoriaId]);
       
       console.log(`🎯 Promociones encontradas para producto ${productId}: ${result.rows.length}`);
       result.rows.forEach(promo => {
