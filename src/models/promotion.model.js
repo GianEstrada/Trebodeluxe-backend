@@ -47,7 +47,7 @@ class PromotionModel {
       console.log(`🎯 Buscando promociones para producto ${productId}, categoría: ${categoria}`);
       
       const query = `
-        SELECT DISTINCT
+        SELECT 
           p.id_promocion,
           p.nombre,
           p.tipo,
@@ -69,7 +69,12 @@ class PromotionModel {
             WHEN pa.aplica_a = 'categoria' AND pa.id_categoria::text = $2 THEN 2
             WHEN pa.aplica_a = 'todos' THEN 3
             ELSE 4
-          END as prioridad
+          END as prioridad,
+          -- Columna para ordenamiento por descuento
+          CASE 
+            WHEN p.tipo = 'porcentaje' THEN COALESCE(pp.porcentaje_descuento, 0)
+            ELSE 0
+          END as orden_descuento
         FROM promocion_aplicacion pa
         INNER JOIN promociones p ON pa.id_promocion = p.id_promocion
         LEFT JOIN promo_porcentaje pp ON p.id_promocion = pp.id_promocion AND p.tipo = 'porcentaje'
@@ -77,6 +82,7 @@ class PromotionModel {
         WHERE p.activo = true
           AND p.fecha_inicio <= NOW() 
           AND p.fecha_fin >= NOW()
+          AND p.tipo IN ('porcentaje', 'x_por_y')  -- Solo promociones de productos
           AND (
             -- Promociones generales (todos)
             pa.aplica_a = 'todos' OR
@@ -87,10 +93,7 @@ class PromotionModel {
           )
         ORDER BY 
           prioridad ASC,  -- Producto específico primero, luego categoría, luego general
-          CASE 
-            WHEN p.tipo = 'porcentaje' THEN COALESCE(pp.porcentaje_descuento, 0)
-            ELSE 0
-          END DESC
+          orden_descuento DESC
         LIMIT 10
       `;
       
