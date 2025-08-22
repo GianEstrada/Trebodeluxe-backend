@@ -23,7 +23,7 @@ async function setupSiteSettings() {
     await db.pool.query(`
       CREATE TABLE IF NOT EXISTS imagenes_principales (
         id_imagen SERIAL PRIMARY KEY,
-        nombre VARCHAR(100) NOT NULL,
+        nombre VARCHAR(100) UNIQUE NOT NULL,
         url VARCHAR(500) NOT NULL,
         public_id VARCHAR(200),
         tipo VARCHAR(50) NOT NULL CHECK (tipo IN ('hero_banner', 'promocion_banner', 'categoria_destacada')),
@@ -80,12 +80,16 @@ async function setupSiteSettings() {
     
     // Insertar imágenes por defecto
     await db.pool.query(`
-      INSERT INTO imagenes_index (nombre, url, seccion, descripcion, estado) VALUES
-      ('Hero Principal', 'https://res.cloudinary.com/demo/image/upload/sample.jpg', 'principal', 'Imagen principal del sitio web', 'activo'),
-      ('Banner Promoción Verano', 'https://res.cloudinary.com/demo/image/upload/sample2.jpg', 'principal', 'Banner promocional de ofertas de verano', 'activo'),
-      ('Categoría Destacada 1', 'https://res.cloudinary.com/demo/image/upload/sample3.jpg', 'banner', 'Banner para categoría destacada', 'activo'),
-      ('Categoría Destacada 2', 'https://res.cloudinary.com/demo/image/upload/sample4.jpg', 'banner', 'Banner para categoría destacada', 'activo')
-      ON CONFLICT (nombre) DO NOTHING;
+      INSERT INTO imagenes_principales (nombre, url, tipo, titulo, subtitulo, enlace, orden) VALUES
+      ('Hero Principal', 'https://res.cloudinary.com/demo/image/upload/sample.jpg', 'hero_banner', 'Bienvenido a Treboluxe', 'Descubre nuestra nueva colección', '/', 1),
+      ('Banner Promoción Verano', 'https://res.cloudinary.com/demo/image/upload/sample2.jpg', 'promocion_banner', 'Ofertas de Verano', '20% de descuento en segunda prenda', '/catalogo', 2),
+      ('Categoría Destacada 1', 'https://res.cloudinary.com/demo/image/upload/sample3.jpg', 'categoria_destacada', 'Playeras', 'Nueva colección de playeras', '/catalogo?categoria=playeras', 3),
+      ('Categoría Destacada 2', 'https://res.cloudinary.com/demo/image/upload/sample4.jpg', 'categoria_destacada', 'Hoodies', 'Perfectos para el clima frío', '/catalogo?categoria=hoodies', 4)
+      ON CONFLICT (nombre) DO UPDATE SET
+        url = EXCLUDED.url,
+        titulo = EXCLUDED.titulo,
+        subtitulo = EXCLUDED.subtitulo,
+        enlace = EXCLUDED.enlace;
     `);
     
     console.log('✅ Configuraciones del sitio configuradas correctamente');
