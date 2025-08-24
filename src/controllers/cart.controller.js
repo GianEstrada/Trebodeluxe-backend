@@ -1,4 +1,5 @@
 const CartModel = require('../models/cart.model');
+const { convertPrices } = require('../utils/priceUtils');
 
 class CartController {
     // Obtener el carrito del usuario o de la sesión
@@ -24,12 +25,27 @@ class CartController {
             
             const cartSummary = await CartModel.getCartSummary(cartId);
             
+            // Convertir precios a números en el resumen del carrito
+            const processedCart = {
+                id: cartId,
+                ...cartSummary
+            };
+            
+            // Si hay items en el carrito, convertir sus precios
+            if (processedCart.items) {
+                processedCart.items = processedCart.items.map(item => 
+                    convertPrices(item, ['precio', 'precio_total_item', 'precio_unitario'])
+                );
+            }
+            
+            // Convertir totales
+            if (processedCart.totalOriginal) processedCart.totalOriginal = parseFloat(processedCart.totalOriginal);
+            if (processedCart.totalFinal) processedCart.totalFinal = parseFloat(processedCart.totalFinal);
+            if (processedCart.totalDescuento) processedCart.totalDescuento = parseFloat(processedCart.totalDescuento);
+            
             res.json({
                 success: true,
-                cart: {
-                    id: cartId,
-                    ...cartSummary
-                },
+                cart: processedCart,
                 sessionToken: req.headers['x-session-token']
             });
         } catch (error) {

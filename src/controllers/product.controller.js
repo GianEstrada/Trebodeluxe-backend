@@ -2,6 +2,7 @@
 
 const ProductModel = require('../models/product.model');
 const { pool } = require('../config/db');
+const { convertPricesArray, convertPrices } = require('../utils/priceUtils');
 
 class ProductController {
   // Obtener todos los productos
@@ -9,10 +10,13 @@ class ProductController {
     try {
       const products = await ProductModel.getAll();
       
+      // Convertir precios a números
+      const productsWithNumbers = convertPricesArray(products, ['precio_minimo', 'precio_maximo']);
+      
       res.status(200).json({
         success: true,
         message: 'Productos obtenidos exitosamente',
-        products: products
+        products: productsWithNumbers
       });
     } catch (error) {
       console.error('Error en getAllProducts:', error);
@@ -29,10 +33,13 @@ class ProductController {
     try {
       const products = await ProductModel.getAllForAdmin();
       
+      // Convertir precios a números
+      const productsWithNumbers = convertPricesArray(products, ['precio_minimo', 'precio_maximo', 'precio_base']);
+      
       res.status(200).json({
         success: true,
         message: 'Productos para admin obtenidos exitosamente',
-        products: products
+        products: productsWithNumbers
       });
     } catch (error) {
       console.error('Error en getAllProductsForAdmin:', error);
@@ -66,10 +73,22 @@ class ProductController {
         });
       }
 
+      // Convertir precios a números si el producto tiene variantes
+      let processedProduct = product;
+      if (product && product.variantes) {
+        processedProduct = {
+          ...product,
+          variantes: convertPricesArray(product.variantes, ['precio', 'precio_minimo', 'precio_maximo', 'precio_base'])
+        };
+      } else {
+        // Si es un producto simple, aplicar conversión directa
+        processedProduct = convertPrices(product, ['precio_minimo', 'precio_maximo', 'precio_base']);
+      }
+
       res.status(200).json({
         success: true,
         message: 'Producto obtenido exitosamente',
-        product: product
+        product: processedProduct
       });
     } catch (error) {
       console.error('Error en getProductById:', error);
@@ -87,10 +106,13 @@ class ProductController {
       const limit = parseInt(req.query.limit) || 6;
       const products = await ProductModel.getRecent(limit);
       
+      // Convertir precios a números
+      const productsWithNumbers = convertPricesArray(products, ['precio_minimo', 'precio_maximo']);
+      
       res.status(200).json({
         success: true,
         message: 'Productos recientes obtenidos exitosamente',
-        products: products
+        products: productsWithNumbers
       });
     } catch (error) {
       console.error('Error en getRecentProducts:', error);
@@ -280,14 +302,17 @@ class ProductController {
 
       const products = await ProductModel.getByCategory(categoria, limit, offset);
 
+      // Convertir precios a números
+      const productsWithNumbers = convertPricesArray(products, ['precio_minimo', 'precio_maximo']);
+
       res.status(200).json({
         success: true,
         message: `Productos de la categoría "${categoria}" obtenidos exitosamente`,
-        products: products,
+        products: productsWithNumbers,
         pagination: {
           limit,
           offset,
-          total: products.length
+          total: productsWithNumbers.length
         }
       });
     } catch (error) {
@@ -357,15 +382,18 @@ class ProductController {
 
       const products = await ProductModel.search(q.trim(), limit, offset);
 
+      // Convertir precios a números
+      const productsWithNumbers = convertPricesArray(products, ['precio_minimo', 'precio_maximo']);
+
       res.status(200).json({
         success: true,
         message: `Resultados de búsqueda para "${q}"`,
-        products: products,
+        products: productsWithNumbers,
         search_term: q.trim(),
         pagination: {
           limit,
           offset,
-          total: products.length
+          total: productsWithNumbers.length
         }
       });
     } catch (error) {
@@ -399,10 +427,13 @@ class ProductController {
         );
       }
 
+      // Convertir precios a números
+      const productsWithNumbers = convertPricesArray(products, ['precio_minimo', 'precio_maximo']);
+
       res.status(200).json({
         success: true,
-        products: products,
-        total: products.length
+        products: productsWithNumbers,
+        total: productsWithNumbers.length
       });
     } catch (error) {
       console.error('Error al obtener productos:', error);
@@ -433,6 +464,11 @@ class ProductController {
         sortOrder
       );
 
+      // Convertir precios a números en los productos del catálogo
+      if (result && result.products) {
+        result.products = convertPricesArray(result.products, ['precio_minimo', 'precio_maximo']);
+      }
+
       res.json({
         success: true,
         message: 'Catálogo obtenido exitosamente',
@@ -456,10 +492,13 @@ class ProductController {
 
       const products = await ProductModel.getFeatured(parseInt(limit));
 
+      // Convertir precios a números
+      const productsWithNumbers = convertPricesArray(products, ['precio_minimo', 'precio_maximo']);
+
       res.json({
         success: true,
         message: 'Productos destacados obtenidos exitosamente',
-        products: products
+        products: productsWithNumbers
       });
 
     } catch (error) {
