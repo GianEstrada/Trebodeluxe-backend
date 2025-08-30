@@ -32,6 +32,7 @@ const siteSettingsRoutes = require('./routes/site-settings.routes');
 const mainImagesRoutes = require('./routes/main-images.routes');
 const publicIndexImagesRoutes = require('./routes/public-index-images.routes');
 const categoriasRoutes = require('./routes/categorias.routes');
+const skydropxRoutes = require('./routes/skydropx.routes');
 
 // Importar middlewares
 const { notFound, errorHandler } = require('./middlewares/error.middleware');
@@ -126,6 +127,8 @@ app.use('/api/public', publicIndexImagesRoutes);
 console.log('✅ Rutas public index images registradas');
 app.use('/api/categorias', categoriasRoutes);
 console.log('✅ Rutas categorias registradas');
+app.use('/api/skydropx', skydropxRoutes);
+console.log('✅ Rutas skydropx registradas');
 console.log('✅ Rutas site-settings registradas');
 console.log('Importando y registrando rutas de sizes...');
 try {
