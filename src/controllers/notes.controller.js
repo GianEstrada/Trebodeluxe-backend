@@ -405,7 +405,7 @@ class NotesController {
       const statsQuery = `
         SELECT 
           COUNT(*) as total_notas,
-          COUNT(CASE WHEN activo = true THEN 1 END) as notas_activas,
+          COUNT(CASE WHEN activa = true THEN 1 END) as notas_activas,
           COUNT(CASE WHEN prioridad = 'urgente' THEN 1 END) as urgentes,
           COUNT(CASE WHEN prioridad = 'alta' THEN 1 END) as altas,
           COUNT(CASE WHEN prioridad = 'normal' THEN 1 END) as normales,
