@@ -45,6 +45,16 @@ router.get('/admin', verifyToken, requireAdmin, async (req, res) => {
   try {
     const { search } = req.query;
     
+    // Primero verificar qué columnas existen
+    const columnsCheck = await database.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'categorias' 
+        AND column_name IN ('alto_cm', 'largo_cm', 'ancho_cm', 'peso_kg', 'nivel_compresion')
+    `);
+    
+    const existingColumns = columnsCheck.rows.map(row => row.column_name);
+    
     let query = `
       SELECT 
         id_categoria,
@@ -54,11 +64,11 @@ router.get('/admin', verifyToken, requireAdmin, async (req, res) => {
         orden,
         fecha_creacion,
         fecha_actualizacion,
-        alto_cm,
-        largo_cm,
-        ancho_cm,
-        peso_kg,
-        nivel_compresion,
+        ${existingColumns.includes('alto_cm') ? 'alto_cm' : '0 as alto_cm'},
+        ${existingColumns.includes('largo_cm') ? 'largo_cm' : '0 as largo_cm'},
+        ${existingColumns.includes('ancho_cm') ? 'ancho_cm' : '0 as ancho_cm'},
+        ${existingColumns.includes('peso_kg') ? 'peso_kg' : '0 as peso_kg'},
+        ${existingColumns.includes('nivel_compresion') ? 'nivel_compresion' : '\'baja\' as nivel_compresion'},
         (SELECT COUNT(*) FROM productos WHERE id_categoria = categorias.id_categoria) as productos_count
       FROM categorias 
     `;
@@ -76,13 +86,21 @@ router.get('/admin', verifyToken, requireAdmin, async (req, res) => {
     
     res.json({
       success: true,
-      categorias: result.rows
+      categorias: result.rows,
+      skydropx_columns_status: {
+        alto_cm: existingColumns.includes('alto_cm'),
+        largo_cm: existingColumns.includes('largo_cm'),
+        ancho_cm: existingColumns.includes('ancho_cm'),
+        peso_kg: existingColumns.includes('peso_kg'),
+        nivel_compresion: existingColumns.includes('nivel_compresion')
+      }
     });
   } catch (error) {
     console.error('Error al obtener categorías para admin:', error);
     res.status(500).json({
       success: false,
-      message: 'Error interno del servidor'
+      message: 'Error interno del servidor',
+      error: error.message
     });
   }
 });
@@ -438,6 +456,142 @@ router.put('/admin/skydropx-config', verifyToken, requireAdmin, async (req, res)
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor'
+    });
+  }
+});
+
+// Endpoint para aplicar migración SkyDropX
+router.post('/admin/apply-skydropx-migration', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    console.log('🚀 Iniciando migración SkyDropX...');
+
+    // Verificar columnas existentes
+    const columnsCheck = await database.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'categorias' 
+        AND column_name IN ('alto_cm', 'largo_cm', 'ancho_cm', 'peso_kg', 'nivel_compresion')
+    `);
+    
+    const existingColumns = columnsCheck.rows.map(row => row.column_name);
+    const neededColumns = ['alto_cm', 'largo_cm', 'ancho_cm', 'peso_kg', 'nivel_compresion'];
+    const missingColumns = neededColumns.filter(col => !existingColumns.includes(col));
+
+    if (missingColumns.length === 0) {
+      return res.json({
+        success: true,
+        message: 'Todas las columnas SkyDropX ya existen',
+        existing_columns: existingColumns
+      });
+    }
+
+    console.log('📋 Columnas faltantes:', missingColumns);
+
+    // Agregar columnas faltantes
+    for (const column of missingColumns) {
+      let alterQuery = '';
+      switch (column) {
+        case 'alto_cm':
+        case 'largo_cm':
+        case 'ancho_cm':
+          alterQuery = `ALTER TABLE categorias ADD COLUMN ${column} DECIMAL(10,2) DEFAULT 0.00`;
+          break;
+        case 'peso_kg':
+          alterQuery = `ALTER TABLE categorias ADD COLUMN ${column} DECIMAL(10,3) DEFAULT 0.000`;
+          break;
+        case 'nivel_compresion':
+          alterQuery = `ALTER TABLE categorias ADD COLUMN ${column} VARCHAR(20) DEFAULT 'baja' CHECK (${column} IN ('baja', 'media', 'alta'))`;
+          break;
+      }
+      
+      if (alterQuery) {
+        await database.query(alterQuery);
+        console.log(`✅ Columna ${column} agregada`);
+      }
+    }
+
+    // Crear función calcular_dimensiones_envio si no existe
+    await database.query(`
+      CREATE OR REPLACE FUNCTION calcular_dimensiones_envio(categoria_id INT)
+      RETURNS JSON AS $$
+      DECLARE
+        categoria_data RECORD;
+        config_data RECORD;
+        result JSON;
+      BEGIN
+        -- Obtener datos de la categoría
+        SELECT alto_cm, largo_cm, ancho_cm, peso_kg, nivel_compresion 
+        INTO categoria_data
+        FROM categorias 
+        WHERE id_categoria = categoria_id;
+        
+        IF NOT FOUND THEN
+          RETURN json_build_object('error', 'Categoría no encontrada');
+        END IF;
+        
+        -- Obtener configuraciones de empaque
+        SELECT 
+          COALESCE(
+            (SELECT valor::DECIMAL FROM configuraciones_sitio WHERE clave = 'empaque_peso_extra_kg'), 
+            0.1
+          ) as peso_extra,
+          COALESCE(
+            (SELECT valor::DECIMAL FROM configuraciones_sitio WHERE clave = 'empaque_margen_cm'), 
+            2.0
+          ) as margen_cm
+        INTO config_data;
+        
+        -- Calcular dimensiones finales
+        result := json_build_object(
+          'alto_final', categoria_data.alto_cm + config_data.margen_cm,
+          'largo_final', categoria_data.largo_cm + config_data.margen_cm,
+          'ancho_final', categoria_data.ancho_cm + config_data.margen_cm,
+          'peso_final', categoria_data.peso_kg + config_data.peso_extra,
+          'nivel_compresion', categoria_data.nivel_compresion,
+          'peso_extra_kg', config_data.peso_extra,
+          'margen_empaque_cm', config_data.margen_cm
+        );
+        
+        RETURN result;
+      END;
+      $$ LANGUAGE plpgsql;
+    `);
+    
+    console.log('✅ Función calcular_dimensiones_envio creada');
+
+    // Insertar configuraciones básicas de SkyDropX si no existen
+    const configs = [
+      ['skydropx_api_key', '', 'text', 'Clave API de SkyDropX'],
+      ['skydropx_webhook_url', 'https://trebodeluxe-backend.onrender.com/api/skydropx/webhook', 'text', 'URL del webhook de SkyDropX'],
+      ['skydropx_enabled', 'false', 'boolean', 'Habilitar integración con SkyDropX'],
+      ['empaque_peso_extra_kg', '0.1', 'number', 'Peso adicional del empaque en kg'],
+      ['empaque_margen_cm', '2.0', 'number', 'Margen adicional del empaque en cm']
+    ];
+
+    for (const [clave, valor, tipo, descripcion] of configs) {
+      await database.query(`
+        INSERT INTO configuraciones_sitio (clave, valor, tipo, descripcion) 
+        VALUES ($1, $2, $3, $4) 
+        ON CONFLICT (clave) DO NOTHING
+      `, [clave, valor, tipo, descripcion]);
+    }
+
+    console.log('✅ Configuraciones SkyDropX insertadas');
+
+    res.json({
+      success: true,
+      message: 'Migración SkyDropX aplicada exitosamente',
+      columns_added: missingColumns,
+      function_created: true,
+      configs_inserted: true
+    });
+
+  } catch (error) {
+    console.error('❌ Error aplicando migración SkyDropX:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error aplicando migración SkyDropX',
+      error: error.message
     });
   }
 });

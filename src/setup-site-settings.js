@@ -78,7 +78,8 @@ async function setupSiteSettings() {
         descripcion = EXCLUDED.descripcion;
     `);
     
-    // Insertar imágenes por defecto
+    // Insertar imágenes por defecto - COMENTADO TEMPORALMENTE HASTA VERIFICAR ESTRUCTURA
+    /*
     await db.pool.query(`
       INSERT INTO imagenes_principales (nombre, url, tipo, titulo, subtitulo, enlace, orden) VALUES
       ('Hero Principal', 'https://res.cloudinary.com/demo/image/upload/sample.jpg', 'hero_banner', 'Bienvenido a Treboluxe', 'Descubre nuestra nueva colección', '/', 1),
@@ -91,6 +92,7 @@ async function setupSiteSettings() {
         subtitulo = EXCLUDED.subtitulo,
         enlace = EXCLUDED.enlace;
     `);
+    */
     
     console.log('✅ Configuraciones del sitio configuradas correctamente');
     return true;
