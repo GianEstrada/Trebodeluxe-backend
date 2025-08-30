@@ -113,6 +113,9 @@ router.get('/admin-temp', async (req, res) => {
 // Obtener todas las categorías para admin (incluye inactivas)
 router.get('/admin', verifyToken, requireAdmin, async (req, res) => {
   try {
+    console.log('🔍 [ADMIN] Endpoint admin con autenticación iniciado...');
+    console.log('🔍 [ADMIN] Usuario autenticado:', req.user);
+    
     const { search } = req.query;
     
     // Primero verificar qué columnas existen
