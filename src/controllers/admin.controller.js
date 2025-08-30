@@ -237,6 +237,21 @@ const createProductWithVariant = async (req, res) => {
       if (variante.tallas && variante.tallas.length > 0) {
         for (const talla of variante.tallas) {
           if (talla.cantidad > 0) {
+            // Determinar el precio: usar precio por talla si existe, sino precio de variante
+            let precio = null;
+            if (talla.precio !== undefined && talla.precio !== null && talla.precio !== '') {
+              precio = parseFloat(talla.precio);
+            } else if (variante.precio !== undefined && variante.precio !== null && variante.precio !== '') {
+              precio = parseFloat(variante.precio);
+            }
+            
+            // Validar que el precio no sea null
+            if (precio === null || isNaN(precio)) {
+              throw new Error(`Precio requerido para la talla ${talla.nombre || talla.id_talla}`);
+            }
+            
+            console.log(`💰 Insertando stock - Talla: ${talla.id_talla}, Cantidad: ${talla.cantidad}, Precio: ${precio}`);
+            
             const stockQuery = `
               INSERT INTO stock (id_producto, id_variante, id_talla, cantidad, precio)
               VALUES ($1, $2, $3, $4, $5);
@@ -247,7 +262,7 @@ const createProductWithVariant = async (req, res) => {
               id_variante,
               talla.id_talla,
               talla.cantidad,
-              variante.precio || null
+              precio
             ]);
           }
         }
