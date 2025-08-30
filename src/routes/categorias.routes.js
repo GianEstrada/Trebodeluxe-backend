@@ -40,6 +40,76 @@ router.get('/', async (req, res) => {
   }
 });
 
+// TEMP: Endpoint de categorías admin SIN autenticación para diagnóstico
+router.get('/admin-temp', async (req, res) => {
+  try {
+    console.log('🔍 [TEMP] Endpoint admin temporal sin auth...');
+    
+    const { search } = req.query;
+    
+    // Verificar columnas existentes
+    const columnsCheck = await database.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'categorias' 
+        AND column_name IN ('alto_cm', 'largo_cm', 'ancho_cm', 'peso_kg', 'nivel_compresion')
+    `);
+    
+    const existingColumns = columnsCheck.rows.map(row => row.column_name);
+    
+    let query = `
+      SELECT 
+        id_categoria,
+        nombre,
+        descripcion,
+        activo,
+        orden,
+        fecha_creacion,
+        fecha_actualizacion,
+        ${existingColumns.includes('alto_cm') ? 'alto_cm' : '0 as alto_cm'},
+        ${existingColumns.includes('largo_cm') ? 'largo_cm' : '0 as largo_cm'},
+        ${existingColumns.includes('ancho_cm') ? 'ancho_cm' : '0 as ancho_cm'},
+        ${existingColumns.includes('peso_kg') ? 'peso_kg' : '0 as peso_kg'},
+        ${existingColumns.includes('nivel_compresion') ? 'nivel_compresion' : '\'baja\' as nivel_compresion'},
+        (SELECT COUNT(*) FROM productos WHERE id_categoria = categorias.id_categoria) as productos_count
+      FROM categorias 
+    `;
+    
+    let queryParams = [];
+    
+    if (search) {
+      query += ` WHERE LOWER(nombre) LIKE LOWER($1) OR LOWER(descripcion) LIKE LOWER($1)`;
+      queryParams.push(`%${search}%`);
+    }
+    
+    query += ` ORDER BY orden ASC, nombre ASC`;
+    
+    const result = await database.query(query, queryParams);
+    
+    console.log('🔍 [TEMP] Categorías recuperadas:', result.rows.length);
+    
+    res.json({
+      success: true,
+      categorias: result.rows,
+      skydropx_columns_status: {
+        alto_cm: existingColumns.includes('alto_cm'),
+        largo_cm: existingColumns.includes('largo_cm'),
+        ancho_cm: existingColumns.includes('ancho_cm'),
+        peso_kg: existingColumns.includes('peso_kg'),
+        nivel_compresion: existingColumns.includes('nivel_compresion')
+      },
+      temp_endpoint: true
+    });
+  } catch (error) {
+    console.error('Error en endpoint temporal:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
 // Obtener todas las categorías para admin (incluye inactivas)
 router.get('/admin', verifyToken, requireAdmin, async (req, res) => {
   try {
