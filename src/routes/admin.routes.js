@@ -27,8 +27,8 @@ router.get('/variants/:id', adminController.getVariantById);
 router.put('/variants/:id', adminController.updateVariant);
 router.delete('/variants/:id', adminController.deleteVariant);
 
-// Ruta para crear variantes en productos existentes
-router.post('/products/variants', adminController.createVariantForProduct);
+// NOTA: La ruta POST /products/variants se movió a admin.product.routes.js 
+// para usar el controlador actualizado que maneja precio_unico correctamente
 
 // Ruta para subir imágenes
 router.post('/upload-image', 

@@ -296,6 +296,8 @@ const createVariantForProduct = async (req, res) => {
   try {
     await client.query('BEGIN');
     
+    console.log('🔍 [ADMIN.CONTROLLER] Datos completos recibidos:', JSON.stringify(req.body, null, 2));
+    
     const { 
       id_producto,
       nombre,
@@ -306,6 +308,14 @@ const createVariantForProduct = async (req, res) => {
       imagenes,
       tallas 
     } = req.body;
+
+    console.log('🔍 [ADMIN.CONTROLLER] Variables extraídas:', {
+      id_producto,
+      nombre,
+      precio,
+      precio_original,
+      tallas: tallas?.map(t => ({ id_talla: t.id_talla, cantidad: t.cantidad, precio: t.precio }))
+    });
 
     // Crear variante (sin precios, van en stock)
     const variantQuery = `
@@ -358,6 +368,18 @@ const createVariantForProduct = async (req, res) => {
     if (tallas && tallas.length > 0) {
       for (const talla of tallas) {
         if (talla.cantidad > 0) {
+          // Asegurar que el precio nunca sea null
+          let precioFinal;
+          if (talla.precio && talla.precio > 0) {
+            precioFinal = talla.precio;
+          } else if (precio && precio > 0) {
+            precioFinal = precio;
+          } else {
+            precioFinal = 1000; // Fallback seguro
+          }
+          
+          console.log(`📊 [ADMIN.CONTROLLER] Insertando stock - Talla: ${talla.id_talla}, Cantidad: ${talla.cantidad}, Precio: ${precioFinal}`);
+          
           const stockQuery = `
             INSERT INTO stock (id_producto, id_variante, id_talla, cantidad, precio)
             VALUES ($1, $2, $3, $4, $5);
@@ -368,7 +390,7 @@ const createVariantForProduct = async (req, res) => {
             id_variante,
             talla.id_talla,
             talla.cantidad,
-            precio || null
+            precioFinal
           ]);
         }
       }
