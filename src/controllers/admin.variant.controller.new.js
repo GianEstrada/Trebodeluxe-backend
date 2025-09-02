@@ -282,11 +282,11 @@ const AdminVariantController = {
         for (const talla of tallas) {
           let precio;
           if (precio_unico) {
-            // Para precio único, usar precio_referencia, sino usar 1000 como fallback
-            precio = precio_referencia && precio_referencia > 0 ? precio_referencia : 1000;
+            // Para precio único, usar precio_referencia, sino usar 0 como fallback
+            precio = precio_referencia && precio_referencia > 0 ? precio_referencia : 0;
           } else {
-            // Para precios individuales, usar precio de talla, sino usar 1000 como fallback
-            precio = talla.precio && talla.precio > 0 ? talla.precio : 1000;
+            // Para precios individuales, usar precio de talla, sino usar 0 como fallback
+            precio = talla.precio && talla.precio > 0 ? talla.precio : 0;
           }
           
           console.log(`📊 [BACKEND] Insertando stock - Talla: ${talla.id_talla}, Cantidad: ${talla.cantidad || 0}, Precio: ${precio}`);
