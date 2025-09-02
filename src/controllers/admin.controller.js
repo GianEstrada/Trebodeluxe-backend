@@ -510,7 +510,7 @@ const getProductById = async (req, res) => {
         p.id_producto,
         p.nombre,
         p.descripcion,
-        p.categoria,
+        c.nombre as categoria,
         p.marca,
         p.id_sistema_talla,
         st.nombre as sistema_talla,
@@ -525,6 +525,7 @@ const getProductById = async (req, res) => {
           )
         ) as variantes
       FROM productos p
+      LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
       LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
       LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
       LEFT JOIN (
@@ -561,7 +562,7 @@ const getProductById = async (req, res) => {
         GROUP BY s.id_variante
       ) tallas ON v.id_variante = tallas.id_variante
       WHERE p.id_producto = $1 AND p.activo = true
-      GROUP BY p.id_producto, p.nombre, p.descripcion, p.categoria, p.marca, 
+      GROUP BY p.id_producto, p.nombre, p.descripcion, c.nombre, p.marca, 
                p.id_sistema_talla, st.nombre;
     `;
     
@@ -714,7 +715,7 @@ const getVariantById = async (req, res) => {
         v.id_producto,
         p.nombre as nombre_producto,
         p.descripcion as descripcion_producto,
-        p.categoria,
+        c.nombre as categoria,
         p.marca,
         p.id_sistema_talla,
         st.nombre as sistema_talla,
@@ -726,6 +727,7 @@ const getVariantById = async (req, res) => {
         precios_info.precio_unico
       FROM variantes v
       INNER JOIN productos p ON v.id_producto = p.id_producto
+      LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
       LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
       LEFT JOIN (
         SELECT 
