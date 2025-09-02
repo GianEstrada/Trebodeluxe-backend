@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const AdminProductController = require('../controllers/admin.product.controller');
+const AdminVariantController = require('../controllers/admin.variant.controller.new'); // Usar el controlador nuevo
 const authMiddleware = require('../middlewares/auth.middleware');
 const { upload, handleMulterError } = require('../middlewares/upload.middleware');
 
@@ -66,21 +67,21 @@ router.post('/variant/:id_variante/image',
 // @route   POST /api/admin/products/variants
 // @desc    Crear nueva variante
 // @access  Private (Admin only)
-router.post('/variants', AdminProductController.createVariant);
+router.post('/variants', AdminVariantController.createVariant);
 
 // @route   GET /api/admin/products/variants/:id
 // @desc    Obtener variante por ID
 // @access  Private (Admin only)
-router.get('/variants/:id', AdminProductController.getVariant);
+router.get('/variants/:id', AdminVariantController.getVariant);
 
 // @route   PUT /api/admin/products/variants/:id
 // @desc    Actualizar variante
 // @access  Private (Admin only)
-router.put('/variants/:id', AdminProductController.updateVariant);
+router.put('/variants/:id', AdminVariantController.updateVariant);
 
 // @route   DELETE /api/admin/products/variants/:id
 // @desc    Eliminar variante (incluyendo imágenes de Cloudinary)
 // @access  Private (Admin only)
-router.delete('/variants/:id', AdminProductController.deleteVariant);
+router.delete('/variants/:id', AdminVariantController.deleteVariant);
 
 module.exports = router;
