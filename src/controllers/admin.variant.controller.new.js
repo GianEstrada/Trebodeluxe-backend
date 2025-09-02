@@ -187,7 +187,7 @@ const AdminVariantController = {
 
   // Crear nueva variante
   async createVariant(req, res) {
-    const client = await database.connect();
+    const client = await database.pool.connect();
     
     try {
       await client.query('BEGIN');
@@ -336,7 +336,7 @@ const AdminVariantController = {
 
   // Actualizar variante existente
   async updateVariant(req, res) {
-    const client = await database.connect();
+    const client = await database.pool.connect();
     
     try {
       await client.query('BEGIN');
@@ -489,7 +489,7 @@ const AdminVariantController = {
 
   // Eliminar variante
   async deleteVariant(req, res) {
-    const client = await database.connect();
+    const client = await database.pool.connect();
     
     try {
       await client.query('BEGIN');
