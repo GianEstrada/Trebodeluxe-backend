@@ -209,6 +209,14 @@ const AdminVariantController = {
         precio_referencia
       } = req.body;
       
+      console.log('🔍 [BACKEND DEBUG] Datos recibidos:', {
+        id_producto,
+        nombre_variante,
+        precio_unico,
+        precio_referencia,
+        tallas: tallas?.map(t => ({ id_talla: t.id_talla, cantidad: t.cantidad, precio: t.precio }))
+      });
+      
       // Validaciones
       if (!nombre_variante || (!precio_unico && (!tallas || tallas.length === 0))) {
         return res.status(400).json({
@@ -272,7 +280,16 @@ const AdminVariantController = {
       // Crear stock con precios
       if (tallas && tallas.length > 0) {
         for (const talla of tallas) {
-          const precio = precio_unico ? precio_referencia : (talla.precio || 0);
+          let precio;
+          if (precio_unico) {
+            // Para precio único, usar precio_referencia, sino usar 1000 como fallback
+            precio = precio_referencia && precio_referencia > 0 ? precio_referencia : 1000;
+          } else {
+            // Para precios individuales, usar precio de talla, sino usar 1000 como fallback
+            precio = talla.precio && talla.precio > 0 ? talla.precio : 1000;
+          }
+          
+          console.log(`📊 [BACKEND] Insertando stock - Talla: ${talla.id_talla}, Cantidad: ${talla.cantidad || 0}, Precio: ${precio}`);
           
           await client.query(
             `INSERT INTO stock (id_producto, id_variante, id_talla, cantidad, precio)
