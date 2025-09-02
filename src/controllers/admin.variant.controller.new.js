@@ -1,4 +1,4 @@
-const database = require('../config/database');
+const database = require('../config/db');
 const { uploadImage, deleteImage } = require('../config/cloudinary');
 
 const AdminVariantController = {
