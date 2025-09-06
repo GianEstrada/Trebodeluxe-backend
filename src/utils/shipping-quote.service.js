@@ -16,12 +16,10 @@ class ShippingQuoteService {
       area_level3: "Monterrey Centro"
     };
     
-    // Paqueterías disponibles
+    // Paqueterías disponibles (empezar con las más comunes)
     this.requestedCarriers = [
-      "fedex",
-      "dhl", 
       "estafeta",
-      "ups"
+      "fedex"
     ];
   }
 
@@ -138,11 +136,11 @@ class ShippingQuoteService {
     const compressedHeight = totalHeight * compressionFactor;
 
     return {
-      totalWeight: Math.max(totalWeight, 100), // Mínimo 100g
+      totalWeight: Math.max(totalWeight, 500), // Mínimo 500g (más realista)
       dimensions: {
-        length: Math.max(maxLength, 10), // Mínimo 10cm
-        width: Math.max(maxWidth, 10),   // Mínimo 10cm  
-        height: Math.max(compressedHeight, 5) // Mínimo 5cm
+        length: Math.max(maxLength, 20), // Mínimo 20cm (más realista)
+        width: Math.max(maxWidth, 15),   // Mínimo 15cm (más realista)  
+        height: Math.max(compressedHeight, 8) // Mínimo 8cm (más realista)
       },
       compressionFactor: compressionFactor
     };
@@ -289,10 +287,13 @@ class ShippingQuoteService {
               length: Math.ceil(cartData.dimensions.length),
               width: Math.ceil(cartData.dimensions.width),
               height: Math.ceil(cartData.dimensions.height),
-              weight: Math.ceil(cartData.totalWeight)
+              weight: Math.ceil(cartData.totalWeight),
+              declared_value: 1000 // Valor declarado en pesos mexicanos
             }
           ],
-          requested_carriers: this.requestedCarriers
+          requested_carriers: this.requestedCarriers,
+          shipment_type: "package", // Tipo de envío
+          quote_type: "carrier" // Tipo de cotización
         }
       };
 
@@ -327,10 +328,19 @@ class ShippingQuoteService {
     } catch (error) {
       console.error('❌ Error obteniendo cotización de envío:', error);
       
+      // Log detallado del error
+      if (error.response) {
+        console.error('📋 Detalles del error de SkyDropX:');
+        console.error('- Status:', error.response.status);
+        console.error('- Data:', JSON.stringify(error.response.data, null, 2));
+        console.error('- Headers:', error.response.headers);
+      }
+      
       return {
         success: false,
         error: error.message,
-        details: error.response?.data || 'No additional details available'
+        details: error.response?.data || 'No additional details available',
+        requestPayload: quotationPayload || null // Para debugging
       };
     }
   }
