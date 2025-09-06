@@ -196,71 +196,30 @@ class ShippingQuoteService {
     try {
       console.log('🏠 Obteniendo información de dirección para CP:', postalCode);
       
-      // Intentar múltiples APIs en orden de preferencia
-      const apis = [
-        {
-          name: 'API CopomexAPI',
-          url: `https://api.copomex.com/query/info_cp/${postalCode}?token=pruebas`,
-          parser: (data) => {
-            if (data && data[0]) {
-              const location = data[0];
-              return {
-                area_level1: location.estado || location.state || "",
-                area_level2: location.municipio || location.municipality || "",
-                area_level3: location.asentamiento || location.settlement || ""
-              };
-            }
-            return null;
-          }
-        },
-        {
-          name: 'API Zippopotam',
-          url: `http://api.zippopotam.us/mx/${postalCode}`,
-          parser: (data) => {
-            if (data && data.places && data.places[0]) {
-              const place = data.places[0];
-              return {
-                area_level1: place.state || "",
-                area_level2: place['place name'] || "",
-                area_level3: place['place name'] || ""
-              };
-            }
-            return null;
-          }
-        }
-      ];
-
-      // Probar cada API
-      for (const api of apis) {
-        try {
-          console.log(`🔍 Probando ${api.name}...`);
-          const response = await fetch(api.url);
+      // Usar API Zippopotam
+      console.log('🔍 Consultando API Zippopotam...');
+      const response = await fetch(`http://api.zippopotam.us/mx/${postalCode}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('📍 Respuesta de Zippopotam:', data);
+        
+        if (data && data.places && data.places[0]) {
+          const place = data.places[0];
+          const addressData = {
+            country_code: "MX",
+            postal_code: postalCode,
+            area_level1: place.state || "",
+            area_level2: place['place name'] || "",
+            area_level3: place['place name'] || ""
+          };
           
-          if (response.ok) {
-            const data = await response.json();
-            console.log(`📍 Respuesta de ${api.name}:`, data);
-            
-            const parsed = api.parser(data);
-            if (parsed && parsed.area_level1) {
-              const addressData = {
-                country_code: "MX",
-                postal_code: postalCode,
-                area_level1: parsed.area_level1,
-                area_level2: parsed.area_level2,
-                area_level3: parsed.area_level3
-              };
-              
-              console.log(`✅ Dirección obtenida de ${api.name}:`, addressData);
-              return addressData;
-            }
-          }
-        } catch (apiError) {
-          console.log(`❌ Error con ${api.name}:`, apiError.message);
-          continue;
+          console.log('✅ Dirección obtenida de Zippopotam:', addressData);
+          return addressData;
         }
       }
       
-      // Si ninguna API funciona, usar fallback específico para CP conocidos
+      // Si Zippopotam falla, usar fallback específico para CP conocidos
       const knownPostalCodes = {
         '66058': {
           area_level1: "Nuevo León",
