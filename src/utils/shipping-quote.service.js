@@ -46,7 +46,7 @@ class ShippingQuoteService {
           cc.cantidad,
           p.id_producto,
           p.nombre as producto_nombre,
-          p.precio,
+          s.precio,
           p.peso_producto,
           p.id_categoria,
           c.nombre as categoria_nombre,
@@ -57,7 +57,6 @@ class ShippingQuoteService {
           c.compresion,
           v.id_variante,
           v.nombre as variante_nombre,
-          v.precio_variante,
           t.id_talla,
           t.nombre as talla_nombre
         FROM contenido_carrito cc
@@ -65,6 +64,9 @@ class ShippingQuoteService {
         INNER JOIN categorias c ON p.id_categoria = c.id_categoria
         INNER JOIN variantes v ON cc.id_variante = v.id_variante
         INNER JOIN tallas t ON cc.id_talla = t.id_talla
+        INNER JOIN stock s ON cc.id_producto = s.id_producto 
+                           AND cc.id_variante = s.id_variante 
+                           AND cc.id_talla = s.id_talla
         WHERE cc.id_carrito = $1
         ORDER BY cc.fecha_agregado
       `;
@@ -140,7 +142,7 @@ class ShippingQuoteService {
         description_en: item.producto_nombre,
         country_code: "MX",
         quantity: quantity,
-        price: parseFloat(item.precio || item.precio_variante || 0)
+        price: parseFloat(item.precio || 0)
       });
     });
 
