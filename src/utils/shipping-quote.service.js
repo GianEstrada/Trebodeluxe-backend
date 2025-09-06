@@ -1,11 +1,17 @@
 const { SkyDropXAuth } = require('./skydropx-auth');
 const db = require('../config/db');
 const axios = require('axios');
+const fs = require('fs').promises;
+const path = require('path');
 
 class ShippingQuoteService {
   constructor() {
-    this.skyDropAuth = new SkyDropXAuth();
+    this.skyDropXAuth = new SkyDropXAuth();
     this.baseUrl = 'https://pro.skydropx.com/api/v1';
+    
+    // Cache para códigos postales
+    this.postalCodeCache = new Map();
+    this.postalCodeDataLoaded = false;
     
     // Configuración del origen (Monterrey, NL)
     this.addressFrom = {
@@ -21,6 +27,62 @@ class ShippingQuoteService {
       "estafeta",
       "fedex"
     ];
+  }
+
+  /**
+   * Carga los códigos postales desde archivo CPdescarga.txt
+   * @returns {Promise<void>}
+   */
+  async loadPostalCodeData() {
+    if (this.postalCodeDataLoaded) return;
+    
+    try {
+      console.log('📂 Cargando base de datos de códigos postales...');
+      
+      const filePath = path.join(__dirname, '..', 'data', 'CPdescarga.txt');
+      const fileContent = await fs.readFile(filePath, 'utf-8');
+      
+      const lines = fileContent.split('\n');
+      let loadedCount = 0;
+      let processedCPs = new Set();
+      
+      for (const line of lines) {
+        if (line.trim() && line.includes('|')) {
+          const parts = line.split('|');
+          
+          // Formato SEPOMEX: CP|Colonia|Tipo|Municipio|Estado|Ciudad|...
+          if (parts.length >= 5) {
+            const cp = parts[0].trim();
+            const colonia = parts[1].trim();
+            const municipio = parts[3].trim(); 
+            const estado = parts[4].trim();
+            
+            // Validar que el CP sea numérico de 5 dígitos
+            if (/^\d{5}$/.test(cp) && estado && municipio && colonia) {
+              // Si ya tenemos este CP, preferir la primera colonia encontrada
+              if (!processedCPs.has(cp)) {
+                this.postalCodeCache.set(cp, {
+                  country_code: "MX",
+                  postal_code: cp,
+                  area_level1: estado,
+                  area_level2: municipio,
+                  area_level3: colonia
+                });
+                processedCPs.add(cp);
+                loadedCount++;
+              }
+            }
+          }
+        }
+      }
+      
+      console.log(`✅ Códigos postales cargados: ${loadedCount}`);
+      this.postalCodeDataLoaded = true;
+      
+    } catch (error) {
+      console.error('❌ Error cargando códigos postales:', error.message);
+      console.log('🔄 Continuando con APIs externas como fallback...');
+    }
   }
 
   /**
@@ -192,6 +254,16 @@ class ShippingQuoteService {
    */
   async getAddressFromPostalCode(postalCode) {
     try {
+      // Cargar datos locales si no están cargados
+      await this.loadPostalCodeData();
+      
+      // Verificar cache local primero
+      if (this.postalCodeCache.has(postalCode)) {
+        console.log(`📍 CP ${postalCode} encontrado en base local`);
+        return this.postalCodeCache.get(postalCode);
+      }
+      
+      console.log(`🔍 CP ${postalCode} no encontrado localmente, consultando APIs externas...`);
       console.log('🏠 Obteniendo información de dirección para CP:', postalCode);
       
       // Usar API Zippopotam
@@ -268,7 +340,7 @@ class ShippingQuoteService {
       console.log('💰 Solicitando cotización de envío para carrito:', cartId, 'hacia:', postalCodeTo);
 
       // Obtener token de autenticación
-      const token = await this.skyDropAuth.getBearerToken();
+      const token = await this.skyDropXAuth.getBearerToken();
       
       // Obtener datos del carrito
       const cartData = await this.getCartShippingData(cartId);
