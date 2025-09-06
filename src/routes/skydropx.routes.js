@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const skyDropXService = require('../utils/skyDropXService');
-const SkyDropXAuth = require('../utils/skydropx-auth');
+const { SkyDropXAuth } = require('../utils/skydropx-auth');
 const { verifyToken, requireAdmin } = require('../middlewares/auth.middleware');
 const db = require('../config/db');
 
