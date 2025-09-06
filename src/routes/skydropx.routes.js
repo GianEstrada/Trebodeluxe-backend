@@ -1,8 +1,52 @@
 const express = require('express');
 const router = express.Router();
 const skyDropXService = require('../utils/skyDropXService');
+const SkyDropXAuth = require('../utils/skydropx-auth');
 const { verifyToken, requireAdmin } = require('../middlewares/authMiddleware');
 const database = require('../config/database');
+
+// Test de autenticación OAuth2 con SkyDropX (público para testing)
+router.get('/test-auth', async (req, res) => {
+  try {
+    console.log('🧪 Testing SkyDropX authentication...');
+    
+    const skyDropAuth = new SkyDropXAuth();
+    const token = await skyDropAuth.getBearerToken();
+    
+    res.json({
+      success: true,
+      message: 'Autenticación SkyDropX exitosa',
+      tokenInfo: {
+        tokenLength: token.length,
+        tokenPrefix: token.substring(0, 20) + '...',
+        expiresAt: skyDropAuth.tokenCache.expiresAt
+      },
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ Error en test de autenticación:', error);
+    
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      details: error.response?.data || 'No additional details',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Test de variables de entorno (público para debugging)
+router.get('/test-env', (req, res) => {
+  res.json({
+    env_check: {
+      SKYDROP_API_KEY: process.env.SKYDROP_API_KEY ? '✅ Configurada' : '❌ No configurada',
+      SKYDROP_API_SECRET: process.env.SKYDROP_API_SECRET ? '✅ Configurada' : '❌ No configurada',
+      NODE_ENV: process.env.NODE_ENV || 'development'
+    },
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Test de conexión con SkyDropX
 router.post('/test-connection', verifyToken, requireAdmin, async (req, res) => {

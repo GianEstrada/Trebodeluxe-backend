@@ -49,9 +49,17 @@ class SkyDropXAuth {
       console.log('📤 Enviando solicitud de autenticación...');
 
       // Realizar la petición para obtener el token
-      const response = await axios.post(this.tokenUrl, authData, {
+      const params = new URLSearchParams();
+      params.append('client_id', this.clientId);
+      params.append('client_secret', this.clientSecret);
+      params.append('grant_type', 'client_credentials');
+      params.append('redirect_uri', 'urn:ietf:wg:oauth:2.0:oob');
+      params.append('refresh_token', '');
+      params.append('scope', 'default orders.create');
+
+      const response = await axios.post(this.tokenUrl, params, {
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
           'Accept': 'application/json'
         },
         timeout: 10000 // 10 segundos de timeout
