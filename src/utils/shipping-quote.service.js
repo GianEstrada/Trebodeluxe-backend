@@ -207,18 +207,50 @@ class ShippingQuoteService {
    */
   async getAddressFromPostalCode(postalCode) {
     try {
-      // Por ahora, devolver estructura básica
-      // En el futuro, podrías integrar con API de códigos postales
+      console.log('🏠 Obteniendo información de dirección para CP:', postalCode);
+      
+      // Usar API pública de códigos postales de México
+      const response = await fetch(`https://api-sepomex.hckdrk.mx/query/info_cp/${postalCode}`);
+      
+      if (!response.ok) {
+        throw new Error(`Error en API de CP: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('📍 Respuesta de API de códigos postales:', data);
+      
+      if (!data || !data.response || !data.response.cp_info) {
+        throw new Error('No se encontró información para el código postal');
+      }
+      
+      const cpInfo = data.response.cp_info;
+      
+      // Tomar el primer resultado si hay múltiples
+      const location = cpInfo[0] || cpInfo;
+      
+      const addressData = {
+        country_code: "MX",
+        postal_code: postalCode,
+        area_level1: location.estado || "", // Estado
+        area_level2: location.municipio || location.ciudad || "", // Ciudad/Municipio
+        area_level3: location.asentamiento || location.colonia || ""  // Colonia/Asentamiento
+      };
+      
+      console.log('✅ Dirección procesada:', addressData);
+      return addressData;
+      
+    } catch (error) {
+      console.error('❌ Error obteniendo datos de dirección:', error);
+      
+      // Fallback: usar datos básicos para que no falle completamente
+      console.log('🔄 Usando fallback para dirección...');
       return {
         country_code: "MX",
         postal_code: postalCode,
-        area_level1: "", // Estado
-        area_level2: "", // Ciudad
-        area_level3: ""  // Colonia
+        area_level1: "México", // Estado genérico
+        area_level2: "Ciudad", // Ciudad genérica  
+        area_level3: "Centro"  // Colonia genérica
       };
-    } catch (error) {
-      console.error('❌ Error obteniendo datos de dirección:', error);
-      throw error;
     }
   }
 
