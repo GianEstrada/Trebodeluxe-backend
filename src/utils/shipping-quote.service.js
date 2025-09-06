@@ -45,7 +45,7 @@ class ShippingQuoteService {
           cc.id_contenido,
           cc.cantidad,
           p.id_producto,
-          p.nombre as producto_nombre,
+          CONCAT(p.nombre, ' - ', v.nombre) as producto_nombre,
           s.precio,
           p.id_categoria,
           c.nombre as categoria_nombre,
@@ -57,7 +57,7 @@ class ShippingQuoteService {
           v.id_variante,
           v.nombre as variante_nombre,
           t.id_talla,
-          t.nombre as talla_nombre
+          t.nombre_talla as talla_nombre
         FROM contenido_carrito cc
         INNER JOIN productos p ON cc.id_producto = p.id_producto
         INNER JOIN categorias c ON p.id_categoria = c.id_categoria
