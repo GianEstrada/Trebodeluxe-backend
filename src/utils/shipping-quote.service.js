@@ -52,8 +52,8 @@ class ShippingQuoteService {
           c.alto_cm,
           c.largo_cm,
           c.ancho_cm,
-          c.peso_gramos,
-          c.compresion,
+          c.peso_kg,
+          c.nivel_compresion,
           v.id_variante,
           v.nombre as variante_nombre,
           t.id_talla,
@@ -118,7 +118,7 @@ class ShippingQuoteService {
 
     cartItems.forEach(item => {
       const quantity = item.cantidad;
-      const itemWeight = parseFloat(item.peso_gramos || 0) * quantity;
+      const itemWeight = parseFloat(item.peso_kg || 0) * quantity;
       const itemHeight = parseFloat(item.alto_cm || 0);
       const itemLength = parseFloat(item.largo_cm || 0);
       const itemWidth = parseFloat(item.ancho_cm || 0);
@@ -172,12 +172,23 @@ class ShippingQuoteService {
     let itemCount = 0;
 
     cartItems.forEach(item => {
-      if (item.compresion) {
-        const compression = parseFloat(item.compresion);
-        if (!isNaN(compression)) {
-          totalCompression += compression;
-          itemCount++;
+      if (item.nivel_compresion) {
+        let compression;
+        switch(item.nivel_compresion.toLowerCase()) {
+          case 'bajo':
+            compression = 0.9; // 90% del volumen original
+            break;
+          case 'medio':
+            compression = 0.7; // 70% del volumen original
+            break;
+          case 'alto':
+            compression = 0.5; // 50% del volumen original
+            break;
+          default:
+            compression = 0.7; // Por defecto medio
         }
+        totalCompression += compression;
+        itemCount++;
       }
     });
 
