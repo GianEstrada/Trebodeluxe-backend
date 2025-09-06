@@ -1,0 +1,303 @@
+const { SkyDropXAuth } = require('./skydropx-auth');
+const db = require('../config/db');
+const axios = require('axios');
+
+class ShippingQuoteService {
+  constructor() {
+    this.skyDropAuth = new SkyDropXAuth();
+    this.baseUrl = 'https://pro.skydropx.com/api/v1';
+    
+    // Configuración del origen (Monterrey, NL)
+    this.addressFrom = {
+      country_code: "MX",
+      postal_code: "64000",
+      area_level1: "Nuevo León",
+      area_level2: "Monterrey",
+      area_level3: "Monterrey Centro"
+    };
+    
+    // Paqueterías disponibles
+    this.requestedCarriers = [
+      "fedex",
+      "dhl", 
+      "estafeta",
+      "ups"
+    ];
+  }
+
+  /**
+   * Obtiene los datos completos del carrito con productos, variantes y categorías
+   * @param {string} cartId - ID del carrito
+   * @returns {Promise<Object>} Datos del carrito con dimensiones calculadas
+   */
+  async getCartShippingData(cartId) {
+    try {
+      console.log('🛒 Obteniendo datos del carrito para envío:', cartId);
+
+      const query = `
+        SELECT 
+          cc.id_contenido,
+          cc.cantidad,
+          p.id_producto,
+          p.nombre as producto_nombre,
+          p.precio,
+          p.peso_producto,
+          p.id_categoria,
+          c.nombre as categoria_nombre,
+          c.alto_cm,
+          c.largo_cm,
+          c.ancho_cm,
+          c.peso_gramos,
+          c.compresion,
+          v.id_variante,
+          v.nombre as variante_nombre,
+          v.precio_variante,
+          t.id_talla,
+          t.nombre as talla_nombre
+        FROM contenido_carrito cc
+        INNER JOIN productos p ON cc.id_producto = p.id_producto
+        INNER JOIN categorias c ON p.id_categoria = c.id_categoria
+        INNER JOIN variantes v ON cc.id_variante = v.id_variante
+        INNER JOIN tallas t ON cc.id_talla = t.id_talla
+        WHERE cc.id_carrito = $1
+        ORDER BY cc.fecha_agregado
+      `;
+
+      const result = await db.query(query, [cartId]);
+      
+      if (result.rows.length === 0) {
+        throw new Error('Carrito vacío o no encontrado');
+      }
+
+      // Calcular dimensiones totales del envío
+      const shippingData = this.calculateShippingDimensions(result.rows);
+      
+      console.log('📦 Datos del carrito calculados:', {
+        items: result.rows.length,
+        totalWeight: shippingData.totalWeight,
+        dimensions: shippingData.dimensions
+      });
+
+      return {
+        cartItems: result.rows,
+        ...shippingData
+      };
+      
+    } catch (error) {
+      console.error('❌ Error obteniendo datos del carrito:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Calcula las dimensiones totales de envío basado en los productos del carrito
+   * @param {Array} cartItems - Items del carrito
+   * @returns {Object} Dimensiones calculadas
+   */
+  calculateShippingDimensions(cartItems) {
+    let totalWeight = 0;
+    let totalVolume = 0;
+    let maxLength = 0;
+    let maxWidth = 0;
+    let totalHeight = 0;
+
+    // Productos para la API de SkyDropX
+    const products = [];
+
+    cartItems.forEach(item => {
+      const quantity = item.cantidad;
+      const itemWeight = parseFloat(item.peso_gramos || 0) * quantity;
+      const itemHeight = parseFloat(item.alto_cm || 0);
+      const itemLength = parseFloat(item.largo_cm || 0);
+      const itemWidth = parseFloat(item.ancho_cm || 0);
+      
+      // Sumar peso total
+      totalWeight += itemWeight;
+      
+      // Calcular volumen
+      const itemVolume = itemHeight * itemLength * itemWidth * quantity;
+      totalVolume += itemVolume;
+      
+      // Mantener las dimensiones máximas
+      maxLength = Math.max(maxLength, itemLength);
+      maxWidth = Math.max(maxWidth, itemWidth);
+      totalHeight += itemHeight * quantity; // Apilar en altura
+      
+      // Agregar producto para la API
+      products.push({
+        hs_code: "6109.10.00", // Código genérico para prendas de vestir
+        description_en: item.producto_nombre,
+        country_code: "MX",
+        quantity: quantity,
+        price: parseFloat(item.precio || item.precio_variante || 0)
+      });
+    });
+
+    // Aplicar factor de compresión si es necesario
+    const compressionFactor = this.getCompressionFactor(cartItems);
+    const compressedHeight = totalHeight * compressionFactor;
+
+    return {
+      totalWeight: Math.max(totalWeight, 100), // Mínimo 100g
+      dimensions: {
+        length: Math.max(maxLength, 10), // Mínimo 10cm
+        width: Math.max(maxWidth, 10),   // Mínimo 10cm  
+        height: Math.max(compressedHeight, 5) // Mínimo 5cm
+      },
+      products: products,
+      compressionFactor: compressionFactor
+    };
+  }
+
+  /**
+   * Obtiene el factor de compresión basado en las categorías de productos
+   * @param {Array} cartItems - Items del carrito
+   * @returns {number} Factor de compresión (0.1 a 1.0)
+   */
+  getCompressionFactor(cartItems) {
+    // Obtener el factor de compresión promedio de las categorías
+    let totalCompression = 0;
+    let itemCount = 0;
+
+    cartItems.forEach(item => {
+      if (item.compresion) {
+        const compression = parseFloat(item.compresion);
+        if (!isNaN(compression)) {
+          totalCompression += compression;
+          itemCount++;
+        }
+      }
+    });
+
+    // Si no hay datos de compresión, usar factor conservador
+    if (itemCount === 0) {
+      return 0.7; // 70% de compresión por defecto
+    }
+
+    return Math.max(0.1, Math.min(1.0, totalCompression / itemCount));
+  }
+
+  /**
+   * Obtiene datos de dirección basado en código postal
+   * @param {string} postalCode - Código postal destino
+   * @returns {Promise<Object>} Datos de la dirección
+   */
+  async getAddressFromPostalCode(postalCode) {
+    try {
+      // Por ahora, devolver estructura básica
+      // En el futuro, podrías integrar con API de códigos postales
+      return {
+        country_code: "MX",
+        postal_code: postalCode,
+        area_level1: "", // Estado
+        area_level2: "", // Ciudad
+        area_level3: ""  // Colonia
+      };
+    } catch (error) {
+      console.error('❌ Error obteniendo datos de dirección:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Solicita cotización de envío a SkyDropX
+   * @param {string} cartId - ID del carrito
+   * @param {string} postalCodeTo - Código postal destino
+   * @returns {Promise<Object>} Cotizaciones de envío
+   */
+  async getShippingQuote(cartId, postalCodeTo) {
+    try {
+      console.log('💰 Solicitando cotización de envío para carrito:', cartId, 'hacia:', postalCodeTo);
+
+      // Obtener token de autenticación
+      const token = await this.skyDropAuth.getBearerToken();
+      
+      // Obtener datos del carrito
+      const cartData = await this.getCartShippingData(cartId);
+      
+      // Obtener datos de dirección destino
+      const addressTo = await this.getAddressFromPostalCode(postalCodeTo);
+
+      // Preparar payload para SkyDropX
+      const quotationPayload = {
+        quotation: {
+          order_id: `cart_${cartId}_${Date.now()}`,
+          address_from: this.addressFrom,
+          address_to: addressTo,
+          parcels: [
+            {
+              length: Math.ceil(cartData.dimensions.length),
+              width: Math.ceil(cartData.dimensions.width),
+              height: Math.ceil(cartData.dimensions.height),
+              weight: Math.ceil(cartData.totalWeight),
+              products: cartData.products
+            }
+          ],
+          requested_carriers: this.requestedCarriers
+        }
+      };
+
+      console.log('📤 Enviando solicitud a SkyDropX:', JSON.stringify(quotationPayload, null, 2));
+
+      // Hacer petición a SkyDropX
+      const response = await axios.post(
+        `${this.baseUrl}/quotations`,
+        quotationPayload,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      console.log('📥 Respuesta de SkyDropX recibida');
+
+      return {
+        success: true,
+        cartData: {
+          items: cartData.cartItems.length,
+          totalWeight: cartData.totalWeight,
+          dimensions: cartData.dimensions,
+          compressionFactor: cartData.compressionFactor
+        },
+        quotations: response.data,
+        requestPayload: quotationPayload // Para debugging
+      };
+
+    } catch (error) {
+      console.error('❌ Error obteniendo cotización de envío:', error);
+      
+      return {
+        success: false,
+        error: error.message,
+        details: error.response?.data || 'No additional details available'
+      };
+    }
+  }
+
+  /**
+   * Formatea las cotizaciones para el frontend
+   * @param {Object} quotationsResponse - Respuesta de SkyDropX
+   * @returns {Array} Cotizaciones formateadas
+   */
+  formatQuotationsForFrontend(quotationsResponse) {
+    if (!quotationsResponse.success || !quotationsResponse.quotations) {
+      return [];
+    }
+
+    const quotations = quotationsResponse.quotations;
+    
+    // Asumiendo que la respuesta tiene un array de cotizaciones
+    return (quotations.data || []).map(quote => ({
+      carrier: quote.carrier,
+      service: quote.service_level,
+      price: quote.total_pricing,
+      currency: quote.currency,
+      estimatedDays: quote.days,
+      description: quote.description || `${quote.carrier} - ${quote.service_level}`
+    }));
+  }
+}
+
+module.exports = ShippingQuoteService;

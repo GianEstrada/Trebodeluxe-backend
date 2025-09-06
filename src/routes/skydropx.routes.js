@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const skyDropXService = require('../utils/skyDropXService');
 const { SkyDropXAuth } = require('../utils/skydropx-auth');
+const ShippingQuoteService = require('../utils/shipping-quote.service');
 const { verifyToken, requireAdmin } = require('../middlewares/auth.middleware');
 const db = require('../config/db');
 
@@ -46,6 +47,84 @@ router.get('/test-env', (req, res) => {
     },
     timestamp: new Date().toISOString()
   });
+});
+
+// Obtener cotización de envío para carrito
+router.post('/cart/quote', async (req, res) => {
+  try {
+    const { cartId, postalCode } = req.body;
+
+    // Validar datos requeridos
+    if (!cartId || !postalCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Se requieren cartId y postalCode'
+      });
+    }
+
+    // Validar formato de código postal mexicano (5 dígitos)
+    if (!/^\d{5}$/.test(postalCode)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Código postal debe tener 5 dígitos'
+      });
+    }
+
+    console.log('🚚 Procesando solicitud de cotización para carrito:', cartId, 'CP:', postalCode);
+
+    const shippingQuoteService = new ShippingQuoteService();
+    const result = await shippingQuoteService.getShippingQuote(cartId, postalCode);
+
+    if (result.success) {
+      // Formatear cotizaciones para el frontend
+      const formattedQuotes = shippingQuoteService.formatQuotationsForFrontend(result);
+      
+      res.json({
+        success: true,
+        cartData: result.cartData,
+        quotations: formattedQuotes,
+        raw: result.quotations, // Para debugging
+        message: 'Cotizaciones obtenidas exitosamente'
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Error obteniendo cotizaciones',
+        error: result.error,
+        details: result.details
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Error en ruta de cotización de carrito:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+// Obtener datos del carrito para envío (solo para debugging)
+router.get('/cart/:cartId/shipping-data', async (req, res) => {
+  try {
+    const { cartId } = req.params;
+    
+    const shippingQuoteService = new ShippingQuoteService();
+    const cartData = await shippingQuoteService.getCartShippingData(cartId);
+    
+    res.json({
+      success: true,
+      data: cartData
+    });
+    
+  } catch (error) {
+    console.error('❌ Error obteniendo datos de carrito:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
 });
 
 // Test de conexión con SkyDropX
