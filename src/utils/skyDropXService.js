@@ -1,5 +1,5 @@
 const axios = require('axios');
-const database = require('../config/database');
+const db = require('../config/db');
 
 class SkyDropXService {
   constructor() {
@@ -21,7 +21,7 @@ class SkyDropXService {
   // Obtener configuraciones desde la base de datos
   async getConfig() {
     try {
-      const result = await database.query(`
+      const result = await db.query(`
         SELECT clave, valor 
         FROM configuraciones_sitio 
         WHERE clave LIKE 'skydropx%' OR clave LIKE 'empaque%'
@@ -190,7 +190,7 @@ class SkyDropXService {
   // Calcular dimensiones de envío para una categoría
   async calculateShippingDimensions(categoryId) {
     try {
-      const result = await database.query(`
+      const result = await db.query(`
         SELECT calcular_dimensiones_envio($1) as dimensions
       `, [categoryId]);
 
