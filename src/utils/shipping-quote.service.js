@@ -34,6 +34,12 @@ class ShippingQuoteService {
     try {
       console.log('🛒 Obteniendo datos del carrito para envío:', cartId);
 
+      // Primero verificar si el carrito existe
+      const cartCheck = await db.query('SELECT id_carrito FROM carritos WHERE id_carrito = $1', [cartId]);
+      if (cartCheck.rows.length === 0) {
+        throw new Error(`Carrito con ID ${cartId} no encontrado`);
+      }
+
       const query = `
         SELECT 
           cc.id_contenido,
@@ -64,6 +70,11 @@ class ShippingQuoteService {
       `;
 
       const result = await db.query(query, [cartId]);
+      
+      console.log('📋 Resultado de consulta del carrito:', {
+        rowCount: result.rows.length,
+        cartId: cartId
+      });
       
       if (result.rows.length === 0) {
         throw new Error('Carrito vacío o no encontrado');

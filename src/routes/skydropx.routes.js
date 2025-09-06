@@ -110,6 +110,8 @@ router.get('/cart/:cartId/shipping-data', async (req, res) => {
   try {
     const { cartId } = req.params;
     
+    console.log('🔍 Debug: Obteniendo datos de carrito:', cartId);
+    
     const shippingQuoteService = new ShippingQuoteService();
     const cartData = await shippingQuoteService.getCartShippingData(cartId);
     
@@ -120,6 +122,30 @@ router.get('/cart/:cartId/shipping-data', async (req, res) => {
     
   } catch (error) {
     console.error('❌ Error obteniendo datos de carrito:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Debug: Verificar si existe un carrito
+router.get('/cart/:cartId/exists', async (req, res) => {
+  try {
+    const { cartId } = req.params;
+    
+    const cartCheck = await db.query('SELECT id_carrito FROM carritos WHERE id_carrito = $1', [cartId]);
+    const contentCheck = await db.query('SELECT COUNT(*) as count FROM contenido_carrito WHERE id_carrito = $1', [cartId]);
+    
+    res.json({
+      success: true,
+      cartExists: cartCheck.rows.length > 0,
+      itemCount: parseInt(contentCheck.rows[0]?.count || 0),
+      cartId: cartId
+    });
+    
+  } catch (error) {
+    console.error('❌ Error verificando carrito:', error);
     res.status(500).json({
       success: false,
       error: error.message
