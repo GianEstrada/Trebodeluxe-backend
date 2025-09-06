@@ -39,7 +39,30 @@ class ShippingQuoteService {
     try {
       console.log('📂 Cargando base de datos de códigos postales...');
       
-      const filePath = path.join(__dirname, '..', 'data', 'CPdescarga.txt');
+      // Intentar múltiples rutas para mayor compatibilidad
+      const possiblePaths = [
+        path.join(__dirname, '..', 'Data', 'CPdescarga.txt'),   // Actual ubicación
+        path.join(__dirname, '..', 'data', 'CPdescarga.txt'),  // Minúsculas
+        path.join(process.cwd(), 'src', 'Data', 'CPdescarga.txt'), // Desde root
+        path.join(process.cwd(), 'src', 'data', 'CPdescarga.txt')  // Desde root minúsculas
+      ];
+      
+      let filePath = null;
+      for (const testPath of possiblePaths) {
+        try {
+          await fs.access(testPath);
+          filePath = testPath;
+          console.log(`✅ Archivo encontrado en: ${filePath}`);
+          break;
+        } catch {
+          // Continuar con la siguiente ruta
+        }
+      }
+      
+      if (!filePath) {
+        throw new Error('Archivo CPdescarga.txt no encontrado en ninguna ubicación esperada');
+      }
+      
       const fileContent = await fs.readFile(filePath, 'utf-8');
       
       const lines = fileContent.split('\n');
