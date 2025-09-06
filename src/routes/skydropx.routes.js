@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const skyDropXService = require('../utils/skyDropXService');
 const SkyDropXAuth = require('../utils/skydropx-auth');
-const { verifyToken, requireAdmin } = require('../middlewares/authMiddleware');
+const { verifyToken, requireAdmin } = require('../middlewares/auth.middleware');
 const db = require('../config/db');
 
 // Test de autenticación OAuth2 con SkyDropX (público para testing)
