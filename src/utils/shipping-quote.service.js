@@ -47,7 +47,6 @@ class ShippingQuoteService {
           p.id_producto,
           p.nombre as producto_nombre,
           s.precio,
-          p.peso_producto,
           p.id_categoria,
           c.nombre as categoria_nombre,
           c.alto_cm,
