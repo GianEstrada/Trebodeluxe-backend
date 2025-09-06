@@ -113,9 +113,6 @@ class ShippingQuoteService {
     let maxWidth = 0;
     let totalHeight = 0;
 
-    // Productos para la API de SkyDropX
-    const products = [];
-
     cartItems.forEach(item => {
       const quantity = item.cantidad;
       const itemWeight = parseFloat(item.peso_kg || 0) * quantity;
@@ -134,15 +131,6 @@ class ShippingQuoteService {
       maxLength = Math.max(maxLength, itemLength);
       maxWidth = Math.max(maxWidth, itemWidth);
       totalHeight += itemHeight * quantity; // Apilar en altura
-      
-      // Agregar producto para la API
-      products.push({
-        hs_code: "6109.10.00", // Código genérico para prendas de vestir
-        description_en: item.producto_nombre,
-        country_code: "MX",
-        quantity: quantity,
-        price: parseFloat(item.precio || 0)
-      });
     });
 
     // Aplicar factor de compresión si es necesario
@@ -156,7 +144,6 @@ class ShippingQuoteService {
         width: Math.max(maxWidth, 10),   // Mínimo 10cm  
         height: Math.max(compressedHeight, 5) // Mínimo 5cm
       },
-      products: products,
       compressionFactor: compressionFactor
     };
   }
@@ -284,8 +271,7 @@ class ShippingQuoteService {
               length: Math.ceil(cartData.dimensions.length),
               width: Math.ceil(cartData.dimensions.width),
               height: Math.ceil(cartData.dimensions.height),
-              weight: Math.ceil(cartData.totalWeight),
-              products: cartData.products
+              weight: Math.ceil(cartData.totalWeight)
             }
           ],
           requested_carriers: this.requestedCarriers
