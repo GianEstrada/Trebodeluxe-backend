@@ -279,87 +279,734 @@ class ShippingQuoteService {
    */
   async getAddressFromPostalCode(postalCode) {
     try {
+      console.log(`🔍 BÚSQUEDA DE CÓDIGO POSTAL: ${postalCode}`);
+      console.log('=====================================');
+      
       // Cargar datos locales si no están cargados
       await this.loadPostalCodeData();
       
-      // Verificar cache local primero
+      // PASO 1: Verificar cache local primero (CPdescarga.txt)
+      console.log('📁 Paso 1: Buscando en base de datos local (CPdescarga.txt)...');
       if (this.postalCodeCache.has(postalCode)) {
-        console.log(`📍 CP ${postalCode} encontrado en base local`);
-        return this.postalCodeCache.get(postalCode);
+        const localData = this.postalCodeCache.get(postalCode);
+        console.log(`✅ CP ${postalCode} ENCONTRADO en base local`);
+        console.log('📍 Datos locales:', JSON.stringify(localData, null, 2));
+        return localData;
       }
       
-      console.log(`🔍 CP ${postalCode} no encontrado localmente, consultando APIs externas...`);
-      console.log('🏠 Obteniendo información de dirección para CP:', postalCode);
+      console.log(`❌ CP ${postalCode} NO encontrado en base local`);
+      console.log(`📊 Total CPs en cache local: ${this.postalCodeCache.size}`);
       
-      // Usar API Zippopotam
-      console.log('🔍 Consultando API Zippopotam...');
-      const response = await fetch(`http://api.zippopotam.us/mx/${postalCode}`);
+      // PASO 2: Usar API Zippopotam como fallback
+      console.log('🌐 Paso 2: Consultando API Zippopotam.us como fallback...');
       
-      if (response.ok) {
-        const data = await response.json();
-        console.log('📍 Respuesta de Zippopotam:', data);
+      try {
+        const zippopotamUrl = `http://api.zippopotam.us/mx/${postalCode}`;
+        console.log('🔗 URL Zippopotam:', zippopotamUrl);
         
-        if (data && data.places && data.places[0]) {
-          const place = data.places[0];
-          const addressData = {
-            country_code: "MX",
-            postal_code: postalCode,
-            area_level1: place.state || "",
-            area_level2: place['place name'] || "",
-            area_level3: place['place name'] || ""
-          };
+        const response = await fetch(zippopotamUrl);
+        console.log(`📡 Response status: ${response.status} ${response.statusText}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('� Respuesta completa de Zippopotam:', JSON.stringify(data, null, 2));
           
-          console.log('✅ Dirección obtenida de Zippopotam:', addressData);
-          return addressData;
+          if (data && data.places && data.places[0]) {
+            const place = data.places[0];
+            
+            // Mapear datos de Zippopotam al formato de SkyDropX
+            const addressData = {
+              country_code: "MX",
+              postal_code: postalCode,
+              area_level1: place.state || place['state abbreviation'] || "",
+              area_level2: place['place name'] || "", // Ciudad/Municipio
+              area_level3: place['place name'] || ""  // Colonia (usar mismo valor como fallback)
+            };
+            
+            console.log('✅ CP encontrado en Zippopotam');
+            console.log('🏷️  Estado:', addressData.area_level1);
+            console.log('🏷️  Municipio:', addressData.area_level2);
+            console.log('🏷️  Colonia:', addressData.area_level3);
+            console.log('📍 Dirección final de Zippopotam:', JSON.stringify(addressData, null, 2));
+            
+            // Guardar en cache para futuras consultas
+            this.postalCodeCache.set(postalCode, addressData);
+            console.log('💾 CP guardado en cache local para futuras consultas');
+            
+            return addressData;
+          } else {
+            console.log('❌ Zippopotam: Respuesta sin datos válidos');
+          }
+        } else {
+          console.log(`❌ Zippopotam: Error HTTP ${response.status}`);
         }
+      } catch (zippopotamError) {
+        console.log('❌ Error consultando Zippopotam:', zippopotamError.message);
       }
       
-      // Si Zippopotam falla, usar fallback específico para CP conocidos
+      // PASO 3: Fallback manual para CPs conocidos
+      console.log('🔧 Paso 3: Usando fallback manual para CPs conocidos...');
+      
+      
+      // PASO 3: Fallback manual para CPs conocidos comunes
+      console.log('🔧 Paso 3: Usando fallback manual para CPs conocidos...');
       const knownPostalCodes = {
-        '66058': {
-          area_level1: "Nuevo León",
-          area_level2: "General Escobedo", 
-          area_level3: "Praderas de San José"
-        },
-        '64000': {
-          area_level1: "Nuevo León",
-          area_level2: "Monterrey",
-          area_level3: "Centro"
-        }
+        // Área Metropolitana de Monterrey
+        '64000': { area_level1: "Nuevo León", area_level2: "Monterrey", area_level3: "Centro" },
+        '64100': { area_level1: "Nuevo León", area_level2: "Monterrey", area_level3: "Del Valle" },
+        '64200': { area_level1: "Nuevo León", area_level2: "Monterrey", area_level3: "Obrera" },
+        '66000': { area_level1: "Nuevo León", area_level2: "San Nicolás de los Garza", area_level3: "Centro" },
+        '66050': { area_level1: "Nuevo León", area_level2: "General Escobedo", area_level3: "Centro" },
+        '66058': { area_level1: "Nuevo León", area_level2: "General Escobedo", area_level3: "Praderas de San José" },
+        '66450': { area_level1: "Nuevo León", area_level2: "San Nicolás de los Garza", area_level3: "Centro" },
+        
+        // Ciudad de México
+        '01000': { area_level1: "Ciudad de México", area_level2: "Álvaro Obregón", area_level3: "Colonia del Valle" },
+        '06000': { area_level1: "Ciudad de México", area_level2: "Cuauhtémoc", area_level3: "Centro" },
+        '11000': { area_level1: "Ciudad de México", area_level2: "Miguel Hidalgo", area_level3: "Lomas de Chapultepec" },
+        
+        // Guadalajara
+        '44100': { area_level1: "Jalisco", area_level2: "Guadalajara", area_level3: "Centro" },
+        '44200': { area_level1: "Jalisco", area_level2: "Guadalajara", area_level3: "Americana" },
+        '44300': { area_level1: "Jalisco", area_level2: "Guadalajara", area_level3: "Lafayette" }
       };
       
       if (knownPostalCodes[postalCode]) {
-        console.log('🗂️ Usando datos conocidos para CP:', postalCode);
-        return {
+        const fallbackData = {
           country_code: "MX",
           postal_code: postalCode,
           ...knownPostalCodes[postalCode]
         };
+        
+        console.log('✅ CP encontrado en fallback manual');
+        console.log('📍 Datos fallback:', JSON.stringify(fallbackData, null, 2));
+        
+        // Guardar en cache para futuras consultas
+        this.postalCodeCache.set(postalCode, fallbackData);
+        console.log('💾 CP guardado en cache desde fallback manual');
+        
+        return fallbackData;
       }
       
-      throw new Error('No se pudo obtener información del código postal');
+      // PASO 4: Error - no se pudo encontrar información
+      console.log('❌ Paso 4: CP no encontrado en ninguna fuente');
+      console.log(`🔍 Fuentes consultadas:
+        ❌ Base local (CPdescarga.txt): ${this.postalCodeCache.size} CPs disponibles
+        ❌ Zippopotam.us API
+        ❌ Fallback manual: ${Object.keys(knownPostalCodes).length} CPs conocidos`);
+      
+      throw new Error(`No se pudo obtener información del código postal ${postalCode} en ninguna fuente disponible`);
       
     } catch (error) {
-      console.error('❌ Error obteniendo datos de dirección:', error);
+      console.error('❌ ERROR GENERAL obteniendo datos de dirección:', error.message);
+      console.error('🔍 Stack trace:', error.stack);
       
-      // Fallback: usar datos básicos para que no falle completamente
-      console.log('🔄 Usando fallback genérico para dirección...');
-      return {
+      // PASO 5: Fallback genérico como último recurso
+      console.log('🆘 Paso 5: Usando fallback genérico como último recurso...');
+      console.log('⚠️  ADVERTENCIA: Usando datos genéricos - puede afectar precisión de cotizaciones');
+      
+      const genericFallback = {
         country_code: "MX",
         postal_code: postalCode,
         area_level1: "México", // Estado genérico
         area_level2: "Ciudad", // Ciudad genérica  
         area_level3: "Centro"  // Colonia genérica
       };
+      
+      console.log('📍 Datos genéricos aplicados:', JSON.stringify(genericFallback, null, 2));
+      console.log('=====================================');
+      
+      return genericFallback;
     }
   }
 
   /**
-   * Solicita cotización de envío a SkyDropX
+   * Detecta el país basado en el código postal
+   * @param {string} postalCode - Código postal a analizar
+   * @returns {Object} Información del país detectado
+   */
+  detectCountryFromPostalCode(postalCode) {
+    // Patrones de códigos postales por país
+    const countryPatterns = {
+      // México: 5 dígitos
+      MX: { pattern: /^\d{5}$/, name: "México" },
+      // Estados Unidos: 5 dígitos o 5-4 dígitos
+      US: { pattern: /^\d{5}(-\d{4})?$/, name: "Estados Unidos" },
+      // Canadá: formato A1A 1A1
+      CA: { pattern: /^[A-Z]\d[A-Z]\s?\d[A-Z]\d$/i, name: "Canadá" },
+      // Reino Unido: varios formatos
+      GB: { pattern: /^[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}$/i, name: "Reino Unido" },
+      // Francia: 5 dígitos
+      FR: { pattern: /^\d{5}$/, name: "Francia" },
+      // Alemania: 5 dígitos
+      DE: { pattern: /^\d{5}$/, name: "Alemania" },
+      // España: 5 dígitos
+      ES: { pattern: /^\d{5}$/, name: "España" },
+      // Italia: 5 dígitos
+      IT: { pattern: /^\d{5}$/, name: "Italia" },
+      // Brasil: 8 dígitos (formato 00000-000)
+      BR: { pattern: /^\d{5}-?\d{3}$/, name: "Brasil" },
+      // Argentina: 4 dígitos o formato A0000AAA
+      AR: { pattern: /^(\d{4}|[A-Z]\d{4}[A-Z]{3})$/i, name: "Argentina" },
+      // Colombia: 6 dígitos
+      CO: { pattern: /^\d{6}$/, name: "Colombia" },
+      // Chile: 7 dígitos
+      CL: { pattern: /^\d{7}$/, name: "Chile" },
+      // Australia: 4 dígitos
+      AU: { pattern: /^\d{4}$/, name: "Australia" },
+      // India: 6 dígitos
+      IN: { pattern: /^\d{6}$/, name: "India" },
+      // China: 6 dígitos
+      CN: { pattern: /^\d{6}$/, name: "China" },
+      // Japón: 7 dígitos (formato 000-0000)
+      JP: { pattern: /^\d{3}-?\d{4}$/, name: "Japón" }
+    };
+
+    // Limpiar el código postal
+    const cleanPostalCode = postalCode.toString().trim().toUpperCase();
+    
+    // Primero verificar México como prioridad (nuestro mercado principal)
+    if (countryPatterns.MX.pattern.test(cleanPostalCode)) {
+      return { countryCode: 'MX', countryName: 'México', cleanPostalCode };
+    }
+    
+    // Luego verificar otros países
+    for (const [code, info] of Object.entries(countryPatterns)) {
+      if (code !== 'MX' && info.pattern.test(cleanPostalCode)) {
+        return { countryCode: code, countryName: info.name, cleanPostalCode };
+      }
+    }
+    
+    // Si no coincide con ningún patrón, asumir México como fallback
+    console.log(`⚠️  Patrón de CP no reconocido: ${postalCode}, asumiendo México`);
+    return { countryCode: 'MX', countryName: 'México', cleanPostalCode };
+  }
+
+  /**
+   * Obtiene datos de API específica por país
+   * @param {string} countryCode - Código del país
+   * @param {string} postalCode - Código postal
+   * @returns {Promise<Object|null>} Datos de la dirección o null si no se encuentra
+   */
+  async getCountrySpecificPostalData(countryCode, postalCode) {
+    try {
+      console.log(`🔧 Intentando API específica para ${countryCode}: ${postalCode}`);
+      
+      switch (countryCode) {
+        case 'US':
+          // Para Estados Unidos podríamos usar USPS API o otra
+          console.log('🇺🇸 API específica de Estados Unidos no implementada');
+          return null;
+          
+        case 'CA':
+          // Para Canadá podríamos usar Canada Post API
+          console.log('🇨🇦 API específica de Canadá no implementada');
+          return null;
+          
+        case 'BR':
+          // Para Brasil podríamos usar ViaCEP
+          try {
+            const cleanCP = postalCode.replace(/\D/g, '');
+            if (cleanCP.length === 8) {
+              const url = `https://viacep.com.br/ws/${cleanCP}/json/`;
+              console.log(`🇧🇷 Consultando ViaCEP Brasil: ${url}`);
+              
+              const response = await fetch(url);
+              if (response.ok) {
+                const data = await response.json();
+                if (data && !data.erro) {
+                  return {
+                    country_code: 'BR',
+                    country_name: 'Brasil',
+                    postal_code: postalCode,
+                    area_level1: data.uf || '',
+                    area_level2: data.localidade || '',
+                    area_level3: data.bairro || '',
+                    latitude: null,
+                    longitude: null
+                  };
+                }
+              }
+            }
+          } catch (error) {
+            console.log('❌ Error consultando ViaCEP:', error.message);
+          }
+          return null;
+          
+        default:
+          console.log(`❌ No hay API específica implementada para ${countryCode}`);
+          return null;
+      }
+    } catch (error) {
+      console.log(`❌ Error en API específica para ${countryCode}:`, error.message);
+      return null;
+    }
+  }
+
+  /**
+   * Obtiene datos de fallback manual internacional
+   * @param {string} countryCode - Código del país
+   * @param {string} postalCode - Código postal
+   * @returns {Object|null} Datos de fallback o null si no se encuentra
+   */
+  getInternationalManualFallback(countryCode, postalCode) {
+    console.log(`🗺️  Buscando fallback manual para ${countryCode}: ${postalCode}`);
+    
+    const internationalFallbacks = {
+      // México - CPs conocidos importantes
+      MX: {
+        '64000': { area_level1: "Nuevo León", area_level2: "Monterrey", area_level3: "Centro" },
+        '64100': { area_level1: "Nuevo León", area_level2: "Monterrey", area_level3: "Del Valle" },
+        '64200': { area_level1: "Nuevo León", area_level2: "Monterrey", area_level3: "Obrera" },
+        '66000': { area_level1: "Nuevo León", area_level2: "San Nicolás de los Garza", area_level3: "Centro" },
+        '01000': { area_level1: "Ciudad de México", area_level2: "Álvaro Obregón", area_level3: "Colonia del Valle" },
+        '06000': { area_level1: "Ciudad de México", area_level2: "Cuauhtémoc", area_level3: "Centro" },
+        '44100': { area_level1: "Jalisco", area_level2: "Guadalajara", area_level3: "Centro" }
+      },
+      
+      // Estados Unidos - ZIP codes importantes
+      US: {
+        '10001': { area_level1: "New York", area_level2: "New York", area_level3: "Manhattan" },
+        '90210': { area_level1: "California", area_level2: "Beverly Hills", area_level3: "Beverly Hills" },
+        '60601': { area_level1: "Illinois", area_level2: "Chicago", area_level3: "Downtown" },
+        '33101': { area_level1: "Florida", area_level2: "Miami", area_level3: "Downtown" },
+        '75201': { area_level1: "Texas", area_level2: "Dallas", area_level3: "Downtown" }
+      },
+      
+      // Canadá - Códigos postales importantes
+      CA: {
+        'M5V 3M6': { area_level1: "Ontario", area_level2: "Toronto", area_level3: "Downtown" },
+        'H3A 0G4': { area_level1: "Quebec", area_level2: "Montreal", area_level3: "Downtown" },
+        'V6B 2W9': { area_level1: "British Columbia", area_level2: "Vancouver", area_level3: "Downtown" }
+      },
+      
+      // España - Códigos importantes
+      ES: {
+        '28001': { area_level1: "Madrid", area_level2: "Madrid", area_level3: "Centro" },
+        '08001': { area_level1: "Barcelona", area_level2: "Barcelona", area_level3: "Ciutat Vella" },
+        '41001': { area_level1: "Sevilla", area_level2: "Sevilla", area_level3: "Centro" }
+      },
+      
+      // Brasil - CEPs importantes
+      BR: {
+        '01310-100': { area_level1: "SP", area_level2: "São Paulo", area_level3: "Bela Vista" },
+        '20040-020': { area_level1: "RJ", area_level2: "Rio de Janeiro", area_level3: "Centro" },
+        '70040-010': { area_level1: "DF", area_level2: "Brasília", area_level3: "Asa Norte" }
+      }
+    };
+    
+    const countryData = internationalFallbacks[countryCode];
+    if (countryData && countryData[postalCode]) {
+      const fallbackData = {
+        country_code: countryCode,
+        country_name: this.detectCountryFromPostalCode(postalCode).countryName,
+        postal_code: postalCode,
+        ...countryData[postalCode],
+        latitude: null,
+        longitude: null
+      };
+      
+      console.log(`✅ Fallback manual encontrado para ${countryCode}: ${postalCode}`);
+      return fallbackData;
+    }
+    
+    console.log(`❌ No hay fallback manual para ${countryCode}: ${postalCode}`);
+    return null;
+  }
+
+  /**
+   * Genera datos genéricos por país como último recurso
+   * @param {string} countryCode - Código del país
+   * @param {string} postalCode - Código postal
+   * @param {string} countryName - Nombre del país
+   * @returns {Object} Datos genéricos del país
+   */
+  getGenericCountryFallback(countryCode, postalCode, countryName) {
+    console.log(`🌐 Generando fallback genérico para ${countryCode}: ${postalCode}`);
+    
+    // Datos genéricos por país basados en ciudades principales
+    const genericCountryData = {
+      MX: { area_level1: "México", area_level2: "Ciudad", area_level3: "Centro" },
+      US: { area_level1: "State", area_level2: "City", area_level3: "Downtown" },
+      CA: { area_level1: "Province", area_level2: "City", area_level3: "Downtown" },
+      GB: { area_level1: "England", area_level2: "City", area_level3: "Centre" },
+      FR: { area_level1: "Région", area_level2: "Ville", area_level3: "Centre" },
+      DE: { area_level1: "Land", area_level2: "Stadt", area_level3: "Zentrum" },
+      ES: { area_level1: "Comunidad", area_level2: "Ciudad", area_level3: "Centro" },
+      IT: { area_level1: "Regione", area_level2: "Città", area_level3: "Centro" },
+      BR: { area_level1: "Estado", area_level2: "Cidade", area_level3: "Centro" },
+      AR: { area_level1: "Provincia", area_level2: "Ciudad", area_level3: "Centro" },
+      CO: { area_level1: "Departamento", area_level2: "Ciudad", area_level3: "Centro" },
+      CL: { area_level1: "Región", area_level2: "Ciudad", area_level3: "Centro" },
+      AU: { area_level1: "State", area_level2: "City", area_level3: "CBD" },
+      IN: { area_level1: "State", area_level2: "City", area_level3: "Central" },
+      CN: { area_level1: "Province", area_level2: "City", area_level3: "Central" },
+      JP: { area_level1: "Prefecture", area_level2: "City", area_level3: "Central" }
+    };
+    
+    const genericData = genericCountryData[countryCode] || {
+      area_level1: "Region",
+      area_level2: "City", 
+      area_level3: "Central"
+    };
+    
+    const fallbackData = {
+      country_code: countryCode,
+      country_name: countryName,
+      postal_code: postalCode,
+      ...genericData,
+      latitude: null,
+      longitude: null,
+      isGeneric: true // Marcar como genérico para logging
+    };
+    
+    console.log(`⚠️  Usando datos genéricos para ${countryName} (${countryCode})`);
+    return fallbackData;
+  }
+
+  /**
+   * Obtiene información de dirección internacional desde código postal
+   * Sistema de múltiples niveles con soporte internacional:
+   * 1. Detección automática del país
+   * 2. Base de datos local (solo México)
+   * 3. API Zippopotam internacional
+   * 4. APIs específicas por país
+   * 5. Fallback manual por país
+   * 6. Fallback genérico
+   * 
+   * @param {string} postalCode - Código postal a buscar
+   * @param {string} forceCountry - Código de país opcional para forzar búsqueda
+   * @returns {Promise<Object>} Información de la dirección
+   */
+  async getAddressFromPostalCodeInternational(postalCode, forceCountry = null) {
+    try {
+      console.log(`🌍 ======== BÚSQUEDA INTERNACIONAL ========`);
+      console.log(`🔍 Código postal: ${postalCode}`);
+      console.log(`🏳️  País forzado: ${forceCountry || 'Auto-detección'}`);
+      console.log('===============================================');
+      
+      // Detectar país automáticamente o usar el forzado
+      const countryInfo = forceCountry 
+        ? { countryCode: forceCountry.toUpperCase(), countryName: 'Forzado', cleanPostalCode: postalCode.toString().trim() }
+        : this.detectCountryFromPostalCode(postalCode);
+      
+      console.log(`🏳️  País detectado: ${countryInfo.countryName} (${countryInfo.countryCode})`);
+      console.log(`📍 CP limpio: ${countryInfo.cleanPostalCode}`);
+      
+      // Verificar cache primero
+      const cacheKey = `${countryInfo.countryCode}-${countryInfo.cleanPostalCode}`;
+      if (this.postalCodeCache.has(cacheKey)) {
+        console.log('💾 CP encontrado en cache internacional');
+        const cachedData = this.postalCodeCache.get(cacheKey);
+        console.log('📍 Datos desde cache:', JSON.stringify(cachedData, null, 2));
+        console.log('===============================================');
+        return cachedData;
+      }
+      
+      // PASO 1: Base de datos local (solo para México)
+      if (countryInfo.countryCode === 'MX') {
+        console.log('📂 Paso 1: Buscando en base de datos local mexicana...');
+        await this.loadPostalCodeData();
+        
+        if (this.postalCodeCache.has(countryInfo.cleanPostalCode)) {
+          console.log('✅ CP encontrado en base de datos local mexicana');
+          const localData = this.postalCodeCache.get(countryInfo.cleanPostalCode);
+          console.log('📍 Dirección desde base local:', JSON.stringify(localData, null, 2));
+          
+          // Guardar en cache internacional
+          this.postalCodeCache.set(cacheKey, localData);
+          console.log('===============================================');
+          return localData;
+        }
+        console.log('❌ CP no encontrado en base de datos local mexicana');
+      } else {
+        console.log(`⏭️  Paso 1: Saltando base local (país: ${countryInfo.countryCode})`);
+      }
+      
+      // PASO 2: API Zippopotam internacional
+      console.log('🌐 Paso 2: Consultando API Zippopotam internacional...');
+      
+      try {
+        const zippopotamUrl = `http://api.zippopotam.us/${countryInfo.countryCode.toLowerCase()}/${countryInfo.cleanPostalCode}`;
+        console.log('🔗 URL Zippopotam internacional:', zippopotamUrl);
+        
+        const response = await fetch(zippopotamUrl);
+        console.log(`📡 Response status: ${response.status} ${response.statusText}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('🌍 Respuesta de Zippopotam internacional:', JSON.stringify(data, null, 2));
+          
+          if (data && data.places && data.places[0]) {
+            const place = data.places[0];
+            
+            // Mapear datos internacionales al formato estándar
+            const addressData = {
+              country_code: countryInfo.countryCode,
+              country_name: data.country || countryInfo.countryName,
+              postal_code: countryInfo.cleanPostalCode,
+              area_level1: place.state || place['state abbreviation'] || "",
+              area_level2: place['place name'] || "",
+              area_level3: place['place name'] || "",
+              latitude: parseFloat(place.latitude) || null,
+              longitude: parseFloat(place.longitude) || null
+            };
+            
+            console.log('✅ CP encontrado en Zippopotam internacional');
+            console.log(`📍 País: ${addressData.country_name}`);
+            console.log(`📍 Estado/Región: ${addressData.area_level1}`);
+            console.log(`📍 Ciudad: ${addressData.area_level2}`);
+            
+            // Guardar en cache internacional
+            this.postalCodeCache.set(cacheKey, addressData);
+            console.log('💾 CP guardado en cache internacional');
+            console.log('===============================================');
+            
+            return addressData;
+          }
+        }
+        console.log(`❌ Zippopotam internacional: No se encontraron datos`);
+      } catch (zippopotamError) {
+        console.log('❌ Error consultando Zippopotam internacional:', zippopotamError.message);
+      }
+      
+      // PASO 3: APIs específicas por país
+      console.log('🔧 Paso 3: Intentando APIs específicas por país...');
+      
+      const countrySpecificData = await this.getCountrySpecificPostalData(countryInfo.countryCode, countryInfo.cleanPostalCode);
+      if (countrySpecificData) {
+        console.log('✅ CP encontrado en API específica del país');
+        console.log('📍 Datos de API específica:', JSON.stringify(countrySpecificData, null, 2));
+        
+        // Guardar en cache internacional
+        this.postalCodeCache.set(cacheKey, countrySpecificData);
+        console.log('💾 CP guardado en cache desde API específica');
+        console.log('===============================================');
+        
+        return countrySpecificData;
+      }
+      
+      // PASO 4: Fallback manual internacional
+      console.log('🗺️  Paso 4: Usando fallback manual internacional...');
+      
+      const manualData = this.getInternationalManualFallback(countryInfo.countryCode, countryInfo.cleanPostalCode);
+      if (manualData) {
+        console.log('✅ CP encontrado en fallback manual internacional');
+        console.log('📍 Datos de fallback manual:', JSON.stringify(manualData, null, 2));
+        
+        // Guardar en cache internacional
+        this.postalCodeCache.set(cacheKey, manualData);
+        console.log('💾 CP guardado en cache desde fallback manual');
+        console.log('===============================================');
+        
+        return manualData;
+      }
+      
+      // PASO 5: Fallback genérico por país
+      console.log('🌐 Paso 5: Usando fallback genérico por país...');
+      
+      const genericData = this.getGenericCountryFallback(countryInfo.countryCode, countryInfo.cleanPostalCode, countryInfo.countryName);
+      console.log('📍 Usando datos genéricos del país:', JSON.stringify(genericData, null, 2));
+      
+      // Guardar en cache internacional
+      this.postalCodeCache.set(cacheKey, genericData);
+      console.log('💾 CP guardado en cache desde fallback genérico');
+      console.log('⚠️  ADVERTENCIA: Datos genéricos - puede afectar precisión');
+      console.log('===============================================');
+      
+      return genericData;
+      
+    } catch (error) {
+      console.error('❌ ERROR CRÍTICO en búsqueda internacional:', error.message);
+      console.error('🔍 Stack trace:', error.stack);
+      
+      // Fallback de emergencia
+      const emergencyData = {
+        country_code: "MX", // Default a México
+        country_name: "México",
+        postal_code: postalCode,
+        area_level1: "México",
+        area_level2: "Ciudad",
+        area_level3: "Centro",
+        latitude: null,
+        longitude: null,
+        isEmergency: true
+      };
+      
+      console.log('🆘 Usando fallback de emergencia:', JSON.stringify(emergencyData, null, 2));
+      console.log('===============================================');
+      
+      return emergencyData;
+    }
+  }
+
+  /**
+   * Solicita cotización de envío a SkyDropX con soporte internacional
    * @param {string} cartId - ID del carrito
    * @param {string} postalCodeTo - Código postal destino
+   * @param {string} forceCountry - Código de país opcional para forzar búsqueda
    * @returns {Promise<Object>} Cotizaciones de envío
    */
+  async getShippingQuoteInternational(cartId, postalCodeTo, forceCountry = null) {
+    try {
+      console.log('🌍 =========================');
+      console.log('💰 INICIANDO COTIZACIÓN INTERNACIONAL');
+      console.log('🚀 =========================');
+      console.log('📦 Cart ID:', cartId);
+      console.log('📍 Código postal destino:', postalCodeTo);
+      console.log('🏳️  País forzado:', forceCountry || 'Auto-detección');
+      console.log('⏰ Timestamp:', new Date().toISOString());
+
+      // Detectar país del código postal
+      const countryInfo = forceCountry 
+        ? { countryCode: forceCountry.toUpperCase(), countryName: 'Forzado', cleanPostalCode: postalCodeTo.toString().trim() }
+        : this.detectCountryFromPostalCode(postalCodeTo);
+      
+      console.log(`🌍 País detectado: ${countryInfo.countryName} (${countryInfo.countryCode})`);
+
+      // Obtener token de autenticación
+      console.log('🔑 Paso 1: Obteniendo token de autenticación...');
+      const token = await this.skyDropXAuth.getBearerToken();
+      console.log('✅ Token obtenido exitosamente');
+      
+      // Obtener datos del carrito
+      console.log('🛒 Paso 2: Obteniendo datos del carrito...');
+      const cartData = await this.getCartShippingData(cartId);
+      console.log('📊 DATOS DEL CARRITO OBTENIDOS:');
+      console.log('   Items:', cartData.cartItems.length);
+      console.log('   Peso total:', cartData.totalWeight, 'kg');
+      console.log('   Dimensiones:', JSON.stringify(cartData.dimensions));
+      console.log('   Factor compresión:', cartData.compressionFactor);
+      
+      // Obtener datos de dirección destino usando sistema internacional
+      console.log('🗺️  Paso 3: Obteniendo dirección destino internacional...');
+      const addressTo = await this.getAddressFromPostalCodeInternational(postalCodeTo, forceCountry);
+      console.log('📍 DIRECCIÓN DESTINO INTERNACIONAL:');
+      console.log('   País:', addressTo.country_name, `(${addressTo.country_code})`);
+      console.log('   Estado/Región:', addressTo.area_level1);
+      console.log('   Ciudad/Municipio:', addressTo.area_level2);
+      console.log('   Área/Colonia:', addressTo.area_level3);
+      console.log('   CP:', addressTo.postal_code);
+      
+      if (addressTo.latitude && addressTo.longitude) {
+        console.log('   Coordenadas:', `${addressTo.latitude}, ${addressTo.longitude}`);
+      }
+      
+      if (addressTo.isGeneric) {
+        console.log('⚠️  ADVERTENCIA: Dirección genérica - puede afectar precisión');
+      }
+
+      // Preparar payload para SkyDropX
+      const quotationPayload = {
+        quotation: {
+          order_id: `cart_${cartId}_${Date.now()}`,
+          address_from: this.addressFrom,
+          address_to: addressTo,
+          parcels: [
+            {
+              length: Math.ceil(cartData.dimensions.length),
+              width: Math.ceil(cartData.dimensions.width),
+              height: Math.ceil(cartData.dimensions.height),
+              weight: Math.ceil(cartData.totalWeight),
+              declared_value: 1000 // Valor declarado en pesos mexicanos
+            }
+          ],
+          shipment_type: "package",
+          quote_type: "carrier"
+        }
+      };
+
+      console.log('📤 Paso 4: Preparando solicitud internacional a SkyDropX...');
+      console.log('🔗 URL:', `${this.baseUrl}/quotations`);
+      console.log('📋 Dirección destino procesada:', JSON.stringify(addressTo, null, 2));
+      console.log('📤 Enviando solicitud...');
+
+      // Hacer petición a SkyDropX
+      const response = await axios.post(
+        `${this.baseUrl}/quotations`,
+        quotationPayload,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      console.log('📥 Respuesta de SkyDropX recibida');
+      console.log('🔍 STATUS RESPONSE:', response.status);
+      
+      // Log específico de cotizaciones exitosas
+      if (response.data && response.data.rates) {
+        const successfulRates = response.data.rates.filter(rate => rate.success === true);
+        const failedRates = response.data.rates.filter(rate => rate.success === false);
+        
+        console.log(`📊 RESUMEN DE COTIZACIONES INTERNACIONAL:`);
+        console.log(`   País destino: ${addressTo.country_name} (${addressTo.country_code})`);
+        console.log(`   Total de rates: ${response.data.rates.length}`);
+        console.log(`   Exitosas: ${successfulRates.length}`);
+        console.log(`   Fallidas: ${failedRates.length}`);
+        
+        if (successfulRates.length > 0) {
+          console.log('✅ COTIZACIONES EXITOSAS:');
+          successfulRates.forEach((rate, index) => {
+            console.log(`   ${index + 1}. ${rate.provider_display_name} - ${rate.provider_service_name}: $${rate.total} ${rate.currency_code} (${rate.days} días)`);
+          });
+        }
+        
+        if (failedRates.length > 0) {
+          console.log('❌ COTIZACIONES FALLIDAS (primeras 3):');
+          failedRates.slice(0, 3).forEach((rate, index) => {
+            const errorMsg = rate.error_messages && rate.error_messages.length > 0 
+              ? rate.error_messages[0].error_message 
+              : 'Sin mensaje de error';
+            console.log(`   ${index + 1}. ${rate.provider_display_name} - ${rate.provider_service_name}: ${errorMsg}`);
+          });
+        }
+      }
+
+      console.log('🎉 COTIZACIÓN INTERNACIONAL COMPLETADA EXITOSAMENTE');
+      
+      return {
+        success: true,
+        isInternational: true,
+        countryInfo: countryInfo,
+        addressInfo: {
+          detected: addressTo,
+          isGeneric: addressTo.isGeneric || false,
+          hasCoordinates: !!(addressTo.latitude && addressTo.longitude)
+        },
+        cartData: {
+          items: cartData.cartItems.length,
+          totalWeight: cartData.totalWeight,
+          dimensions: cartData.dimensions,
+          compressionFactor: cartData.compressionFactor
+        },
+        quotations: response.data,
+        requestPayload: quotationPayload
+      };
+
+    } catch (error) {
+      console.error('❌ Error obteniendo cotización internacional:', error.message);
+      
+      // Log detallado del error
+      if (error.response) {
+        console.error('📋 DETALLES DEL ERROR INTERNACIONAL:');
+        console.error('🔍 STATUS ERROR:', error.response.status);
+        console.error('🔍 STATUS TEXT:', error.response.statusText);
+        console.error('🔍 DATA ERROR:', JSON.stringify(error.response.data, null, 2));
+      }
+      
+      return {
+        success: false,
+        isInternational: true,
+        error: error.message,
+        details: error.response?.data || 'No additional details available',
+        requestPayload: quotationPayload || null
+      };
+    }
+  }
+
   async getShippingQuote(cartId, postalCodeTo) {
     try {
       console.log('� =========================');
