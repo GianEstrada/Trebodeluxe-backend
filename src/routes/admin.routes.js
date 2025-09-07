@@ -3,6 +3,8 @@ const router = express.Router();
 const adminController = require('../controllers/admin.controller');
 const authMiddleware = require('../middlewares/auth-activity.middleware');
 const { upload, handleMulterError } = require('../middlewares/upload.middleware');
+const { getRecommendedHSCodes, getAllHSCodes, suggestHSCodeByCategory } = require('../utils/hs-codes');
+const db = require('../config/db');
 
 // Middleware para todas las rutas de admin
 router.use(authMiddleware.verifyToken);
