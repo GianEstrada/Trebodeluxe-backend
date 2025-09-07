@@ -543,21 +543,53 @@ class ShippingQuoteService {
    * @returns {Array} Cotizaciones formateadas
    */
   formatQuotationsForFrontend(quotationsResponse) {
+    console.log('🔄 Formateando cotizaciones para frontend...');
+    console.log('📋 Input recibido:', JSON.stringify(quotationsResponse, null, 2));
+    
     if (!quotationsResponse.success || !quotationsResponse.quotations) {
+      console.log('❌ No hay cotizaciones exitosas para formatear');
       return [];
     }
 
     const quotations = quotationsResponse.quotations;
     
-    // Asumiendo que la respuesta tiene un array de cotizaciones
-    return (quotations.data || []).map(quote => ({
-      carrier: quote.carrier,
-      service: quote.service_level,
-      price: quote.total_pricing,
-      currency: quote.currency,
-      estimatedDays: quote.days,
-      description: quote.description || `${quote.carrier} - ${quote.service_level}`
-    }));
+    // La respuesta de SkyDropX tiene rates, no data
+    if (!quotations.rates || !Array.isArray(quotations.rates)) {
+      console.log('❌ No se encontró array de rates en la respuesta');
+      return [];
+    }
+
+    // Filtrar solo las cotizaciones exitosas
+    const successfulRates = quotations.rates.filter(rate => rate.success === true);
+    console.log(`📊 Rates exitosas encontradas: ${successfulRates.length} de ${quotations.rates.length} total`);
+
+    if (successfulRates.length === 0) {
+      console.log('❌ No hay rates exitosas para mostrar al frontend');
+      return [];
+    }
+
+    // Formatear según la estructura real de SkyDropX
+    const formattedQuotations = successfulRates.map(rate => {
+      const formatted = {
+        carrier: rate.provider_display_name,
+        service: rate.provider_service_name,
+        price: parseFloat(rate.total),
+        currency: rate.currency_code,
+        estimatedDays: rate.days,
+        description: `${rate.provider_display_name} - ${rate.provider_service_name}`,
+        // Datos adicionales útiles
+        cost: rate.cost,
+        zone: rate.zone,
+        rateId: rate.id
+      };
+      
+      console.log(`✅ Cotización formateada: ${formatted.carrier} - ${formatted.service}: $${formatted.price} ${formatted.currency} (${formatted.estimatedDays} días)`);
+      
+      return formatted;
+    });
+
+    console.log(`🎉 ${formattedQuotations.length} cotizaciones formateadas exitosamente`);
+    return formattedQuotations;
   }
 }
 
