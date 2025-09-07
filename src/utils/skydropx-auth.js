@@ -5,9 +5,8 @@ const axios = require('axios');
  */
 class SkyDropXAuth {
   constructor() {
-    // Usar las variables que tienes en Render
-    this.clientId = process.env.SKYDROP_CLIENT_ID || process.env.SKYDROP_API_KEY;
-    this.clientSecret = process.env.SKYDROP_CLIENT_SECRET || process.env.SKYDROP_API_SECRET;
+    this.clientId = process.env.SKYDROP_API_KEY;
+    this.clientSecret = process.env.SKYDROP_API_SECRET;
     this.baseUrl = process.env.SKYDROP_BASE_URL || 'https://pro.skydropx.com/api/v1';
     this.tokenUrl = 'https://pro.skydropx.com/api/v1/oauth/token'; // ✅ URL correcta
     
