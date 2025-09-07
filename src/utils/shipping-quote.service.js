@@ -848,6 +848,8 @@ class ShippingQuoteService {
    * @returns {Promise<Object>} Cotizaciones de envío
    */
   async getShippingQuoteInternational(cartId, postalCodeTo, forceCountry = null) {
+    let quotationPayload = null; // Declarar variable al inicio para que esté disponible en catch
+    
     try {
       console.log('🌍 =========================');
       console.log('💰 INICIANDO COTIZACIÓN INTERNACIONAL');
@@ -897,7 +899,7 @@ class ShippingQuoteService {
       }
 
       // Preparar payload para SkyDropX
-      const quotationPayload = {
+      quotationPayload = {
         quotation: {
           order_id: `cart_${cartId}_${Date.now()}`,
           address_from: this.addressFrom,
@@ -1008,6 +1010,8 @@ class ShippingQuoteService {
   }
 
   async getShippingQuote(cartId, postalCodeTo) {
+    let quotationPayload = null; // Declarar variable al inicio para que esté disponible en catch
+    
     try {
       console.log('� =========================');
       console.log('💰 INICIANDO COTIZACIÓN DE ENVÍO');
@@ -1040,7 +1044,7 @@ class ShippingQuoteService {
       console.log('   CP:', addressTo.postal_code);
 
       // Preparar payload para SkyDropX
-      const quotationPayload = {
+      quotationPayload = {
         quotation: {
           order_id: `cart_${cartId}_${Date.now()}`,
           address_from: this.addressFrom,
@@ -1180,6 +1184,120 @@ class ShippingQuoteService {
         error: error.message,
         details: error.response?.data || 'No additional details available',
         requestPayload: quotationPayload || null // Para debugging
+      };
+    }
+  }
+
+  /**
+   * Busca un CP solo en la base de datos mexicana (sin fallbacks)
+   * @param {string} postalCode - Código postal a buscar
+   * @returns {Object} Resultado de la búsqueda
+   */
+  async searchInMexicanDatabase(postalCode) {
+    console.log('🔍 BÚSQUEDA DIRECTA EN BASE MEXICANA:', postalCode);
+    
+    try {
+      // Cargar base de datos si no está cargada
+      if (!this.postalCodeDataLoaded || this.postalCodeCache.size === 0) {
+        await this.loadPostalCodeData();
+      }
+
+      const cleanPostalCode = postalCode.trim();
+      
+      // Buscar en cache local
+      if (this.postalCodeCache.has(cleanPostalCode)) {
+        const cachedData = this.postalCodeCache.get(cleanPostalCode);
+        console.log('✅ CP encontrado en cache mexicano');
+        return {
+          found: true,
+          address: {
+            country_code: 'MX',
+            postal_code: cleanPostalCode,
+            area_level1: cachedData.area_level1,
+            area_level2: cachedData.area_level2,
+            area_level3: cachedData.area_level3
+          }
+        };
+      }
+
+      console.log('❌ CP no encontrado en base mexicana');
+      return { found: false, address: null };
+      
+    } catch (error) {
+      console.error('❌ Error en búsqueda directa mexicana:', error.message);
+      return { found: false, address: null };
+    }
+  }
+
+  /**
+   * Función híbrida que primero verifica CP en México, luego aplica internacional
+   * @param {string} cartId - ID del carrito
+   * @param {string} postalCodeTo - Código postal destino
+   * @param {string} forceCountry - País forzado (opcional)
+   * @returns {Object} Resultado de cotización
+   */
+  async getShippingQuoteHybrid(cartId, postalCodeTo, forceCountry = null) {
+    console.log('🔄 =======================================');
+    console.log('🌎 COTIZACIÓN HÍBRIDA (MÉXICO + INTERNACIONAL)');
+    console.log('🔄 =======================================');
+    console.log('📦 Cart ID:', cartId);
+    console.log('📍 Código postal destino:', postalCodeTo);
+    console.log('🏳️  País forzado:', forceCountry || 'Auto-detección');
+    console.log('⏰ Timestamp:', new Date().toISOString());
+
+    try {
+      // PASO 1: Verificar si el CP existe en la base de datos mexicana
+      console.log('\n🇲🇽 PASO 1: Verificando si CP existe en base mexicana...');
+      
+      let isMexicanCP = false;
+      let mexicanAddress = null;
+      
+      try {
+        // Intentar búsqueda directa en base mexicana (sin fallback genérico)
+        const result = await this.searchInMexicanDatabase(postalCodeTo);
+        if (result && result.found) {
+          mexicanAddress = result.address;
+          console.log('✅ CP encontrado en base mexicana:');
+          console.log('   Estado:', mexicanAddress.area_level1);
+          console.log('   Municipio:', mexicanAddress.area_level2);
+          console.log('   Colonia:', mexicanAddress.area_level3);
+          isMexicanCP = true;
+        } else {
+          console.log('❌ CP no encontrado en base mexicana');
+          isMexicanCP = false;
+        }
+      } catch (error) {
+        console.log('❌ Error verificando base mexicana:', error.message);
+        isMexicanCP = false;
+      }
+
+      // PASO 2: Decidir qué función usar
+      if (isMexicanCP && !forceCountry) {
+        console.log('\n🇲🇽 DECISIÓN: Usar cotización nacional (México)');
+        console.log('📞 Llamando a getShippingQuote()...');
+        return await this.getShippingQuote(cartId, postalCodeTo);
+      } else {
+        console.log('\n🌍 DECISIÓN: Usar cotización internacional');
+        if (forceCountry) {
+          console.log('📋 Razón: País forzado =', forceCountry);
+        } else {
+          console.log('📋 Razón: CP no encontrado en base mexicana');
+        }
+        console.log('📞 Llamando a getShippingQuoteInternational()...');
+        return await this.getShippingQuoteInternational(cartId, postalCodeTo, forceCountry);
+      }
+
+    } catch (error) {
+      console.error('❌ ERROR EN COTIZACIÓN HÍBRIDA:');
+      console.error('   Mensaje:', error.message);
+      console.error('   Stack:', error.stack);
+      
+      return {
+        success: false,
+        isHybrid: true,
+        error: error.message,
+        details: 'Error en función híbrida de cotización',
+        timestamp: new Date().toISOString()
       };
     }
   }
