@@ -19,7 +19,8 @@ router.get('/', async (req, res) => {
         largo_cm,
         ancho_cm,
         peso_kg,
-        nivel_compresion
+        nivel_compresion,
+        hs_code
       FROM categorias 
       WHERE activo = true 
       ORDER BY orden ASC, nombre ASC
@@ -189,7 +190,8 @@ router.post('/', verifyToken, requireAdmin, async (req, res) => {
       largo_cm = 0,
       ancho_cm = 0,
       peso_kg = 0,
-      nivel_compresion = 'medio'
+      nivel_compresion = 'medio',
+      hs_code = null
     } = req.body;
     
     if (!nombre || nombre.trim() === '') {
@@ -230,11 +232,11 @@ router.post('/', verifyToken, requireAdmin, async (req, res) => {
     const query = `
       INSERT INTO categorias (
         nombre, descripcion, orden, activo,
-        alto_cm, largo_cm, ancho_cm, peso_kg, nivel_compresion
+        alto_cm, largo_cm, ancho_cm, peso_kg, nivel_compresion, hs_code
       )
-      VALUES ($1, $2, $3, true, $4, $5, $6, $7, $8)
+      VALUES ($1, $2, $3, true, $4, $5, $6, $7, $8, $9)
       RETURNING id_categoria, nombre, descripcion, orden, activo, fecha_creacion,
-                alto_cm, largo_cm, ancho_cm, peso_kg, nivel_compresion
+                alto_cm, largo_cm, ancho_cm, peso_kg, nivel_compresion, hs_code
     `;
     
     const result = await database.query(query, [
@@ -245,7 +247,8 @@ router.post('/', verifyToken, requireAdmin, async (req, res) => {
       parseFloat(largo_cm) || 0,
       parseFloat(ancho_cm) || 0,
       parseFloat(peso_kg) || 0,
-      nivel_compresion
+      nivel_compresion,
+      hs_code?.trim() || null
     ]);
     
     res.json({
@@ -275,7 +278,8 @@ router.put('/:id', verifyToken, requireAdmin, async (req, res) => {
       largo_cm,
       ancho_cm,
       peso_kg,
-      nivel_compresion
+      nivel_compresion,
+      hs_code
     } = req.body;
     
     if (!nombre || nombre.trim() === '') {
@@ -324,10 +328,10 @@ router.put('/:id', verifyToken, requireAdmin, async (req, res) => {
     const query = `
       UPDATE categorias 
       SET nombre = $1, descripcion = $2, orden = $3, activo = $4,
-          alto_cm = $5, largo_cm = $6, ancho_cm = $7, peso_kg = $8, nivel_compresion = $9
-      WHERE id_categoria = $10
+          alto_cm = $5, largo_cm = $6, ancho_cm = $7, peso_kg = $8, nivel_compresion = $9, hs_code = $10
+      WHERE id_categoria = $11
       RETURNING id_categoria, nombre, descripcion, orden, activo, fecha_creacion, fecha_actualizacion,
-                alto_cm, largo_cm, ancho_cm, peso_kg, nivel_compresion
+                alto_cm, largo_cm, ancho_cm, peso_kg, nivel_compresion, hs_code
     `;
     
     const result = await database.query(query, [
@@ -340,6 +344,7 @@ router.put('/:id', verifyToken, requireAdmin, async (req, res) => {
       ancho_cm !== undefined ? parseFloat(ancho_cm) || 0 : currentCategory.ancho_cm,
       peso_kg !== undefined ? parseFloat(peso_kg) || 0 : currentCategory.peso_kg,
       nivel_compresion || currentCategory.nivel_compresion,
+      hs_code?.trim() || null,
       id
     ]);
     
