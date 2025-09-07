@@ -74,14 +74,9 @@ async function testSanNicolasToEscobedo() {
           }
         ],
         requested_carriers: [
-          "paquetexpress",
           "fedex",
-          "ups",
-          "ampm",
-          "estafeta", 
-          "dhl",
-          "ninetynineminutes",
-          "sendex"
+          "dhl", 
+          "paquetexpress"
         ],
         shipment_type: "package",
         quote_type: "carrier"
