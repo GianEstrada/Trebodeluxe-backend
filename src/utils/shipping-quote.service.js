@@ -898,32 +898,7 @@ class ShippingQuoteService {
         console.log('⚠️  ADVERTENCIA: Dirección genérica - puede afectar precisión');
       }
 
-      // Preparar productos para la API internacional (formato correcto según SkyDropX)
-      console.log('📦 Paso 3.5: Preparando productos para API internacional...');
-      const productsForParcel = cartData.cartItems.map((item, index) => {
-        const unitPrice = parseFloat(item.precio) || 10.0;
-        
-        // Asegurar descripción en inglés con mínimo 15 caracteres
-        let descriptionEn = `Cotton clothing item - ${item.producto_nombre || `Product ${index + 1}`}`;
-        if (descriptionEn.length < 15) {
-          descriptionEn = `Cotton clothing product - Item ${index + 1} from Mexico`;
-        }
-        
-        return {
-          hs_code: "6109.10.00", // Código arancelario válido para ropa de algodón
-          description_en: descriptionEn.substring(0, 100), // Máximo 100 caracteres
-          country_code: "MX", // País de origen (México)
-          quantity: parseInt(item.cantidad) || 1,
-          price: parseFloat(unitPrice.toFixed(2)) // Precio por unidad como número
-        };
-      });
-
-      console.log('📋 Productos preparados para parcel internacional:', productsForParcel.length);
-      productsForParcel.forEach((product, index) => {
-        console.log(`   ${index + 1}. ${product.description_en} - Qty: ${product.quantity} - Price: $${product.price}`);
-      });
-
-      // Preparar payload para SkyDropX (formato correcto según ejemplo)
+      // Preparar payload para SkyDropX
       quotationPayload = {
         quotation: {
           order_id: `cart_${cartId}_${Date.now()}`,
@@ -935,10 +910,12 @@ class ShippingQuoteService {
               width: Math.ceil(cartData.dimensions.width),
               height: Math.ceil(cartData.dimensions.height),
               weight: Math.ceil(cartData.totalWeight),
-              products: productsForParcel // Productos dentro del parcel según formato SkyDropX
+              declared_value: Math.ceil(cartData.totalValue), // Usar valor real del carrito
+              description: "Cotton clothing items" // Descripción genérica para evitar errores HS
             }
-          ]
-          // Sin requested_carriers para obtener todos los carriers disponibles
+          ],
+          shipment_type: "package",
+          quote_type: "carrier"
         }
       };
 
@@ -1079,7 +1056,8 @@ class ShippingQuoteService {
               width: Math.ceil(cartData.dimensions.width),
               height: Math.ceil(cartData.dimensions.height),
               weight: Math.ceil(cartData.totalWeight),
-              declared_value: 1000 // Valor declarado en pesos mexicanos
+              declared_value: Math.ceil(cartData.totalValue), // Usar valor real del carrito
+              description: "Cotton clothing items" // Descripción genérica para clasificación
             }
           ],
           // No especificar requested_carriers inicialmente para obtener todas las opciones
