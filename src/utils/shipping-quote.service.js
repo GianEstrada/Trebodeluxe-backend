@@ -898,19 +898,44 @@ class ShippingQuoteService {
         console.log('⚠️  ADVERTENCIA: Dirección genérica - puede afectar precisión');
       }
 
+      // Preparar productos para la API internacional
+      console.log('📦 Paso 3.5: Preparando productos para API internacional...');
+      const products = cartData.cartItems.map((item, index) => {
+        const unitPrice = parseFloat(item.precio) || 10.0; // Precio unitario
+        const totalValue = unitPrice * item.cantidad;
+        
+        return {
+          description: item.producto_nombre || `Producto ${index + 1}`,
+          sku: `SKU-${item.id_producto}-${item.id_variante}-${item.id_talla}`,
+          quantity: parseInt(item.cantidad) || 1,
+          weight: parseFloat(item.peso_kg) || 0.5, // Peso en kg
+          unit_value: parseFloat(unitPrice.toFixed(2)),
+          total_value: parseFloat(totalValue.toFixed(2)),
+          currency: "MXN",
+          country_of_origin: "MX",
+          harmonized_code: "6109.10.00" // Código genérico para ropa
+        };
+      });
+
+      console.log('📋 Productos preparados para envío internacional:', products.length);
+      products.forEach((product, index) => {
+        console.log(`   ${index + 1}. ${product.description} - Qty: ${product.quantity} - Value: $${product.total_value} MXN`);
+      });
+
       // Preparar payload para SkyDropX
       quotationPayload = {
         quotation: {
           order_id: `cart_${cartId}_${Date.now()}`,
           address_from: this.addressFrom,
           address_to: addressTo,
+          products: products, // Campo requerido para API internacional
           parcels: [
             {
               length: Math.ceil(cartData.dimensions.length),
               width: Math.ceil(cartData.dimensions.width),
               height: Math.ceil(cartData.dimensions.height),
               weight: Math.ceil(cartData.totalWeight),
-              declared_value: 1000 // Valor declarado en pesos mexicanos
+              declared_value: products.reduce((sum, p) => sum + p.total_value, 0) // Suma del valor de productos
             }
           ],
           shipment_type: "package",
