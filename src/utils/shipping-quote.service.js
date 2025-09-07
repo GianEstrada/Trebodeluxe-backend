@@ -980,7 +980,7 @@ class ShippingQuoteService {
       console.log('📦 Paso 3.5: Preparando productos con códigos HS de categorías...');
       const productsForParcel = cartData.cartItems.map((item, index) => {
         const unitPrice = parseFloat(item.precio) || 10.0;
-        const hsCode = item.categoria_hs_code || '6109.90.00'; // Fallback genérico
+        const hsCode = item.categoria_hs_code || '6217.90.90'; // Fallback seguro para accesorios textiles
         
         // Generar descripción en inglés basada en la categoría
         let descriptionEn = `${item.categoria_nombre} - ${item.variante_nombre}`;

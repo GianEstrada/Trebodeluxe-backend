@@ -1,6 +1,10 @@
 const { Client } = require('pg');
 const fs = require('fs');
 const path = require('path');
+const dotenv = require('dotenv');
+
+// Cargar variables de entorno
+dotenv.config();
 
 async function runHSCodeMigration() {
   console.log('🗄️ =======================================');
@@ -9,8 +13,19 @@ async function runHSCodeMigration() {
   console.log('⏰ Timestamp:', new Date().toISOString());
   console.log('');
 
+  // Usar la DATABASE_URL del archivo .env
+  const DATABASE_URL = process.env.DATABASE_URL;
+  
+  if (!DATABASE_URL) {
+    console.error('❌ DATABASE_URL no está definida en el archivo .env');
+    process.exit(1);
+  }
+
+  console.log('🔗 Conectando a base de datos...');
+  console.log('🔗 Host:', DATABASE_URL.split('@')[1]?.split('/')[0] || 'No detectado');
+
   const client = new Client({
-    connectionString: 'postgresql://trebolux_usr:9A9s1dLLF2PG@dpg-d1rk123e5dus73bsib8g-a/trebolux_db',
+    connectionString: DATABASE_URL,
     ssl: { rejectUnauthorized: false }
   });
 

@@ -20,7 +20,7 @@ async function testHSCodeImplementation() {
         precio: 350.00,
         id_categoria: 1,
         categoria_nombre: 'Playeras',
-        categoria_hs_code: '6109.10.00', // HS code para playeras de algodón
+        categoria_hs_code: '6109.10.10', // HS code válido para playeras de algodón
         alto_cm: 2.0,
         largo_cm: 30.0,
         ancho_cm: 25.0,
@@ -39,7 +39,7 @@ async function testHSCodeImplementation() {
         precio: 650.00,
         id_categoria: 2,
         categoria_nombre: 'Sudaderas',
-        categoria_hs_code: '6110.20.00', // HS code para sudaderas
+        categoria_hs_code: '6110.20.20', // HS code válido para sudaderas
         alto_cm: 3.0,
         largo_cm: 35.0,
         ancho_cm: 28.0,
