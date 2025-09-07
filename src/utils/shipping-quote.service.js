@@ -134,6 +134,7 @@ class ShippingQuoteService {
           s.precio,
           p.id_categoria,
           c.nombre as categoria_nombre,
+          c.hs_code as categoria_hs_code,
           c.alto_cm,
           c.largo_cm,
           c.ancho_cm,
@@ -180,6 +181,7 @@ class ShippingQuoteService {
         console.log(`   🔢 Cantidad: ${item.cantidad}`);
         console.log(`   💰 Precio: $${item.precio}`);
         console.log(`   🏷️  Categoría: ${item.categoria_nombre} (ID: ${item.id_categoria})`);
+        console.log(`   🏛️  Código HS: ${item.categoria_hs_code || 'NO DEFINIDO'}`);
         console.log(`   📏 Dimensiones: ${item.largo_cm}x${item.ancho_cm}x${item.alto_cm} cm`);
         console.log(`   ⚖️  Peso: ${item.peso_kg} kg`);
         console.log(`   🗜️  Compresión: ${item.nivel_compresion}`);
@@ -974,6 +976,62 @@ class ShippingQuoteService {
         console.log('⚠️  ADVERTENCIA: Dirección genérica - puede afectar precisión');
       }
 
+      // Preparar productos para la API internacional con códigos HS reales
+      console.log('📦 Paso 3.5: Preparando productos con códigos HS de categorías...');
+      const productsForParcel = cartData.cartItems.map((item, index) => {
+        const unitPrice = parseFloat(item.precio) || 10.0;
+        const hsCode = item.categoria_hs_code || '6109.90.00'; // Fallback genérico
+        
+        // Generar descripción en inglés basada en la categoría
+        let descriptionEn = `${item.categoria_nombre} - ${item.variante_nombre}`;
+        
+        // Traducir categorías comunes al inglés
+        const categoryTranslations = {
+          'playeras': 'T-shirt',
+          'camisetas': 'T-shirt', 
+          'sueteres': 'Sweater',
+          'hoodies': 'Hoodie',
+          'sudaderas': 'Sweatshirt',
+          'pantalones': 'Pants',
+          'jeans': 'Jeans',
+          'shorts': 'Shorts',
+          'faldas': 'Skirt',
+          'vestidos': 'Dress',
+          'gorras': 'Cap',
+          'sombreros': 'Hat',
+          'zapatos': 'Shoes',
+          'tenis': 'Sneakers',
+          'sandalias': 'Sandals',
+          'bolsas': 'Bag',
+          'mochilas': 'Backpack',
+          'carteras': 'Purse'
+        };
+        
+        const categoryKey = item.categoria_nombre.toLowerCase();
+        const translatedCategory = categoryTranslations[categoryKey] || 'Cotton clothing';
+        descriptionEn = `${translatedCategory} - ${item.variante_nombre}`;
+        
+        // Asegurar mínimo 15 caracteres
+        if (descriptionEn.length < 15) {
+          descriptionEn = `Cotton ${translatedCategory} from Mexico`;
+        }
+        
+        console.log(`   📦 Producto ${index + 1}: ${item.producto_nombre}`);
+        console.log(`     🏛️  HS Code: ${hsCode} (Categoría: ${item.categoria_nombre})`);
+        console.log(`     🌍 Descripción EN: ${descriptionEn}`);
+        console.log(`     💰 Precio: $${unitPrice} x ${item.cantidad}`);
+        
+        return {
+          hs_code: hsCode,
+          description_en: descriptionEn.substring(0, 100), // Máximo 100 caracteres
+          country_code: "MX", // País de origen (México)
+          quantity: parseInt(item.cantidad) || 1,
+          price: parseFloat(unitPrice.toFixed(2))
+        };
+      });
+
+      console.log(`📋 ${productsForParcel.length} productos preparados con códigos HS reales`);
+
       // Preparar payload para SkyDropX
       quotationPayload = {
         quotation: {
@@ -986,8 +1044,7 @@ class ShippingQuoteService {
               width: Math.ceil(cartData.dimensions.width),
               height: Math.ceil(cartData.dimensions.height),
               weight: Math.ceil(cartData.totalWeight),
-              declared_value: Math.ceil(cartData.totalValue), // Usar valor real del carrito
-              description: "Cotton clothing items" // Descripción genérica para evitar errores HS
+              products: productsForParcel // Productos con códigos HS reales
             }
           ],
           shipment_type: "package",
