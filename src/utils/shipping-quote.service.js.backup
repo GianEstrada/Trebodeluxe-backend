@@ -1,0 +1,818 @@
+const { SkyDropXAuth } = require('./skydropx-auth');
+const db = require('../config/db');
+const axios = require('axios');
+const fs = require('fs').promises;
+const path = require('path');
+
+class ShippingQuoteService {
+  constructor() {
+    this.skyDropXAuth = new SkyDropXAuth();
+    this.baseUrl = 'https://pro.skydropx.com/api/v1';
+    
+    // Cache para códigos postales
+    this.postalCodeCache = new Map();
+    this.postalCodeDataLoaded = false;
+    
+    // Configuración del origen (Monterrey, NL)
+    this.addressFrom = {
+      country_code: "MX",
+      async getShippingQuote(cartId, postalCodeTo) {
+    let quotationPayload = null; // Declarar fuera del try para acceso en catch
+    
+    try {
+      console.log('� =========================');
+      console.log('💰 INICIANDO COTIZACIÓN DE ENVÍO');
+      console.log('🚀 =========================');
+      console.log('📦 Cart ID:', cartId);
+      console.log('📍 Código postal destino:', postalCodeTo);
+      console.log('⏰ Timestamp:', new Date().toISOString());_code: "64000",
+      area_level1: "Nuevo León",
+      area_level2: "Monterrey",
+      area_level3: "Monterrey Centro"
+    };
+    
+    // Paqueterías disponibles - incluir más opciones para mejor cobertura
+    this.requestedCarriers = [
+      "paquetexpress",
+      "fedex",
+      "dhl",
+      "estafeta"
+    ];
+  }
+
+  /**
+   * Carga los códigos postales desde archivo CPdescarga.txt
+   * @returns {Promise<void>}
+   */
+  async loadPostalCodeData() {
+    if (this.postalCodeDataLoaded) return;
+    
+    try {
+      console.log('📂 Cargando base de datos de códigos postales...');
+      
+      // Intentar múltiples rutas para mayor compatibilidad
+      const possiblePaths = [
+        path.join(__dirname, '..', 'Data', 'CPdescarga.txt'),   // Actual ubicación
+        path.join(__dirname, '..', 'data', 'CPdescarga.txt'),  // Minúsculas
+        path.join(process.cwd(), 'src', 'Data', 'CPdescarga.txt'), // Desde root
+        path.join(process.cwd(), 'src', 'data', 'CPdescarga.txt')  // Desde root minúsculas
+      ];
+      
+      let filePath = null;
+      for (const testPath of possiblePaths) {
+        try {
+          await fs.access(testPath);
+          filePath = testPath;
+          console.log(`✅ Archivo encontrado en: ${filePath}`);
+          break;
+        } catch {
+          // Continuar con la siguiente ruta
+        }
+      }
+      
+      if (!filePath) {
+        throw new Error('Archivo CPdescarga.txt no encontrado en ninguna ubicación esperada');
+      }
+      
+      const fileContent = await fs.readFile(filePath, 'utf-8');
+      
+      const lines = fileContent.split('\n');
+      let loadedCount = 0;
+      let processedCPs = new Set();
+      
+      for (const line of lines) {
+        if (line.trim() && line.includes('|')) {
+          const parts = line.split('|');
+          
+          // Formato SEPOMEX: CP|Colonia|Tipo|Municipio|Estado|Ciudad|...
+          if (parts.length >= 5) {
+            const cp = parts[0].trim();
+            const colonia = parts[1].trim();
+            const municipio = parts[3].trim(); 
+            const estado = parts[4].trim();
+            
+            // Validar que el CP sea numérico de 5 dígitos
+            if (/^\d{5}$/.test(cp) && estado && municipio && colonia) {
+              // Si ya tenemos este CP, preferir la primera colonia encontrada
+              if (!processedCPs.has(cp)) {
+                this.postalCodeCache.set(cp, {
+                  country_code: "MX",
+                  postal_code: cp,
+                  area_level1: estado,
+                  area_level2: municipio,
+                  area_level3: colonia
+                });
+                processedCPs.add(cp);
+                loadedCount++;
+              }
+            }
+          }
+        }
+      }
+      
+      console.log(`✅ Códigos postales cargados: ${loadedCount}`);
+      this.postalCodeDataLoaded = true;
+      
+    } catch (error) {
+      console.error('❌ Error cargando códigos postales:', error.message);
+      console.log('🔄 Continuando con APIs externas como fallback...');
+    }
+  }
+
+  /**
+   * Obtiene los datos completos del carrito con productos, variantes y categorías
+   * @param {string} cartId - ID del carrito
+   * @returns {Promise<Object>} Datos del carrito con dimensiones calculadas
+   */
+  async getCartShippingData(cartId) {
+    try {
+      console.log('🛒 Obteniendo datos del carrito para envío:', cartId);
+
+      // Primero verificar si el carrito existe
+      const cartCheck = await db.query('SELECT id_carrito FROM carritos WHERE id_carrito = $1', [cartId]);
+      if (cartCheck.rows.length === 0) {
+        throw new Error(`Carrito con ID ${cartId} no encontrado`);
+      }
+
+      const query = `
+        SELECT 
+          cc.id_contenido,
+          cc.cantidad,
+          p.id_producto,
+          CONCAT(p.nombre, ' - ', v.nombre) as producto_nombre,
+          s.precio,
+          p.id_categoria,
+          c.nombre as categoria_nombre,
+          c.alto_cm,
+          c.largo_cm,
+          c.ancho_cm,
+          c.peso_kg,
+          c.nivel_compresion,
+          v.id_variante,
+          v.nombre as variante_nombre,
+          t.id_talla,
+          t.nombre_talla as talla_nombre
+        FROM contenido_carrito cc
+        INNER JOIN productos p ON cc.id_producto = p.id_producto
+        INNER JOIN categorias c ON p.id_categoria = c.id_categoria
+        INNER JOIN variantes v ON cc.id_variante = v.id_variante
+        INNER JOIN tallas t ON cc.id_talla = t.id_talla
+        INNER JOIN stock s ON cc.id_producto = s.id_producto 
+                           AND cc.id_variante = s.id_variante 
+                           AND cc.id_talla = s.id_talla
+        WHERE cc.id_carrito = $1
+        ORDER BY cc.fecha_agregado
+      `;
+
+      const result = await db.query(query, [cartId]);
+      
+      console.log('📋 Resultado de consulta del carrito:', {
+        rowCount: result.rows.length,
+        cartId: cartId
+      });
+      
+      if (result.rows.length === 0) {
+        throw new Error('Carrito vacío o no encontrado');
+      }
+
+      // Calcular dimensiones totales del envío
+      const shippingData = this.calculateShippingDimensions(result.rows);
+      
+      console.log('📦 Datos del carrito calculados:', {
+        items: result.rows.length,
+        totalWeight: shippingData.totalWeight,
+        dimensions: shippingData.dimensions
+      });
+
+      return {
+        cartItems: result.rows,
+        ...shippingData
+      };
+      
+    } catch (error) {
+      console.error('❌ Error obteniendo datos del carrito:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Calcula las dimensiones totales de envío basado en los productos del carrito
+   * @param {Array} cartItems - Items del carrito
+   * @returns {Object} Dimensiones calculadas
+   */
+  calculateShippingDimensions(cartItems) {
+    let totalWeight = 0;
+    let totalVolume = 0;
+    let maxLength = 0;
+    let maxWidth = 0;
+    let totalHeight = 0;
+
+    cartItems.forEach(item => {
+      const quantity = item.cantidad;
+      const itemWeight = parseFloat(item.peso_kg || 0) * quantity;
+      const itemHeight = parseFloat(item.alto_cm || 0);
+      const itemLength = parseFloat(item.largo_cm || 0);
+      const itemWidth = parseFloat(item.ancho_cm || 0);
+      
+      // Sumar peso total
+      totalWeight += itemWeight;
+      
+      // Calcular volumen
+      const itemVolume = itemHeight * itemLength * itemWidth * quantity;
+      totalVolume += itemVolume;
+      
+      // Mantener las dimensiones máximas
+      maxLength = Math.max(maxLength, itemLength);
+      maxWidth = Math.max(maxWidth, itemWidth);
+      totalHeight += itemHeight * quantity; // Apilar en altura
+    });
+
+    // Aplicar factor de compresión si es necesario
+    const compressionFactor = this.getCompressionFactor(cartItems);
+    const compressedHeight = totalHeight * compressionFactor;
+
+    return {
+      totalWeight: Math.max(totalWeight, 0.5), // Mínimo 0.5kg (500g) - corregido para KG
+      dimensions: {
+        length: Math.max(maxLength, 20), // Mínimo 20cm (más realista)
+        width: Math.max(maxWidth, 15),   // Mínimo 15cm (más realista)  
+        height: Math.max(compressedHeight, 8) // Mínimo 8cm (más realista)
+      },
+      compressionFactor: compressionFactor
+    };
+  }
+
+  /**
+   * Obtiene el factor de compresión basado en las categorías de productos
+   * @param {Array} cartItems - Items del carrito
+   * @returns {number} Factor de compresión (0.1 a 1.0)
+   */
+  getCompressionFactor(cartItems) {
+    // Obtener el factor de compresión promedio de las categorías
+    let totalCompression = 0;
+    let itemCount = 0;
+
+    cartItems.forEach(item => {
+      if (item.nivel_compresion) {
+        let compression;
+        switch(item.nivel_compresion.toLowerCase()) {
+          case 'bajo':
+            compression = 0.9; // 90% del volumen original
+            break;
+          case 'medio':
+            compression = 0.7; // 70% del volumen original
+            break;
+          case 'alto':
+            compression = 0.5; // 50% del volumen original
+            break;
+          default:
+            compression = 0.7; // Por defecto medio
+        }
+        totalCompression += compression;
+        itemCount++;
+      }
+    });
+
+    // Si no hay datos de compresión, usar factor conservador
+    if (itemCount === 0) {
+      return 0.7; // 70% de compresión por defecto
+    }
+
+    return Math.max(0.1, Math.min(1.0, totalCompression / itemCount));
+  }
+
+  /**
+   * Detecta el país basado en el formato del código postal
+   * @param {string} postalCode - Código postal a analizar
+   * @returns {string} Código de país ISO (mx, us, ca, etc.)
+   */
+  detectCountryFromPostalCode(postalCode) {
+    // Limpiar el código postal
+    const cleanCP = postalCode.toString().replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    
+    // México: 5 dígitos
+    if (/^\d{5}$/.test(cleanCP)) {
+      const num = parseInt(cleanCP);
+      
+      // Rangos específicos y exclusivos de México
+      if (num >= 1000 && num <= 16999) return 'mx'; // Ciudad de México y área
+      if (num >= 20000 && num <= 32999) return 'mx'; // Estados del centro-oeste
+      if (num >= 34000 && num <= 49999) return 'mx'; // Estados del oeste
+      if (num >= 50000 && num <= 59999) return 'mx'; // Estados del norte
+      if (num >= 70000 && num <= 96999) return 'mx'; // Estados del sur
+      if (num >= 97000 && num <= 99999) return 'mx'; // Yucatán
+      
+      // Rango conflictivo 60000-69999: puede ser México o USA
+      // Aplicar lógica más específica
+      if (num >= 60000 && num <= 69999) {
+        // CPs específicos de México en este rango
+        const mexicanCPs = [
+          60000, 60050, 60100, 60200, 60300, 60400, 60500, 60600, 60700, 60800, 60900,
+          61000, 61100, 61200, 61300, 61400, 61500, 61600, 61700, 61800, 61900,
+          62000, 62100, 62200, 62300, 62400, 62500, 62600, 62700, 62800, 62900,
+          63000, 63100, 63200, 63300, 63400, 63500, 63600, 63700, 63800, 63900,
+          64000, 64100, 64200, 64300, 64400, 64500, 64600, 64700, 64800, 64900,
+          65000, 65100, 65200, 65300, 65400, 65500, 65600, 65700, 65800, 65900,
+          66000, 66100, 66200, 66300, 66400, 66500, 66600, 66700, 66800, 66900,
+          67000, 67100, 67200, 67300, 67400, 67500, 67600, 67700, 67800, 67900,
+          68000, 68100, 68200, 68300, 68400, 68500, 68600, 68700, 68800, 68900,
+          69000, 69100, 69200, 69300, 69400, 69500, 69600, 69700, 69800, 69900
+        ];
+        
+        // Si el CP coincide exactamente con uno mexicano conocido
+        if (mexicanCPs.includes(num)) {
+          return 'mx';
+        }
+        
+        // Para CPs específicos como 61422, verificar si es formato USA común
+        // Los ZIP codes de USA en este rango suelen ser de Illinois
+        if (num === 61422) {
+          return 'us'; // Illinois, USA
+        }
+        
+        // Por defecto en este rango, preferir USA
+        return 'us';
+      }
+      
+      // Si no está en rangos conocidos de México, probablemente sea USA
+      return 'us';
+    }
+    
+    // Estados Unidos: 5 dígitos o 5+4 (ZIP codes)
+    if (/^\d{5}(-?\d{4})?$/.test(cleanCP)) {
+      return 'us';
+    }
+    
+    // Canadá: Formato A1A 1A1
+    if (/^[A-Z]\d[A-Z]\s?\d[A-Z]\d$/.test(cleanCP)) {
+      return 'ca';
+    }
+    
+    // Reino Unido: Varios formatos
+    if (/^[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}$/.test(cleanCP)) {
+      return 'gb';
+    }
+    
+    // Francia: 5 dígitos
+    if (/^(0[1-9]|[1-8]\d|9[0-5])\d{3}$/.test(cleanCP)) {
+      return 'fr';
+    }
+    
+    // Alemania: 5 dígitos
+    if (/^[0-9]{5}$/.test(cleanCP)) {
+      const num = parseInt(cleanCP);
+      if (num >= 1000 && num <= 99999) {
+        // Rango alemán es típicamente 01067-99998
+        return 'de';
+      }
+    }
+    
+    // Por defecto, asumir México si es 5 dígitos
+    if (/^\d{5}$/.test(cleanCP)) {
+      return 'mx';
+    }
+    
+    // Si no se puede determinar, asumir México
+    return 'mx';
+  }
+
+  /**
+   * Obtiene datos de dirección basado en código postal
+   * @param {string} postalCode - Código postal destino
+   * @returns {Promise<Object>} Datos de la dirección
+   */
+  async getAddressFromPostalCode(postalCode) {
+    try {
+      console.log(`🔍 BÚSQUEDA DE CÓDIGO POSTAL: ${postalCode}`);
+      console.log('=====================================');
+      
+      // PASO 0: Detectar país basado en formato del código postal
+      const detectedCountry = this.detectCountryFromPostalCode(postalCode);
+      console.log(`🌍 País detectado: ${detectedCountry.toUpperCase()}`);
+      
+      // Si es México, usar base de datos local primero
+      if (detectedCountry === 'mx') {
+        // Cargar datos locales si no están cargados
+        await this.loadPostalCodeData();
+        
+        // PASO 1: Verificar cache local primero (CPdescarga.txt)
+        console.log('📁 Paso 1: Buscando en base de datos local (CPdescarga.txt)...');
+        if (this.postalCodeCache.has(postalCode)) {
+          const localData = this.postalCodeCache.get(postalCode);
+          console.log(`✅ CP ${postalCode} ENCONTRADO en base local`);
+          console.log('📍 Datos locales:', JSON.stringify(localData, null, 2));
+          return localData;
+        }
+        
+        console.log(`❌ CP ${postalCode} NO encontrado en base local`);
+        console.log(`📊 Total CPs en cache local: ${this.postalCodeCache.size}`);
+      }
+      
+      // PASO 2: Usar API Zippopotam con el país detectado
+      console.log(`🌐 Paso 2: Consultando API Zippopotam.us para país ${detectedCountry.toUpperCase()}...`);
+      
+      try {
+        const zippopotamUrl = `http://api.zippopotam.us/${detectedCountry}/${postalCode}`;
+        console.log('🔗 URL Zippopotam:', zippopotamUrl);
+        
+        const response = await fetch(zippopotamUrl);
+        console.log(`📡 Response status: ${response.status} ${response.statusText}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('� Respuesta completa de Zippopotam:', JSON.stringify(data, null, 2));
+          
+          if (data && data.places && data.places[0]) {
+            const place = data.places[0];
+            
+            // Mapear datos de Zippopotam al formato universal
+            const addressData = {
+              country_code: detectedCountry.toUpperCase(),
+              postal_code: postalCode,
+              area_level1: place.state || place['state abbreviation'] || "",
+              area_level2: place['place name'] || "", // Ciudad/Municipio
+              area_level3: place['place name'] || ""  // Colonia (usar mismo valor como fallback)
+            };
+            
+            console.log('✅ CP encontrado en Zippopotam');
+            console.log('🏷️  Estado/Provincia:', addressData.area_level1);
+            console.log('🏷️  Ciudad/Municipio:', addressData.area_level2);
+            console.log('🏷️  Área/Colonia:', addressData.area_level3);
+            console.log('🌍 País:', addressData.country_code);
+            console.log('📍 Dirección final de Zippopotam:', JSON.stringify(addressData, null, 2));
+            
+            // Guardar en cache para futuras consultas
+            this.postalCodeCache.set(postalCode, addressData);
+            console.log('💾 CP guardado en cache local para futuras consultas');
+            
+            return addressData;
+          } else {
+            console.log('❌ Zippopotam: Respuesta sin datos válidos');
+          }
+        } else {
+          console.log(`❌ Zippopotam: Error HTTP ${response.status}`);
+        }
+      } catch (zippopotamError) {
+        console.log('❌ Error consultando Zippopotam:', zippopotamError.message);
+      }
+      
+      // PASO 3: Fallback manual para CPs conocidos
+      console.log('🔧 Paso 3: Usando fallback manual para CPs conocidos...');
+      
+      
+      // PASO 3: Fallback manual para CPs conocidos comunes
+      console.log('🔧 Paso 3: Usando fallback manual para CPs conocidos...');
+      const knownPostalCodes = {
+        // Área Metropolitana de Monterrey
+        '64000': { area_level1: "Nuevo León", area_level2: "Monterrey", area_level3: "Centro" },
+        '64100': { area_level1: "Nuevo León", area_level2: "Monterrey", area_level3: "Del Valle" },
+        '64200': { area_level1: "Nuevo León", area_level2: "Monterrey", area_level3: "Obrera" },
+        '66000': { area_level1: "Nuevo León", area_level2: "San Nicolás de los Garza", area_level3: "Centro" },
+        '66050': { area_level1: "Nuevo León", area_level2: "General Escobedo", area_level3: "Centro" },
+        '66058': { area_level1: "Nuevo León", area_level2: "General Escobedo", area_level3: "Praderas de San José" },
+        '66450': { area_level1: "Nuevo León", area_level2: "San Nicolás de los Garza", area_level3: "Centro" },
+        
+        // Ciudad de México
+        '01000': { area_level1: "Ciudad de México", area_level2: "Álvaro Obregón", area_level3: "Colonia del Valle" },
+        '06000': { area_level1: "Ciudad de México", area_level2: "Cuauhtémoc", area_level3: "Centro" },
+        '11000': { area_level1: "Ciudad de México", area_level2: "Miguel Hidalgo", area_level3: "Lomas de Chapultepec" },
+        
+        // Guadalajara
+        '44100': { area_level1: "Jalisco", area_level2: "Guadalajara", area_level3: "Centro" },
+        '44200': { area_level1: "Jalisco", area_level2: "Guadalajara", area_level3: "Americana" },
+        '44300': { area_level1: "Jalisco", area_level2: "Guadalajara", area_level3: "Lafayette" }
+      };
+      
+      if (knownPostalCodes[postalCode]) {
+        const fallbackData = {
+          country_code: "MX",
+          postal_code: postalCode,
+          ...knownPostalCodes[postalCode]
+        };
+        
+        console.log('✅ CP encontrado en fallback manual');
+        console.log('📍 Datos fallback:', JSON.stringify(fallbackData, null, 2));
+        
+        // Guardar en cache para futuras consultas
+        this.postalCodeCache.set(postalCode, fallbackData);
+        console.log('💾 CP guardado en cache desde fallback manual');
+        
+        return fallbackData;
+      }
+      
+      // PASO 4: Error - no se pudo encontrar información
+      console.log('❌ Paso 4: CP no encontrado en ninguna fuente');
+      console.log(`🔍 Fuentes consultadas:
+        ❌ Base local (CPdescarga.txt): ${this.postalCodeCache.size} CPs disponibles
+        ❌ Zippopotam.us API
+        ❌ Fallback manual: ${Object.keys(knownPostalCodes).length} CPs conocidos`);
+      
+      throw new Error(`No se pudo obtener información del código postal ${postalCode} en ninguna fuente disponible`);
+      
+    } catch (error) {
+      console.error('❌ ERROR GENERAL obteniendo datos de dirección:', error.message);
+      console.error('🔍 Stack trace:', error.stack);
+      
+      // PASO 5: Fallback genérico como último recurso
+      console.log('🆘 Paso 5: Usando fallback genérico como último recurso...');
+      console.log('⚠️  ADVERTENCIA: Usando datos genéricos - puede afectar precisión de cotizaciones');
+      
+      const genericFallback = {
+        country_code: "MX",
+        postal_code: postalCode,
+        area_level1: "México", // Estado genérico
+        area_level2: "Ciudad", // Ciudad genérica  
+        area_level3: "Centro"  // Colonia genérica
+      };
+      
+      console.log('📍 Datos genéricos aplicados:', JSON.stringify(genericFallback, null, 2));
+      console.log('=====================================');
+      
+      return genericFallback;
+    }
+  }
+
+  /**
+   * Transforma datos internos de dirección al formato esperado por el frontend
+   * @param {Object} internalData - Datos en formato interno {country_code, postal_code, area_level1, area_level2, area_level3}
+   * @param {string} source - Fuente de los datos (local, zippopotam, manual, generic)
+   * @returns {Object} Datos en formato frontend {postalCode, city, state, country, source, coordinates}
+   */
+  transformAddressData(internalData, source = 'unknown') {
+    return {
+      postalCode: internalData.postal_code,
+      city: internalData.area_level2 || internalData.area_level3 || 'Ciudad',
+      state: internalData.area_level1 || 'Estado',
+      country: internalData.country_code || 'MX',
+      source: source,
+      coordinates: internalData.coordinates || null
+    };
+  }
+
+  /**
+   * Obtiene información de dirección formateada para el frontend
+   * @param {string} postalCode - Código postal
+   * @returns {Promise<Object>} Información de dirección en formato frontend
+   */
+  async getFormattedAddressFromPostalCode(postalCode) {
+    try {
+      const addressData = await this.getAddressFromPostalCode(postalCode);
+      
+      // Determinar la fuente basada en los datos
+      let source = 'unknown';
+      if (this.postalCodeCache.has(postalCode)) {
+        source = 'local';
+      } else if (addressData.country_code !== 'MX') {
+        source = 'zippopotam';
+      } else if (addressData.area_level1 === 'México' && addressData.area_level2 === 'Ciudad') {
+        source = 'generic';
+      } else {
+        source = 'manual';
+      }
+      
+      return this.transformAddressData(addressData, source);
+    } catch (error) {
+      throw new Error(`Error obteniendo dirección formateada: ${error.message}`);
+    }
+  }
+
+  /**
+   * Solicita cotización de envío a SkyDropX
+   * @param {string} cartId - ID del carrito
+   * @param {string} postalCodeTo - Código postal destino
+   * @returns {Promise<Object>} Cotizaciones de envío
+   */
+  async getShippingQuote(cartId, postalCodeTo) {
+    try {
+      console.log('� =========================');
+      console.log('💰 INICIANDO COTIZACIÓN DE ENVÍO');
+      console.log('🚀 =========================');
+      console.log('📦 Cart ID:', cartId);
+      console.log('📍 Código postal destino:', postalCodeTo);
+      console.log('⏰ Timestamp:', new Date().toISOString());
+
+      // Obtener token de autenticación
+      console.log('🔑 Paso 1: Obteniendo token de autenticación...');
+      const token = await this.skyDropXAuth.getBearerToken();
+      console.log('✅ Token obtenido exitosamente');
+      
+      // Obtener datos del carrito
+      console.log('🛒 Paso 2: Obteniendo datos del carrito...');
+      const cartData = await this.getCartShippingData(cartId);
+      console.log('📊 DATOS DEL CARRITO OBTENIDOS:');
+      console.log('   Items:', cartData.cartItems.length);
+      console.log('   Peso total:', cartData.totalWeight, 'kg');
+      console.log('   Dimensiones:', JSON.stringify(cartData.dimensions));
+      console.log('   Factor compresión:', cartData.compressionFactor);
+      
+      // Obtener datos de dirección destino
+      console.log('🗺️  Paso 3: Obteniendo dirección destino...');
+      const addressTo = await this.getAddressFromPostalCode(postalCodeTo);
+      console.log('📍 DIRECCIÓN DESTINO:');
+      console.log('   Estado:', addressTo.area_level1);
+      console.log('   Municipio:', addressTo.area_level2);
+      console.log('   Colonia:', addressTo.area_level3);
+      console.log('   CP:', addressTo.postal_code);
+
+      // Preparar payload para SkyDropX
+      const quotationPayload = {
+        quotation: {
+          order_id: `cart_${cartId}_${Date.now()}`,
+          address_from: this.addressFrom,
+          address_to: addressTo,
+          parcels: [
+            {
+              length: Math.ceil(cartData.dimensions.length),
+              width: Math.ceil(cartData.dimensions.width),
+              height: Math.ceil(cartData.dimensions.height),
+              weight: Math.ceil(cartData.totalWeight),
+              declared_value: 1000 // Valor declarado en pesos mexicanos
+            }
+          ],
+          // No especificar requested_carriers inicialmente para obtener todas las opciones
+          shipment_type: "package", // Tipo de envío
+          quote_type: "carrier" // Tipo de cotización
+        }
+      };
+
+      console.log('📤 Paso 4: Preparando solicitud a SkyDropX...');
+      console.log('🔗 URL:', `${this.baseUrl}/quotations`);
+      console.log('📋 PAYLOAD COMPLETO:', JSON.stringify(quotationPayload, null, 2));
+      console.log('🔑 Authorization: Bearer [TOKEN_PRESENTE]');
+      console.log('📤 Enviando solicitud...');
+
+      // Hacer petición a SkyDropX
+      const response = await axios.post(
+        `${this.baseUrl}/quotations`,
+        quotationPayload,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      console.log('📥 Respuesta de SkyDropX recibida');
+      console.log('🔍 STATUS RESPONSE:', response.status);
+      console.log('🔍 HEADERS RESPONSE:', JSON.stringify(response.headers, null, 2));
+      console.log('🔍 DATA RESPONSE COMPLETA:', JSON.stringify(response.data, null, 2));
+      
+      // Log específico de cotizaciones exitosas
+      if (response.data && response.data.rates) {
+        const successfulRates = response.data.rates.filter(rate => rate.success === true);
+        const failedRates = response.data.rates.filter(rate => rate.success === false);
+        
+        console.log(`📊 RESUMEN DE COTIZACIONES:`);
+        console.log(`   Total de rates: ${response.data.rates.length}`);
+        console.log(`   Exitosas: ${successfulRates.length}`);
+        console.log(`   Fallidas: ${failedRates.length}`);
+        
+        if (successfulRates.length > 0) {
+          console.log('✅ COTIZACIONES EXITOSAS:');
+          successfulRates.forEach((rate, index) => {
+            console.log(`   ${index + 1}. ${rate.provider_display_name} - ${rate.provider_service_name}: $${rate.total} ${rate.currency_code} (${rate.days} días)`);
+          });
+        }
+        
+        if (failedRates.length > 0) {
+          console.log('❌ COTIZACIONES FALLIDAS (primeras 3):');
+          failedRates.slice(0, 3).forEach((rate, index) => {
+            const errorMsg = rate.error_messages && rate.error_messages.length > 0 
+              ? rate.error_messages[0].error_message 
+              : 'Sin mensaje de error';
+            console.log(`   ${index + 1}. ${rate.provider_display_name} - ${rate.provider_service_name}: ${errorMsg}`);
+          });
+        }
+      }
+
+      return {
+        success: true,
+        cartData: {
+          items: cartData.cartItems.length,
+          totalWeight: cartData.totalWeight,
+          dimensions: cartData.dimensions,
+          compressionFactor: cartData.compressionFactor
+        },
+        quotations: response.data,
+        requestPayload: quotationPayload // Para debugging
+      };
+      
+      console.log('🎉 COTIZACIÓN COMPLETADA EXITOSAMENTE');
+      console.log('📊 Datos retornados al cliente:', JSON.stringify({
+        success: true,
+        totalQuotations: response.data.rates ? response.data.rates.length : 0,
+        successfulQuotations: response.data.rates ? response.data.rates.filter(r => r.success).length : 0,
+        cartItems: cartData.cartItems.length,
+        totalWeight: cartData.totalWeight + ' kg'
+      }, null, 2));
+      console.log('🚀 =========================');
+      
+      return {
+        success: true,
+        cartData: {
+          items: cartData.cartItems.length,
+          totalWeight: cartData.totalWeight,
+          dimensions: cartData.dimensions,
+          compressionFactor: cartData.compressionFactor
+        },
+        quotations: response.data,
+        requestPayload: quotationPayload // Para debugging
+      };
+
+    } catch (error) {
+      console.error('❌ Error obteniendo cotización de envío:', error.message);
+      
+      // Log detallado del error con más información
+      if (error.response) {
+        console.error('📋 DETALLES DEL ERROR DE SKYDROPX:');
+        console.error('🔍 STATUS ERROR:', error.response.status);
+        console.error('🔍 STATUS TEXT:', error.response.statusText);
+        console.error('🔍 HEADERS ERROR:', JSON.stringify(error.response.headers, null, 2));
+        console.error('🔍 DATA ERROR COMPLETA:', JSON.stringify(error.response.data, null, 2));
+        
+        // Log específico para errores comunes
+        if (error.response.status === 401) {
+          console.error('🚨 ERROR DE AUTENTICACIÓN: Token inválido o expirado');
+        } else if (error.response.status === 422) {
+          console.error('🚨 ERROR DE VALIDACIÓN: Datos de la solicitud incorrectos');
+        } else if (error.response.status === 429) {
+          console.error('🚨 ERROR DE RATE LIMIT: Demasiadas solicitudes');
+        } else if (error.response.status >= 500) {
+          console.error('🚨 ERROR DEL SERVIDOR: Problema en SkyDropX');
+        }
+      } else if (error.request) {
+        console.error('📋 ERROR DE RED/CONEXIÓN:');
+        console.error('🔍 REQUEST CONFIG:', JSON.stringify(error.config, null, 2));
+        console.error('🚨 No se recibió respuesta del servidor');
+      } else {
+        console.error('📋 ERROR DESCONOCIDO:');
+        console.error('🔍 ERROR STACK:', error.stack);
+      }
+      
+      return {
+        success: false,
+        error: error.message,
+        details: error.response?.data || 'No additional details available',
+        requestPayload: quotationPayload || null // Para debugging
+      };
+    }
+  }
+
+  /**
+   * Formatea las cotizaciones para el frontend
+   * @param {Object} quotationsResponse - Respuesta de SkyDropX
+   * @returns {Array} Cotizaciones formateadas
+   */
+  formatQuotationsForFrontend(quotationsResponse) {
+    console.log('🔄 Formateando cotizaciones para frontend...');
+    console.log('📋 Input recibido:', JSON.stringify(quotationsResponse, null, 2));
+    
+    if (!quotationsResponse.success || !quotationsResponse.quotations) {
+      console.log('❌ No hay cotizaciones exitosas para formatear');
+      return [];
+    }
+
+    const quotations = quotationsResponse.quotations;
+    
+    // La respuesta de SkyDropX tiene rates, no data
+    if (!quotations.rates || !Array.isArray(quotations.rates)) {
+      console.log('❌ No se encontró array de rates en la respuesta');
+      return [];
+    }
+
+    // Filtrar solo las cotizaciones exitosas
+    const successfulRates = quotations.rates.filter(rate => rate.success === true);
+    console.log(`📊 Rates exitosas encontradas: ${successfulRates.length} de ${quotations.rates.length} total`);
+
+    if (successfulRates.length === 0) {
+      console.log('❌ No hay rates exitosas para mostrar al frontend');
+      return [];
+    }
+
+    // Formatear según la estructura real de SkyDropX
+    const formattedQuotations = successfulRates.map(rate => {
+      const formatted = {
+        carrier: rate.provider_display_name,
+        service: rate.provider_service_name,
+        price: parseFloat(rate.total),
+        currency: rate.currency_code,
+        estimatedDays: rate.days,
+        description: `${rate.provider_display_name} - ${rate.provider_service_name}`,
+        // Datos adicionales útiles
+        cost: rate.cost,
+        zone: rate.zone,
+        rateId: rate.id
+      };
+      
+      console.log(`✅ Cotización formateada: ${formatted.carrier} - ${formatted.service}: $${formatted.price} ${formatted.currency} (${formatted.estimatedDays} días)`);
+      
+      return formatted;
+    });
+
+    console.log(`🎉 ${formattedQuotations.length} cotizaciones formateadas exitosamente`);
+    return formattedQuotations;
+  }
+}
+
+module.exports = ShippingQuoteService;
