@@ -5,10 +5,11 @@ const axios = require('axios');
  */
 class SkyDropXAuth {
   constructor() {
-    this.clientId = process.env.SKYDROP_API_KEY;
-    this.clientSecret = process.env.SKYDROP_API_SECRET;
+    // Usar las variables que tienes en Render
+    this.clientId = process.env.SKYDROP_CLIENT_ID || process.env.SKYDROP_API_KEY;
+    this.clientSecret = process.env.SKYDROP_CLIENT_SECRET || process.env.SKYDROP_API_SECRET;
     this.baseUrl = process.env.SKYDROP_BASE_URL || 'https://pro.skydropx.com/api/v1';
-    this.tokenUrl = 'https://pro.skydropx.com/api/v1/oauth/token';
+    this.tokenUrl = 'https://pro.skydropx.com/api/v1/oauth/token'; // ✅ URL correcta
     
     // Cache del token
     this.tokenCache = {
@@ -65,8 +66,16 @@ class SkyDropXAuth {
         timeout: 10000 // 10 segundos de timeout
       });
 
+      console.log('📥 Respuesta de autenticación recibida');
+      console.log('🔍 STATUS AUTH:', response.status);
+      console.log('🔍 HEADERS AUTH:', JSON.stringify(response.headers, null, 2));
+      console.log('🔍 DATA AUTH COMPLETA:', JSON.stringify(response.data, null, 2));
+
       if (response.data && response.data.access_token) {
         const { access_token, expires_in } = response.data;
+        
+        console.log('🔍 TOKEN OBTENIDO:', access_token.substring(0, 20) + '...');
+        console.log('🔍 EXPIRES_IN:', expires_in);
         
         // Guardar en cache (expires_in viene en segundos)
         this.tokenCache.token = access_token;
@@ -77,6 +86,7 @@ class SkyDropXAuth {
         
         return access_token;
       } else {
+        console.error('❌ Respuesta sin access_token:', response.data);
         throw new Error('Respuesta inválida del servidor de SkyDropX');
       }
 
@@ -84,11 +94,22 @@ class SkyDropXAuth {
       console.error('❌ Error obteniendo token de SkyDropX:', error.message);
       
       if (error.response) {
-        console.error('📋 Detalles del error:', {
-          status: error.response.status,
-          statusText: error.response.statusText,
-          data: error.response.data
-        });
+        console.error('📋 Detalles del error de autenticación:');
+        console.error('- Status:', error.response.status);
+        console.error('- Status Text:', error.response.statusText);
+        console.error('- Headers Error Auth:', JSON.stringify(error.response.headers, null, 2));
+        console.error('- Data Error Auth:', JSON.stringify(error.response.data, null, 2));
+        
+        if (error.response.data) {
+          console.error('🔍 ANÁLISIS ERROR AUTH:');
+          console.error('- Tipo:', typeof error.response.data);
+          console.error('- Keys:', Object.keys(error.response.data));
+        }
+      } else if (error.request) {
+        console.error('📋 Error de conexión en auth - No hubo respuesta:');
+        console.error('- Request:', error.request);
+      } else {
+        console.error('📋 Error configurando petición de auth:', error.message);
       }
       
       throw new Error(`Error de autenticación SkyDropX: ${error.message}`);

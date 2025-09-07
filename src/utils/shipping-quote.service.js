@@ -22,10 +22,12 @@ class ShippingQuoteService {
       area_level3: "Monterrey Centro"
     };
     
-    // Paqueterías disponibles (empezar con las más comunes)
+    // Paqueterías disponibles - incluir más opciones para mejor cobertura
     this.requestedCarriers = [
-      "estafeta",
-      "fedex"
+      "paquetexpress",
+      "fedex",
+      "dhl",
+      "estafeta"
     ];
   }
 
@@ -386,7 +388,7 @@ class ShippingQuoteService {
               declared_value: 1000 // Valor declarado en pesos mexicanos
             }
           ],
-          requested_carriers: this.requestedCarriers,
+          // No especificar requested_carriers inicialmente para obtener todas las opciones
           shipment_type: "package", // Tipo de envío
           quote_type: "carrier" // Tipo de cotización
         }
