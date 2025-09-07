@@ -898,48 +898,47 @@ class ShippingQuoteService {
         console.log('⚠️  ADVERTENCIA: Dirección genérica - puede afectar precisión');
       }
 
-      // Preparar productos para la API internacional
+      // Preparar productos para la API internacional (formato correcto según SkyDropX)
       console.log('📦 Paso 3.5: Preparando productos para API internacional...');
-      const products = cartData.cartItems.map((item, index) => {
-        const unitPrice = parseFloat(item.precio) || 10.0; // Precio unitario
-        const totalValue = unitPrice * item.cantidad;
+      const productsForParcel = cartData.cartItems.map((item, index) => {
+        const unitPrice = parseFloat(item.precio) || 10.0;
+        
+        // Asegurar descripción en inglés con mínimo 15 caracteres
+        let descriptionEn = `Cotton clothing item - ${item.producto_nombre || `Product ${index + 1}`}`;
+        if (descriptionEn.length < 15) {
+          descriptionEn = `Cotton clothing product - Item ${index + 1} from Mexico`;
+        }
         
         return {
-          description: item.producto_nombre || `Producto ${index + 1}`,
-          sku: `SKU-${item.id_producto}-${item.id_variante}-${item.id_talla}`,
+          hs_code: "6109.10.00", // Código arancelario válido para ropa de algodón
+          description_en: descriptionEn.substring(0, 100), // Máximo 100 caracteres
+          country_code: "MX", // País de origen (México)
           quantity: parseInt(item.cantidad) || 1,
-          weight: parseFloat(item.peso_kg) || 0.5, // Peso en kg
-          unit_value: parseFloat(unitPrice.toFixed(2)),
-          total_value: parseFloat(totalValue.toFixed(2)),
-          currency: "MXN",
-          country_of_origin: "MX",
-          harmonized_code: "6109.10.00" // Código genérico para ropa
+          price: parseFloat(unitPrice.toFixed(2)) // Precio por unidad como número
         };
       });
 
-      console.log('📋 Productos preparados para envío internacional:', products.length);
-      products.forEach((product, index) => {
-        console.log(`   ${index + 1}. ${product.description} - Qty: ${product.quantity} - Value: $${product.total_value} MXN`);
+      console.log('📋 Productos preparados para parcel internacional:', productsForParcel.length);
+      productsForParcel.forEach((product, index) => {
+        console.log(`   ${index + 1}. ${product.description_en} - Qty: ${product.quantity} - Price: $${product.price}`);
       });
 
-      // Preparar payload para SkyDropX
+      // Preparar payload para SkyDropX (formato correcto según ejemplo)
       quotationPayload = {
         quotation: {
           order_id: `cart_${cartId}_${Date.now()}`,
           address_from: this.addressFrom,
           address_to: addressTo,
-          products: products, // Campo requerido para API internacional
           parcels: [
             {
               length: Math.ceil(cartData.dimensions.length),
               width: Math.ceil(cartData.dimensions.width),
               height: Math.ceil(cartData.dimensions.height),
               weight: Math.ceil(cartData.totalWeight),
-              declared_value: products.reduce((sum, p) => sum + p.total_value, 0) // Suma del valor de productos
+              products: productsForParcel // Productos dentro del parcel según formato SkyDropX
             }
-          ],
-          shipment_type: "package",
-          quote_type: "carrier"
+          ]
+          // Sin requested_carriers para obtener todos los carriers disponibles
         }
       };
 
