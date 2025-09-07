@@ -60,6 +60,7 @@ try {
   const categoriasRoutes = require('./src/routes/categorias.routes');
   const skydropxRoutes = require('./src/routes/skydropx.routes');
   const adminVariantRoutes = require('./src/routes/admin.variant.routes');
+  const stripeRoutes = require('./routes/stripe.routes');
   const { setupSiteSettings } = require('./src/setup-site-settings');
   
   // Crear la aplicación Express
@@ -145,6 +146,7 @@ try {
   app.use('/api/categorias', categoriasRoutes);
   app.use('/api/skydropx', skydropxRoutes);
   app.use('/api/admin/variants', adminVariantRoutes);
+  app.use('/api/stripe', stripeRoutes);
   
   console.log('✅ Todas las rutas configuradas correctamente');
 
@@ -213,6 +215,10 @@ try {
     - DELETE /api/cart/clear (CARRITO) 🛒
     - GET  /api/public/index-images (PÚBLICO) 🌐
     - GET  /api/public/index-images/:seccion/:estado (PÚBLICO) 🌐
+    - POST /api/stripe/create-payment-intent (STRIPE) 💳
+    - GET  /api/stripe/payment-intent/:id (STRIPE) 💳
+    - POST /api/stripe/webhook (STRIPE) 💳
+    - POST /api/stripe/refund (STRIPE) 💳
     `);
     
     // Configurar tablas automáticamente
