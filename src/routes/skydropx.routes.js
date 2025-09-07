@@ -105,64 +105,6 @@ router.post('/cart/quote', async (req, res) => {
   }
 });
 
-// Obtener cotización de envío HÍBRIDA (México + Internacional)
-router.post('/cart/quote-hybrid', async (req, res) => {
-  try {
-    const { cartId, postalCode, countryCode } = req.body;
-
-    // Validar datos requeridos
-    if (!cartId || !postalCode) {
-      return res.status(400).json({
-        success: false,
-        message: 'Se requieren cartId y postalCode'
-      });
-    }
-
-    console.log('🔄 Procesando cotización HÍBRIDA para carrito:', cartId, 'CP:', postalCode, 'País:', countryCode || 'Auto-detección');
-
-    const shippingQuoteService = new ShippingQuoteService();
-    
-    // Usar función híbrida que decide automáticamente entre nacional e internacional
-    const result = await shippingQuoteService.getShippingQuoteHybrid(cartId, postalCode, countryCode);
-
-    if (result.success) {
-      // Formatear cotizaciones para el frontend
-      const formattedQuotes = shippingQuoteService.formatQuotationsForFrontend(result);
-      
-      res.json({
-        success: true,
-        isHybrid: true,
-        isInternational: result.isInternational || false,
-        cartData: result.cartData,
-        quotations: formattedQuotes,
-        raw: result.quotations, // Para debugging
-        message: 'Cotizaciones híbridas obtenidas exitosamente',
-        decisionInfo: {
-          countryDetected: result.countryDetected,
-          decisionReason: result.decisionReason
-        }
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        message: 'Error obteniendo cotizaciones híbridas',
-        error: result.error,
-        details: result.details,
-        isHybrid: true
-      });
-    }
-
-  } catch (error) {
-    console.error('❌ Error en ruta de cotización híbrida:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error interno del servidor',
-      error: error.message,
-      isHybrid: true
-    });
-  }
-});
-
 // Obtener datos del carrito para envío (solo para debugging)
 router.get('/cart/:cartId/shipping-data', async (req, res) => {
   try {
@@ -381,6 +323,128 @@ router.get('/stats', verifyToken, requireAdmin, async (req, res) => {
       success: false,
       message: 'Error interno del servidor',
       error: error.message
+    });
+  }
+});
+
+// Obtener cotización de envío híbrida (México automático vs Internacional)
+router.post('/cart/quote-hybrid', async (req, res) => {
+  try {
+    const { cartId, postalCode, forceCountry } = req.body;
+
+    // Validar datos requeridos
+    if (!cartId || !postalCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Se requieren cartId y postalCode'
+      });
+    }
+
+    // Validar formato básico de código postal (mínimo 3 dígitos)
+    if (postalCode.length < 3) {
+      return res.status(400).json({
+        success: false,
+        message: 'Código postal debe tener al menos 3 caracteres'
+      });
+    }
+
+    console.log('🔄 Procesando solicitud de cotización HÍBRIDA para carrito:', cartId, 'CP:', postalCode, 'País forzado:', forceCountry || 'Auto');
+
+    const shippingQuoteService = new ShippingQuoteService();
+    const result = await shippingQuoteService.getShippingQuoteHybrid(cartId, postalCode, forceCountry);
+
+    if (result.success) {
+      // Formatear cotizaciones para el frontend
+      const formattedQuotes = shippingQuoteService.formatQuotationsForFrontend(result);
+      
+      res.json({
+        success: true,
+        isHybrid: true,
+        decision: result.isInternational ? 'internacional' : 'nacional',
+        cartData: result.cartData,
+        quotations: formattedQuotes,
+        raw: result.quotations, // Para debugging
+        message: 'Cotizaciones híbridas obtenidas exitosamente'
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        isHybrid: true,
+        message: 'Error obteniendo cotizaciones híbridas',
+        error: result.error,
+        details: result.details
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Error en ruta de cotización híbrida:', error);
+    res.status(500).json({
+      success: false,
+      isHybrid: true,
+      message: 'Error interno del servidor',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Obtener cotización de envío internacional
+router.post('/cart/quote-international', async (req, res) => {
+  try {
+    const { cartId, postalCode, forceCountry } = req.body;
+
+    // Validar datos requeridos
+    if (!cartId || !postalCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Se requieren cartId y postalCode'
+      });
+    }
+
+    // Validar formato básico de código postal
+    if (postalCode.length < 3) {
+      return res.status(400).json({
+        success: false,
+        message: 'Código postal debe tener al menos 3 caracteres'
+      });
+    }
+
+    console.log('🌍 Procesando solicitud de cotización INTERNACIONAL para carrito:', cartId, 'CP:', postalCode, 'País:', forceCountry || 'Auto-detectar');
+
+    const shippingQuoteService = new ShippingQuoteService();
+    const result = await shippingQuoteService.getShippingQuoteInternational(cartId, postalCode, forceCountry);
+
+    if (result.success) {
+      // Formatear cotizaciones para el frontend
+      const formattedQuotes = shippingQuoteService.formatQuotationsForFrontend(result);
+      
+      res.json({
+        success: true,
+        isInternational: true,
+        country: result.addressData?.country_code || forceCountry || 'N/A',
+        cartData: result.cartData,
+        quotations: formattedQuotes,
+        raw: result.quotations, // Para debugging
+        message: 'Cotizaciones internacionales obtenidas exitosamente'
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        isInternational: true,
+        message: 'Error obteniendo cotizaciones internacionales',
+        error: result.error,
+        details: result.details
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Error en ruta de cotización internacional:', error);
+    res.status(500).json({
+      success: false,
+      isInternational: true,
+      message: 'Error interno del servidor',
+      error: error.message,
+      timestamp: new Date().toISOString()
     });
   }
 });
