@@ -162,6 +162,33 @@ class ShippingQuoteService {
         cartId: cartId
       });
       
+      // ==========================================
+      // 🔍 LOG DETALLADO DE DATOS DEL CARRITO
+      // ==========================================
+      console.log('🔍 ==========================================');
+      console.log('🔍 DATOS COMPLETOS DEL CARRITO:');
+      console.log('🔍 ==========================================');
+      console.log('🛒 Cart ID:', cartId);
+      console.log('📊 Total de items encontrados:', result.rows.length);
+      console.log('');
+      console.log('📋 ITEMS DEL CARRITO (DETALLE COMPLETO):');
+      console.log('-------------------------------------');
+      result.rows.forEach((item, index) => {
+        console.log(`📦 Item ${index + 1}:`);
+        console.log(`   🆔 ID Contenido: ${item.id_contenido}`);
+        console.log(`   📝 Producto: ${item.producto_nombre}`);
+        console.log(`   🔢 Cantidad: ${item.cantidad}`);
+        console.log(`   💰 Precio: $${item.precio}`);
+        console.log(`   🏷️  Categoría: ${item.categoria_nombre} (ID: ${item.id_categoria})`);
+        console.log(`   📏 Dimensiones: ${item.largo_cm}x${item.ancho_cm}x${item.alto_cm} cm`);
+        console.log(`   ⚖️  Peso: ${item.peso_kg} kg`);
+        console.log(`   🗜️  Compresión: ${item.nivel_compresion}`);
+        console.log(`   🎨 Variante: ${item.variante_nombre} (ID: ${item.id_variante})`);
+        console.log(`   📐 Talla: ${item.talla_nombre} (ID: ${item.id_talla})`);
+        console.log('   ---');
+      });
+      console.log('🔍 ==========================================');
+      
       if (result.rows.length === 0) {
         throw new Error('Carrito vacío o no encontrado');
       }
@@ -192,21 +219,43 @@ class ShippingQuoteService {
    * @returns {Object} Dimensiones calculadas
    */
   calculateShippingDimensions(cartItems) {
+    console.log('🔍 ==========================================');
+    console.log('🔍 CALCULANDO DIMENSIONES DE ENVÍO:');
+    console.log('🔍 ==========================================');
+    
     let totalWeight = 0;
     let totalVolume = 0;
     let maxLength = 0;
     let maxWidth = 0;
     let totalHeight = 0;
+    let totalValue = 0; // Agregar cálculo del valor total
 
-    cartItems.forEach(item => {
+    console.log('📊 PROCESANDO ITEMS INDIVIDUALES:');
+    console.log('-------------------------------------');
+
+    cartItems.forEach((item, index) => {
       const quantity = item.cantidad;
       const itemWeight = parseFloat(item.peso_kg || 0) * quantity;
       const itemHeight = parseFloat(item.alto_cm || 0);
       const itemLength = parseFloat(item.largo_cm || 0);
       const itemWidth = parseFloat(item.ancho_cm || 0);
+      const itemPrice = parseFloat(item.precio || 0);
+      const itemValue = itemPrice * quantity;
+      
+      console.log(`📦 Item ${index + 1}: ${item.producto_nombre}`);
+      console.log(`   🔢 Cantidad: ${quantity}`);
+      console.log(`   📏 Dimensiones: ${itemLength}x${itemWidth}x${itemHeight} cm`);
+      console.log(`   ⚖️  Peso unitario: ${item.peso_kg} kg`);
+      console.log(`   ⚖️  Peso total: ${itemWeight} kg`);
+      console.log(`   💰 Precio unitario: $${itemPrice}`);
+      console.log(`   💰 Valor total: $${itemValue}`);
+      console.log('   ---');
       
       // Sumar peso total
       totalWeight += itemWeight;
+      
+      // Sumar valor total
+      totalValue += itemValue;
       
       // Calcular volumen
       const itemVolume = itemHeight * itemLength * itemWidth * quantity;
@@ -222,8 +271,9 @@ class ShippingQuoteService {
     const compressionFactor = this.getCompressionFactor(cartItems);
     const compressedHeight = totalHeight * compressionFactor;
 
-    return {
+    const result = {
       totalWeight: Math.max(totalWeight, 0.5), // Mínimo 0.5kg (500g) - corregido para KG
+      totalValue: totalValue, // Valor total calculado
       dimensions: {
         length: Math.max(maxLength, 20), // Mínimo 20cm (más realista)
         width: Math.max(maxWidth, 15),   // Mínimo 15cm (más realista)  
@@ -231,6 +281,23 @@ class ShippingQuoteService {
       },
       compressionFactor: compressionFactor
     };
+
+    console.log('');
+    console.log('📊 CÁLCULOS FINALES:');
+    console.log('-------------------------------------');
+    console.log('⚖️  Peso total calculado:', totalWeight, 'kg');
+    console.log('⚖️  Peso final (con mínimo):', result.totalWeight, 'kg');
+    console.log('💰 Valor total calculado: $', totalValue);
+    console.log('📦 Volumen total:', totalVolume, 'cm³');
+    console.log('📏 Dimensión máxima largo:', maxLength, 'cm');
+    console.log('📏 Dimensión máxima ancho:', maxWidth, 'cm');
+    console.log('📏 Altura total sin comprimir:', totalHeight, 'cm');
+    console.log('🗜️  Factor de compresión:', compressionFactor);
+    console.log('📏 Altura final comprimida:', compressedHeight, 'cm');
+    console.log('📦 DIMENSIONES FINALES:', JSON.stringify(result.dimensions, null, 2));
+    console.log('🔍 ==========================================');
+
+    return result;
   }
 
   /**
@@ -246,19 +313,28 @@ class ShippingQuoteService {
     cartItems.forEach(item => {
       if (item.nivel_compresion) {
         let compression;
-        switch(item.nivel_compresion.toLowerCase()) {
-          case 'bajo':
-            compression = 0.9; // 90% del volumen original
-            break;
-          case 'medio':
-            compression = 0.7; // 70% del volumen original
-            break;
-          case 'alto':
-            compression = 0.5; // 50% del volumen original
-            break;
-          default:
-            compression = 0.7; // Por defecto medio
+        
+        // Manejar tanto números como strings
+        if (typeof item.nivel_compresion === 'number') {
+          compression = item.nivel_compresion; // Usar directamente si es número
+        } else if (typeof item.nivel_compresion === 'string') {
+          switch(item.nivel_compresion.toLowerCase()) {
+            case 'bajo':
+              compression = 0.9; // 90% del volumen original
+              break;
+            case 'medio':
+              compression = 0.7; // 70% del volumen original
+              break;
+            case 'alto':
+              compression = 0.5; // 50% del volumen original
+              break;
+            default:
+              compression = 0.7; // Por defecto medio
+          }
+        } else {
+          compression = 0.7; // Fallback por defecto
         }
+        
         totalCompression += compression;
         itemCount++;
       }
@@ -922,6 +998,37 @@ class ShippingQuoteService {
       console.log('📤 Paso 4: Preparando solicitud internacional a SkyDropX...');
       console.log('🔗 URL:', `${this.baseUrl}/quotations`);
       console.log('📋 Dirección destino procesada:', JSON.stringify(addressTo, null, 2));
+      
+      // ==========================================
+      // 🔍 LOG DETALLADO DE LA ESTRUCTURA JSON
+      // ==========================================
+      console.log('🔍 ==========================================');
+      console.log('🔍 ESTRUCTURA COMPLETA DEL JSON A ENVIAR:');
+      console.log('🔍 ==========================================');
+      console.log('📦 PAYLOAD COMPLETO:', JSON.stringify(quotationPayload, null, 2));
+      console.log('');
+      console.log('🔧 ANÁLISIS DETALLADO DE COMPONENTES:');
+      console.log('-------------------------------------');
+      console.log('📋 ORDER ID:', quotationPayload.quotation.order_id);
+      console.log('📍 ADDRESS FROM:', JSON.stringify(quotationPayload.quotation.address_from, null, 2));
+      console.log('📍 ADDRESS TO:', JSON.stringify(quotationPayload.quotation.address_to, null, 2));
+      console.log('📦 PARCELS:', JSON.stringify(quotationPayload.quotation.parcels, null, 2));
+      console.log('🚚 SHIPMENT TYPE:', quotationPayload.quotation.shipment_type);
+      console.log('💰 QUOTE TYPE:', quotationPayload.quotation.quote_type);
+      console.log('');
+      console.log('📊 DATOS DEL CARRITO USADOS:');
+      console.log('-------------------------------------');
+      console.log('   Items en carrito:', cartData.cartItems.length);
+      console.log('   Peso total calculado:', cartData.totalWeight, 'kg');
+      console.log('   Valor total del carrito:', cartData.totalValue || 'NO DISPONIBLE');
+      console.log('   Dimensiones calculadas:', JSON.stringify(cartData.dimensions, null, 2));
+      console.log('   Factor de compresión:', cartData.compressionFactor);
+      console.log('');
+      console.log('🔍 HEADERS DE LA PETICIÓN:');
+      console.log('-------------------------------------');
+      console.log('   Content-Type: application/json');
+      console.log('   Authorization: Bearer [TOKEN_PRESENTE]');
+      console.log('🔍 ==========================================');
       console.log('📤 Enviando solicitud...');
 
       // Hacer petición a SkyDropX
@@ -938,6 +1045,22 @@ class ShippingQuoteService {
 
       console.log('📥 Respuesta de SkyDropX recibida');
       console.log('🔍 STATUS RESPONSE:', response.status);
+      
+      // ==========================================
+      // 🔍 LOG DETALLADO DE LA RESPUESTA JSON (INTERNACIONAL)
+      // ==========================================
+      console.log('🔍 ==========================================');
+      console.log('🔍 RESPUESTA COMPLETA DE SKYDROPX (INTERNACIONAL):');
+      console.log('🔍 ==========================================');
+      console.log('📥 RESPONSE DATA COMPLETA:', JSON.stringify(response.data, null, 2));
+      console.log('');
+      console.log('🔧 ANÁLISIS DE LA RESPUESTA:');
+      console.log('-------------------------------------');
+      console.log('📊 Status HTTP:', response.status);
+      console.log('📋 Response Headers:', JSON.stringify(response.headers, null, 2));
+      console.log('📦 Response Size:', JSON.stringify(response.data).length, 'caracteres');
+      console.log('🌍 País destino:', addressTo.country_name, '(' + addressTo.country_code + ')');
+      console.log('🔍 ==========================================');
       
       // Log específico de cotizaciones exitosas
       if (response.data && response.data.rates) {
@@ -1068,8 +1191,37 @@ class ShippingQuoteService {
 
       console.log('📤 Paso 4: Preparando solicitud a SkyDropX...');
       console.log('🔗 URL:', `${this.baseUrl}/quotations`);
-      console.log('📋 PAYLOAD COMPLETO:', JSON.stringify(quotationPayload, null, 2));
-      console.log('🔑 Authorization: Bearer [TOKEN_PRESENTE]');
+      
+      // ==========================================
+      // 🔍 LOG DETALLADO DE LA ESTRUCTURA JSON (NACIONAL)
+      // ==========================================
+      console.log('� ==========================================');
+      console.log('🔍 ESTRUCTURA COMPLETA DEL JSON A ENVIAR (NACIONAL):');
+      console.log('🔍 ==========================================');
+      console.log('📦 PAYLOAD COMPLETO:', JSON.stringify(quotationPayload, null, 2));
+      console.log('');
+      console.log('🔧 ANÁLISIS DETALLADO DE COMPONENTES:');
+      console.log('-------------------------------------');
+      console.log('📋 ORDER ID:', quotationPayload.quotation.order_id);
+      console.log('📍 ADDRESS FROM:', JSON.stringify(quotationPayload.quotation.address_from, null, 2));
+      console.log('📍 ADDRESS TO:', JSON.stringify(quotationPayload.quotation.address_to, null, 2));
+      console.log('� PARCELS:', JSON.stringify(quotationPayload.quotation.parcels, null, 2));
+      console.log('🚚 SHIPMENT TYPE:', quotationPayload.quotation.shipment_type);
+      console.log('💰 QUOTE TYPE:', quotationPayload.quotation.quote_type);
+      console.log('');
+      console.log('📊 DATOS DEL CARRITO USADOS:');
+      console.log('-------------------------------------');
+      console.log('   Items en carrito:', cartData.cartItems.length);
+      console.log('   Peso total calculado:', cartData.totalWeight, 'kg');
+      console.log('   Valor total del carrito:', cartData.totalValue || 'NO DISPONIBLE');
+      console.log('   Dimensiones calculadas:', JSON.stringify(cartData.dimensions, null, 2));
+      console.log('   Factor de compresión:', cartData.compressionFactor);
+      console.log('');
+      console.log('🔍 HEADERS DE LA PETICIÓN:');
+      console.log('-------------------------------------');
+      console.log('   Content-Type: application/json');
+      console.log('   Authorization: Bearer [TOKEN_PRESENTE]');
+      console.log('🔍 ==========================================');
       console.log('📤 Enviando solicitud...');
 
       // Hacer petición a SkyDropX
@@ -1087,7 +1239,21 @@ class ShippingQuoteService {
       console.log('📥 Respuesta de SkyDropX recibida');
       console.log('🔍 STATUS RESPONSE:', response.status);
       console.log('🔍 HEADERS RESPONSE:', JSON.stringify(response.headers, null, 2));
-      console.log('🔍 DATA RESPONSE COMPLETA:', JSON.stringify(response.data, null, 2));
+      
+      // ==========================================
+      // 🔍 LOG DETALLADO DE LA RESPUESTA JSON
+      // ==========================================
+      console.log('🔍 ==========================================');
+      console.log('🔍 RESPUESTA COMPLETA DE SKYDROPX (NACIONAL):');
+      console.log('🔍 ==========================================');
+      console.log('📥 RESPONSE DATA COMPLETA:', JSON.stringify(response.data, null, 2));
+      console.log('');
+      console.log('🔧 ANÁLISIS DE LA RESPUESTA:');
+      console.log('-------------------------------------');
+      console.log('📊 Status HTTP:', response.status);
+      console.log('📋 Response Headers:', JSON.stringify(response.headers, null, 2));
+      console.log('📦 Response Size:', JSON.stringify(response.data).length, 'caracteres');
+      console.log('🔍 ==========================================');
       
       // Log específico de cotizaciones exitosas
       if (response.data && response.data.rates) {
