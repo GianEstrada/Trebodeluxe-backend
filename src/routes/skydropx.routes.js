@@ -105,6 +105,64 @@ router.post('/cart/quote', async (req, res) => {
   }
 });
 
+// Obtener cotización de envío HÍBRIDA (México + Internacional)
+router.post('/cart/quote-hybrid', async (req, res) => {
+  try {
+    const { cartId, postalCode, countryCode } = req.body;
+
+    // Validar datos requeridos
+    if (!cartId || !postalCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Se requieren cartId y postalCode'
+      });
+    }
+
+    console.log('🔄 Procesando cotización HÍBRIDA para carrito:', cartId, 'CP:', postalCode, 'País:', countryCode || 'Auto-detección');
+
+    const shippingQuoteService = new ShippingQuoteService();
+    
+    // Usar función híbrida que decide automáticamente entre nacional e internacional
+    const result = await shippingQuoteService.getShippingQuoteHybrid(cartId, postalCode, countryCode);
+
+    if (result.success) {
+      // Formatear cotizaciones para el frontend
+      const formattedQuotes = shippingQuoteService.formatQuotationsForFrontend(result);
+      
+      res.json({
+        success: true,
+        isHybrid: true,
+        isInternational: result.isInternational || false,
+        cartData: result.cartData,
+        quotations: formattedQuotes,
+        raw: result.quotations, // Para debugging
+        message: 'Cotizaciones híbridas obtenidas exitosamente',
+        decisionInfo: {
+          countryDetected: result.countryDetected,
+          decisionReason: result.decisionReason
+        }
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Error obteniendo cotizaciones híbridas',
+        error: result.error,
+        details: result.details,
+        isHybrid: true
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Error en ruta de cotización híbrida:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message,
+      isHybrid: true
+    });
+  }
+});
+
 // Obtener datos del carrito para envío (solo para debugging)
 router.get('/cart/:cartId/shipping-data', async (req, res) => {
   try {
