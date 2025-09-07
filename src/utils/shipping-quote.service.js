@@ -223,7 +223,7 @@ class ShippingQuoteService {
     const compressedHeight = totalHeight * compressionFactor;
 
     return {
-      totalWeight: Math.max(totalWeight, 500), // Mínimo 500g (más realista)
+      totalWeight: Math.max(totalWeight, 0.5), // Mínimo 0.5kg (500g) - corregido para KG
       dimensions: {
         length: Math.max(maxLength, 20), // Mínimo 20cm (más realista)
         width: Math.max(maxWidth, 15),   // Mínimo 15cm (más realista)  
