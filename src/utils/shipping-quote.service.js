@@ -362,16 +362,35 @@ class ShippingQuoteService {
    */
   async getShippingQuote(cartId, postalCodeTo) {
     try {
-      console.log('💰 Solicitando cotización de envío para carrito:', cartId, 'hacia:', postalCodeTo);
+      console.log('� =========================');
+      console.log('💰 INICIANDO COTIZACIÓN DE ENVÍO');
+      console.log('🚀 =========================');
+      console.log('📦 Cart ID:', cartId);
+      console.log('📍 Código postal destino:', postalCodeTo);
+      console.log('⏰ Timestamp:', new Date().toISOString());
 
       // Obtener token de autenticación
+      console.log('🔑 Paso 1: Obteniendo token de autenticación...');
       const token = await this.skyDropXAuth.getBearerToken();
+      console.log('✅ Token obtenido exitosamente');
       
       // Obtener datos del carrito
+      console.log('🛒 Paso 2: Obteniendo datos del carrito...');
       const cartData = await this.getCartShippingData(cartId);
+      console.log('📊 DATOS DEL CARRITO OBTENIDOS:');
+      console.log('   Items:', cartData.cartItems.length);
+      console.log('   Peso total:', cartData.totalWeight, 'kg');
+      console.log('   Dimensiones:', JSON.stringify(cartData.dimensions));
+      console.log('   Factor compresión:', cartData.compressionFactor);
       
       // Obtener datos de dirección destino
+      console.log('🗺️  Paso 3: Obteniendo dirección destino...');
       const addressTo = await this.getAddressFromPostalCode(postalCodeTo);
+      console.log('📍 DIRECCIÓN DESTINO:');
+      console.log('   Estado:', addressTo.area_level1);
+      console.log('   Municipio:', addressTo.area_level2);
+      console.log('   Colonia:', addressTo.area_level3);
+      console.log('   CP:', addressTo.postal_code);
 
       // Preparar payload para SkyDropX
       const quotationPayload = {
@@ -394,7 +413,11 @@ class ShippingQuoteService {
         }
       };
 
-      console.log('📤 Enviando solicitud a SkyDropX:', JSON.stringify(quotationPayload, null, 2));
+      console.log('📤 Paso 4: Preparando solicitud a SkyDropX...');
+      console.log('🔗 URL:', `${this.baseUrl}/quotations`);
+      console.log('📋 PAYLOAD COMPLETO:', JSON.stringify(quotationPayload, null, 2));
+      console.log('🔑 Authorization: Bearer [TOKEN_PRESENTE]');
+      console.log('📤 Enviando solicitud...');
 
       // Hacer petición a SkyDropX
       const response = await axios.post(
@@ -409,7 +432,60 @@ class ShippingQuoteService {
       );
 
       console.log('📥 Respuesta de SkyDropX recibida');
+      console.log('🔍 STATUS RESPONSE:', response.status);
+      console.log('🔍 HEADERS RESPONSE:', JSON.stringify(response.headers, null, 2));
+      console.log('🔍 DATA RESPONSE COMPLETA:', JSON.stringify(response.data, null, 2));
+      
+      // Log específico de cotizaciones exitosas
+      if (response.data && response.data.rates) {
+        const successfulRates = response.data.rates.filter(rate => rate.success === true);
+        const failedRates = response.data.rates.filter(rate => rate.success === false);
+        
+        console.log(`📊 RESUMEN DE COTIZACIONES:`);
+        console.log(`   Total de rates: ${response.data.rates.length}`);
+        console.log(`   Exitosas: ${successfulRates.length}`);
+        console.log(`   Fallidas: ${failedRates.length}`);
+        
+        if (successfulRates.length > 0) {
+          console.log('✅ COTIZACIONES EXITOSAS:');
+          successfulRates.forEach((rate, index) => {
+            console.log(`   ${index + 1}. ${rate.provider_display_name} - ${rate.provider_service_name}: $${rate.total} ${rate.currency_code} (${rate.days} días)`);
+          });
+        }
+        
+        if (failedRates.length > 0) {
+          console.log('❌ COTIZACIONES FALLIDAS (primeras 3):');
+          failedRates.slice(0, 3).forEach((rate, index) => {
+            const errorMsg = rate.error_messages && rate.error_messages.length > 0 
+              ? rate.error_messages[0].error_message 
+              : 'Sin mensaje de error';
+            console.log(`   ${index + 1}. ${rate.provider_display_name} - ${rate.provider_service_name}: ${errorMsg}`);
+          });
+        }
+      }
 
+      return {
+        success: true,
+        cartData: {
+          items: cartData.cartItems.length,
+          totalWeight: cartData.totalWeight,
+          dimensions: cartData.dimensions,
+          compressionFactor: cartData.compressionFactor
+        },
+        quotations: response.data,
+        requestPayload: quotationPayload // Para debugging
+      };
+      
+      console.log('🎉 COTIZACIÓN COMPLETADA EXITOSAMENTE');
+      console.log('📊 Datos retornados al cliente:', JSON.stringify({
+        success: true,
+        totalQuotations: response.data.rates ? response.data.rates.length : 0,
+        successfulQuotations: response.data.rates ? response.data.rates.filter(r => r.success).length : 0,
+        cartItems: cartData.cartItems.length,
+        totalWeight: cartData.totalWeight + ' kg'
+      }, null, 2));
+      console.log('🚀 =========================');
+      
       return {
         success: true,
         cartData: {
@@ -423,14 +499,33 @@ class ShippingQuoteService {
       };
 
     } catch (error) {
-      console.error('❌ Error obteniendo cotización de envío:', error);
+      console.error('❌ Error obteniendo cotización de envío:', error.message);
       
-      // Log detallado del error
+      // Log detallado del error con más información
       if (error.response) {
-        console.error('📋 Detalles del error de SkyDropX:');
-        console.error('- Status:', error.response.status);
-        console.error('- Data:', JSON.stringify(error.response.data, null, 2));
-        console.error('- Headers:', error.response.headers);
+        console.error('📋 DETALLES DEL ERROR DE SKYDROPX:');
+        console.error('🔍 STATUS ERROR:', error.response.status);
+        console.error('🔍 STATUS TEXT:', error.response.statusText);
+        console.error('🔍 HEADERS ERROR:', JSON.stringify(error.response.headers, null, 2));
+        console.error('🔍 DATA ERROR COMPLETA:', JSON.stringify(error.response.data, null, 2));
+        
+        // Log específico para errores comunes
+        if (error.response.status === 401) {
+          console.error('🚨 ERROR DE AUTENTICACIÓN: Token inválido o expirado');
+        } else if (error.response.status === 422) {
+          console.error('🚨 ERROR DE VALIDACIÓN: Datos de la solicitud incorrectos');
+        } else if (error.response.status === 429) {
+          console.error('🚨 ERROR DE RATE LIMIT: Demasiadas solicitudes');
+        } else if (error.response.status >= 500) {
+          console.error('🚨 ERROR DEL SERVIDOR: Problema en SkyDropX');
+        }
+      } else if (error.request) {
+        console.error('📋 ERROR DE RED/CONEXIÓN:');
+        console.error('🔍 REQUEST CONFIG:', JSON.stringify(error.config, null, 2));
+        console.error('🚨 No se recibió respuesta del servidor');
+      } else {
+        console.error('📋 ERROR DESCONOCIDO:');
+        console.error('🔍 ERROR STACK:', error.stack);
       }
       
       return {
