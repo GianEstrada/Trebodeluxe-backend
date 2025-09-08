@@ -49,4 +49,7 @@ router.delete('/clear', optionalAuth, CartController.clearCart);
 // POST /api/cart/migrate - Migrar carrito de sesión a usuario autenticado (requiere autenticación)
 router.post('/migrate', verifyToken, CartController.migrateCart);
 
+// POST /api/cart/migrate-to-session - Migrar carrito de usuario a token de sesión (para logout)
+router.post('/migrate-to-session', verifyToken, CartController.migrateCartToSession);
+
 module.exports = router;

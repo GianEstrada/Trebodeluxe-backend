@@ -7,9 +7,10 @@ class CartController {
         try {
             let cartId;
             
-            if (req.user && req.user.id) {
-                // Usuario autenticado
-                cartId = await CartModel.getOrCreateCartForUser(req.user.id);
+            if (req.user && req.user.id_usuario) {
+                // Usuario autenticado - usar id_usuario
+                console.log('🛒 Obteniendo carrito para usuario autenticado:', req.user.id_usuario);
+                cartId = await CartModel.getOrCreateCartForUser(req.user.id_usuario);
             } else {
                 // Usuario no autenticado - usar token de sesión
                 let sessionToken = req.headers['x-session-token'];
@@ -18,8 +19,10 @@ class CartController {
                     // Crear nuevo token de sesión
                     sessionToken = CartModel.generateSessionToken();
                     res.setHeader('X-Session-Token', sessionToken);
+                    console.log('🎫 Token de sesión generado:', sessionToken.substring(0, 10) + '...');
                 }
                 
+                console.log('🛒 Obteniendo carrito para sesión:', sessionToken.substring(0, 10) + '...');
                 cartId = await CartModel.getOrCreateCartForSession(sessionToken);
             }
             
@@ -80,18 +83,21 @@ class CartController {
             
             let cartId;
             
-            if (req.user && req.user.id) {
-                // Usuario autenticado
-                cartId = await CartModel.getOrCreateCartForUser(req.user.id);
+            if (req.user && req.user.id_usuario) {
+                // Usuario autenticado - usar id_usuario
+                console.log('➕ Agregando al carrito para usuario autenticado:', req.user.id_usuario);
+                cartId = await CartModel.getOrCreateCartForUser(req.user.id_usuario);
             } else {
-                // Usuario no autenticado
+                // Usuario no autenticado - usar token de sesión
                 let sessionToken = req.headers['x-session-token'];
                 
                 if (!sessionToken) {
                     sessionToken = CartModel.generateSessionToken();
                     res.setHeader('X-Session-Token', sessionToken);
+                    console.log('🎫 Token de sesión generado para agregar item:', sessionToken.substring(0, 10) + '...');
                 }
                 
+                console.log('➕ Agregando al carrito para sesión:', sessionToken.substring(0, 10) + '...');
                 cartId = await CartModel.getOrCreateCartForSession(sessionToken);
             }
             
@@ -313,6 +319,50 @@ class CartController {
             });
         } catch (error) {
             console.error('Error migrando carrito:', error);
+            res.status(500).json({
+                success: false,
+                message: error.message
+            });
+        }
+    }
+
+    // Migrar carrito de usuario a token de sesión (para logout)
+    static async migrateCartToSession(req, res) {
+        try {
+            const { sessionToken } = req.body;
+            
+            if (!req.user || !req.user.id_usuario) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Usuario no autenticado'
+                });
+            }
+            
+            if (!sessionToken) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Token de sesión requerido'
+                });
+            }
+            
+            console.log('🔄 Migrando carrito de usuario a sesión:', {
+                userId: req.user.id_usuario,
+                sessionToken: sessionToken.substring(0, 10) + '...'
+            });
+            
+            const result = await CartModel.migrateUserCartToSession(req.user.id_usuario, sessionToken);
+            const cartSummary = await CartModel.getCartSummary(result.cartId);
+            
+            res.json({
+                success: true,
+                message: result.message,
+                cart: {
+                    id: result.cartId,
+                    ...cartSummary
+                }
+            });
+        } catch (error) {
+            console.error('Error migrando carrito a sesión:', error);
             res.status(500).json({
                 success: false,
                 message: error.message

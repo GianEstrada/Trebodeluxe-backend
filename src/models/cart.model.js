@@ -387,6 +387,83 @@ class CartModel {
             client.release();
         }
     }
+
+    // Migrar carrito de usuario autenticado a token de sesión (para logout)
+    static async migrateUserCartToSession(userId, sessionToken) {
+        const client = await pool.connect();
+        
+        try {
+            await client.query('BEGIN');
+            
+            // Buscar carrito del usuario
+            const userCart = await client.query(
+                'SELECT id_carrito FROM carritos WHERE id_usuario = $1',
+                [userId]
+            );
+            
+            if (userCart.rows.length === 0) {
+                await client.query('ROLLBACK');
+                return { success: true, message: 'No hay carrito de usuario para migrar' };
+            }
+            
+            const userCartId = userCart.rows[0].id_carrito;
+            
+            // Obtener o crear carrito de sesión
+            const sessionCartId = await this.getOrCreateCartForSession(sessionToken);
+            
+            if (userCartId === sessionCartId) {
+                // Es el mismo carrito, no hay nada que migrar
+                await client.query('ROLLBACK');
+                return { success: true, message: 'Carrito ya está vinculado a sesión' };
+            }
+            
+            // Obtener items del carrito del usuario
+            const userItems = await client.query(
+                'SELECT id_producto, id_variante, id_talla, cantidad FROM contenido_carrito WHERE id_carrito = $1',
+                [userCartId]
+            );
+            
+            // Migrar cada item al carrito de sesión
+            for (const item of userItems.rows) {
+                // Verificar si el item ya existe en el carrito de sesión
+                const existingSessionItem = await client.query(
+                    'SELECT cantidad FROM contenido_carrito WHERE id_carrito = $1 AND id_producto = $2 AND id_variante = $3 AND id_talla = $4',
+                    [sessionCartId, item.id_producto, item.id_variante, item.id_talla]
+                );
+                
+                if (existingSessionItem.rows.length > 0) {
+                    // Item existe, sumar cantidades
+                    const nuevaCantidad = existingSessionItem.rows[0].cantidad + item.cantidad;
+                    await client.query(
+                        'UPDATE contenido_carrito SET cantidad = $1, fecha_actualizacion = CURRENT_TIMESTAMP WHERE id_carrito = $2 AND id_producto = $3 AND id_variante = $4 AND id_talla = $5',
+                        [nuevaCantidad, sessionCartId, item.id_producto, item.id_variante, item.id_talla]
+                    );
+                } else {
+                    // Item no existe, insertarlo
+                    await client.query(
+                        'INSERT INTO contenido_carrito (id_carrito, id_producto, id_variante, id_talla, cantidad) VALUES ($1, $2, $3, $4, $5)',
+                        [sessionCartId, item.id_producto, item.id_variante, item.id_talla, item.cantidad]
+                    );
+                }
+            }
+            
+            // Eliminar carrito del usuario
+            await client.query('DELETE FROM carritos WHERE id_carrito = $1', [userCartId]);
+            
+            await client.query('COMMIT');
+            
+            return { 
+                success: true, 
+                message: 'Carrito migrado a sesión exitosamente',
+                cartId: sessionCartId 
+            };
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
 }
 
 module.exports = CartModel;
