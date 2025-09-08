@@ -6,21 +6,56 @@ const { verifyToken } = require('../middlewares/auth.middleware');
 // Middleware opcional que permite usuarios autenticados y no autenticados
 const optionalAuth = async (req, res, next) => {
   const authHeader = req.headers.authorization;
+  
+  console.log('🔍 [OPTIONALAUTH] Verificando autenticación opcional...');
+  console.log('🔍 [OPTIONALAUTH] Authorization header presente:', !!authHeader);
+  
   if (authHeader && authHeader.startsWith('Bearer ')) {
     // Hay token, intentar verificar
     try {
+      console.log('🔍 [OPTIONALAUTH] Procesando token de autenticación...');
+      
       // Intentar verificar el token manualmente
       const jwt = require('jsonwebtoken');
+      const { pool } = require('../config/db');
       const token = authHeader.substring(7);
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.user = decoded;
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'trebodeluxe_default_secret_key_CHANGE_IN_PRODUCTION');
+      
+      console.log('🔍 [OPTIONALAUTH] Token decodificado:', { id: decoded.id });
+      
+      // Buscar el usuario en la base de datos para obtener datos completos
+      const result = await pool.query(
+        'SELECT id_usuario, nombres, apellidos, correo, usuario, rol FROM usuarios WHERE id_usuario = $1',
+        [decoded.id]
+      );
+      
+      const user = result.rows[0];
+      if (user) {
+        req.user = {
+          id_usuario: user.id_usuario,
+          nombres: user.nombres,
+          apellidos: user.apellidos,
+          correo: user.correo,
+          usuario: user.usuario,
+          rol: user.rol
+        };
+        console.log('✅ [OPTIONALAUTH] Usuario autenticado:', {
+          id_usuario: user.id_usuario,
+          usuario: user.usuario,
+          rol: user.rol
+        });
+      } else {
+        console.warn('⚠️ [OPTIONALAUTH] Usuario no encontrado en BD para ID:', decoded.id);
+        req.user = null;
+      }
     } catch (error) {
       // Si falla la verificación, continuar sin usuario
-      console.log('Token inválido, continuando sin usuario:', error.message);
+      console.log('⚠️ [OPTIONALAUTH] Token inválido, continuando sin usuario:', error.message);
       req.user = null;
     }
   } else {
     // Sin token, continuar sin usuario
+    console.log('🔍 [OPTIONALAUTH] Sin token de autenticación, continuando como usuario anónimo');
     req.user = null;
   }
   next();
