@@ -180,16 +180,14 @@ class SkyDropXService {
         width: 0.08   // 8cm por defecto
       }));
 
-      // 4. Construir JSON para SkyDropX
+      // 4. Construir JSON para SkyDropX - ENFOQUE EN VALOR DECLARADO
+      const declaredValueCalculated = this.calculateDeclaredValue(finalTotalPrice);
+      
       const skyDropXPayload = {
-        // 🚀 CAMPOS AUTOMATIZADOS A NIVEL RAÍZ
-        declared_value: this.calculateDeclaredValue(finalTotalPrice),
-        provider: this.extractCarrierFromShippingMethod(shippingMethod),
-        insurance: this.shouldEnableInsurance(finalTotalPrice, insurance),
-        content: "Mercancía general",
-        delivery_type: 1,
-        dangerous_goods: false,
-        oversized: false,
+        // MÚLTIPLES OPCIONES PARA VALOR DECLARADO
+        declared_value: declaredValueCalculated,
+        value: declaredValueCalculated,
+        total_value: declaredValueCalculated,
         
         // DATOS DE LA ORDEN
         order: {
@@ -197,6 +195,12 @@ class SkyDropXService {
           reference_number: finalReferenceNumber,
           payment_status: paymentStatus === 'succeeded' ? 'paid' : 'pending',
           total_price: (finalTotalPrice || 0).toString(),
+          
+          // VALOR DECLARADO EN MÚLTIPLES FORMATOS
+          declared_value: declaredValueCalculated,
+          value: declaredValueCalculated,
+          total_value: declaredValueCalculated,
+          
           merchant_store_id: "1",
           headquarter_id: "1", 
           platform: "trebodeluxe",
@@ -210,6 +214,12 @@ class SkyDropXService {
             dimension_unit: "CM",
             mass_unit: "KG",
             package_type: "box",
+            
+            // VALOR DECLARADO EN MÚLTIPLES FORMATOS
+            declared_value: declaredValueCalculated,
+            value: declaredValueCalculated,
+            total_value: declaredValueCalculated,
+            
             consignment_note: `Orden ${finalReferenceNumber} - ${cartItems.length} items`,
             products: products
           }],
@@ -246,12 +256,15 @@ class SkyDropXService {
 
       console.log('📦 [SKYDROPX] Payload preparado:', JSON.stringify(skyDropXPayload, null, 2));
       
-      // Logging de automatización
-      console.log('🤖 [SKYDROPX] Automatización aplicada:');
-      console.log(`   💰 Valor declarado: $${skyDropXPayload.declared_value} MXN`);
-      console.log(`   📦 Carrier: ${skyDropXPayload.provider}`);
-      console.log(`   🛡️ Seguro: ${skyDropXPayload.insurance ? 'Activado' : 'Desactivado'}`);
-      console.log(`   📋 Contenido: ${skyDropXPayload.content}`);
+      // Logging específico para valor declarado
+      console.log('💰 [SKYDROPX] VERIFICACIÓN DE VALOR DECLARADO:');
+      console.log(`   🎯 Valor calculado: $${declaredValueCalculated} MXN`);
+      console.log(`   � Nivel raíz - declared_value: ${skyDropXPayload.declared_value}`);
+      console.log(`   � Nivel raíz - value: ${skyDropXPayload.value}`);
+      console.log(`   � Nivel raíz - total_value: ${skyDropXPayload.total_value}`);
+      console.log(`   📍 Orden - declared_value: ${skyDropXPayload.order.declared_value}`);
+      console.log(`   📍 Orden - value: ${skyDropXPayload.order.value}`);
+      console.log(`   � Parcel - declared_value: ${skyDropXPayload.order.parcels[0].declared_value}`);
 
       // 5. Obtener token de acceso
       const accessToken = await SkyDropXService.getAccessToken();
