@@ -1536,7 +1536,7 @@ const getAllOrders = async (req, res) => {
 
     if (search) {
       whereConditions.push(`(
-        CAST(p.id_pedido AS TEXT) ILIKE $${++paramCount} OR
+        CAST(o.id_orden AS TEXT) ILIKE $${++paramCount} OR
         CONCAT(u.nombres, ' ', u.apellidos) ILIKE $${paramCount} OR
         u.correo ILIKE $${paramCount}
       )`);
@@ -1544,17 +1544,17 @@ const getAllOrders = async (req, res) => {
     }
 
     if (estado) {
-      whereConditions.push(`p.estado = $${++paramCount}`);
+      whereConditions.push(`o.estado = $${++paramCount}`);
       queryParams.push(estado);
     }
 
     if (fecha_desde) {
-      whereConditions.push(`p.fecha_creacion >= $${++paramCount}`);
+      whereConditions.push(`o.fecha_creacion >= $${++paramCount}`);
       queryParams.push(fecha_desde);
     }
 
     if (fecha_hasta) {
-      whereConditions.push(`p.fecha_creacion <= $${++paramCount}`);
+      whereConditions.push(`o.fecha_creacion <= $${++paramCount}`);
       queryParams.push(fecha_hasta + ' 23:59:59');
     }
 
@@ -1565,11 +1565,11 @@ const getAllOrders = async (req, res) => {
     // Query principal con JOIN mejorado
     const query = `
       SELECT 
-        p.id_pedido,
-        p.fecha_creacion,
-        p.estado,
-        p.total,
-        p.notas,
+        o.id_orden as id_pedido,
+        o.fecha_creacion,
+        o.estado,
+        o.total,
+        o.notas,
         u.nombres as cliente_nombres,
         u.apellidos as cliente_apellidos,
         u.correo as cliente_correo,
@@ -1581,16 +1581,16 @@ const getAllOrders = async (req, res) => {
         mp.nombre as metodo_pago_nombre,
         (
           SELECT COUNT(*)::integer 
-          FROM detalles_pedido dp 
-          WHERE dp.id_pedido = p.id_pedido
+          FROM detalles_orden do 
+          WHERE do.id_orden = o.id_orden
         ) as total_items
-      FROM pedidos p
-      LEFT JOIN usuarios u ON p.id_usuario = u.id_usuario
-      LEFT JOIN informacion_envio ie ON p.id_informacion_envio = ie.id_informacion_envio
-      LEFT JOIN metodos_envio me ON p.id_metodo_envio = me.id_metodo_envio
-      LEFT JOIN metodos_pago mp ON p.id_metodo_pago = mp.id_metodo_pago
+      FROM ordenes o
+      LEFT JOIN usuarios u ON o.id_usuario = u.id_usuario
+      LEFT JOIN informacion_envio ie ON o.id_informacion_envio = ie.id_informacion_envio
+      LEFT JOIN metodos_envio me ON o.id_metodo_envio = me.id_metodo_envio
+      LEFT JOIN metodos_pago mp ON o.id_metodo_pago = mp.id_metodo_pago
       ${whereClause}
-      ORDER BY p.${sort_by} ${sort_order.toUpperCase()}
+      ORDER BY o.${sort_by} ${sort_order.toUpperCase()}
       LIMIT $${++paramCount} OFFSET $${++paramCount}
     `;
 
@@ -1599,9 +1599,9 @@ const getAllOrders = async (req, res) => {
     // Query para contar total
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM pedidos p
-      LEFT JOIN usuarios u ON p.id_usuario = u.id_usuario
-      LEFT JOIN informacion_envio ie ON p.id_informacion_envio = ie.id_informacion_envio
+      FROM ordenes o
+      LEFT JOIN usuarios u ON o.id_usuario = u.id_usuario
+      LEFT JOIN informacion_envio ie ON o.id_informacion_envio = ie.id_informacion_envio
       ${whereClause}
     `;
 
@@ -1648,7 +1648,7 @@ const getOrdersStats = async (req, res) => {
         COALESCE(AVG(total), 0) as ticket_promedio,
         COUNT(*) FILTER (WHERE DATE(fecha_creacion) = CURRENT_DATE) as pedidos_hoy,
         COUNT(*) FILTER (WHERE fecha_creacion >= CURRENT_DATE - INTERVAL '7 days') as pedidos_semana
-      FROM pedidos
+      FROM ordenes
     `;
 
     const result = await pool.query(statsQuery);
@@ -1683,11 +1683,11 @@ const getOrderById = async (req, res) => {
     // Query para obtener información del pedido
     const orderQuery = `
       SELECT 
-        p.id_pedido,
-        p.fecha_creacion,
-        p.estado,
-        p.total,
-        p.notas,
+        o.id_orden as id_pedido,
+        o.fecha_creacion,
+        o.estado,
+        o.total,
+        o.notas,
         u.nombres as cliente_nombres,
         u.apellidos as cliente_apellidos,
         u.correo as cliente_correo,
@@ -1701,32 +1701,32 @@ const getOrderById = async (req, res) => {
         ie.referencia as direccion_referencia,
         me.nombre as metodo_envio_nombre,
         mp.nombre as metodo_pago_nombre
-      FROM pedidos p
-      LEFT JOIN usuarios u ON p.id_usuario = u.id_usuario
-      LEFT JOIN informacion_envio ie ON p.id_informacion_envio = ie.id_informacion_envio
-      LEFT JOIN metodos_envio me ON p.id_metodo_envio = me.id_metodo_envio
-      LEFT JOIN metodos_pago mp ON p.id_metodo_pago = mp.id_metodo_pago
-      WHERE p.id_pedido = $1
+      FROM ordenes o
+      LEFT JOIN usuarios u ON o.id_usuario = u.id_usuario
+      LEFT JOIN informacion_envio ie ON o.id_informacion_envio = ie.id_informacion_envio
+      LEFT JOIN metodos_envio me ON o.id_metodo_envio = me.id_metodo_envio
+      LEFT JOIN metodos_pago mp ON o.id_metodo_pago = mp.id_metodo_pago
+      WHERE o.id_orden = $1
     `;
 
     // Query para obtener detalles del pedido
     const detailsQuery = `
       SELECT 
-        dp.id_detalle,
-        dp.id_producto,
-        dp.id_variante,
-        dp.id_talla,
-        dp.cantidad,
-        dp.precio_unitario,
+        do.id_detalle,
+        do.id_producto,
+        do.id_variante,
+        do.id_talla,
+        do.cantidad,
+        do.precio_unitario,
         pr.nombre as producto_nombre,
         v.nombre as variante_nombre,
         t.nombre_talla
-      FROM detalles_pedido dp
-      LEFT JOIN productos pr ON dp.id_producto = pr.id_producto
-      LEFT JOIN variantes v ON dp.id_variante = v.id_variante
-      LEFT JOIN tallas t ON dp.id_talla = t.id_talla
-      WHERE dp.id_pedido = $1
-      ORDER BY dp.id_detalle
+      FROM detalles_orden do
+      LEFT JOIN productos pr ON do.id_producto = pr.id_producto
+      LEFT JOIN variantes v ON do.id_variante = v.id_variante
+      LEFT JOIN tallas t ON do.id_talla = t.id_talla
+      WHERE do.id_orden = $1
+      ORDER BY do.id_detalle
     `;
 
     const [orderResult, detailsResult] = await Promise.all([
@@ -1765,9 +1765,9 @@ const updateOrder = async (req, res) => {
     const { estado, notas } = req.body;
 
     const updateQuery = `
-      UPDATE pedidos 
+      UPDATE ordenes 
       SET estado = $1, notas = $2, fecha_actualizacion = CURRENT_TIMESTAMP
-      WHERE id_pedido = $3
+      WHERE id_orden = $3
       RETURNING *
     `;
 
