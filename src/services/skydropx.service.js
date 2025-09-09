@@ -182,6 +182,16 @@ class SkyDropXService {
 
       // 4. Construir JSON para SkyDropX
       const skyDropXPayload = {
+        // 🚀 CAMPOS AUTOMATIZADOS A NIVEL RAÍZ
+        declared_value: this.calculateDeclaredValue(finalTotalPrice),
+        provider: this.extractCarrierFromShippingMethod(shippingMethod),
+        insurance: this.shouldEnableInsurance(finalTotalPrice, insurance),
+        content: "Mercancía general",
+        delivery_type: 1,
+        dangerous_goods: false,
+        oversized: false,
+        
+        // DATOS DE LA ORDEN
         order: {
           reference: finalReferenceNumber,
           reference_number: finalReferenceNumber,
@@ -230,15 +240,7 @@ class SkyDropXService {
             company: shippingInfo.empresa || "",
             phone: shippingInfo.telefono,
             email: shippingInfo.correo || ""
-          },
-          // ✨ CAMPOS AUTOMATIZADOS
-          declared_value: this.calculateDeclaredValue(finalTotalPrice),
-          provider: this.extractCarrierFromShippingMethod(shippingMethod),
-          insurance: this.shouldEnableInsurance(finalTotalPrice, insurance),
-          content: "Mercancía general",
-          delivery_type: 1,
-          dangerous_goods: false,
-          oversized: false
+          }
         }
       };
 
@@ -246,10 +248,10 @@ class SkyDropXService {
       
       // Logging de automatización
       console.log('🤖 [SKYDROPX] Automatización aplicada:');
-      console.log(`   💰 Valor declarado: $${skyDropXPayload.order.declared_value} MXN`);
-      console.log(`   📦 Carrier: ${skyDropXPayload.order.provider}`);
-      console.log(`   🛡️ Seguro: ${skyDropXPayload.order.insurance ? 'Activado' : 'Desactivado'}`);
-      console.log(`   📋 Contenido: ${skyDropXPayload.order.content}`);
+      console.log(`   💰 Valor declarado: $${skyDropXPayload.declared_value} MXN`);
+      console.log(`   📦 Carrier: ${skyDropXPayload.provider}`);
+      console.log(`   🛡️ Seguro: ${skyDropXPayload.insurance ? 'Activado' : 'Desactivado'}`);
+      console.log(`   📋 Contenido: ${skyDropXPayload.content}`);
 
       // 5. Obtener token de acceso
       const accessToken = await SkyDropXService.getAccessToken();
@@ -273,8 +275,29 @@ class SkyDropXService {
       console.log('✅ [SKYDROPX] Respuesta de la API:', apiResponse.status);
       console.log('📋 [SKYDROPX] Datos recibidos:', JSON.stringify(apiResponse.data, null, 2));
 
-      // 7. Procesar respuesta exitosa
-      if (apiResponse.data && apiResponse.data.id) {
+      // 7. Procesar respuesta exitosa - Ajustado para la nueva estructura de respuesta
+      if (apiResponse.data && apiResponse.data.data && apiResponse.data.data.id) {
+        const orderData = apiResponse.data.data;
+        const attributes = orderData.attributes || {};
+        
+        console.log('✅ [SKYDROPX] Orden creada exitosamente:');
+        console.log(`   🆔 ID: ${orderData.id}`);
+        console.log(`   📦 Platform: ${attributes.platform}`);
+        console.log(`   💰 Price: $${attributes.price}`);
+        console.log(`   📋 Ecommerce ID: ${attributes.ecommerce_id}`);
+        
+        return {
+          success: true,
+          orderId: orderData.id,
+          platform: attributes.platform,
+          price: attributes.price,
+          ecommerce_id: attributes.ecommerce_id,
+          created_at: attributes.created_at,
+          message: 'Orden creada exitosamente en SkyDropX',
+          rawResponse: apiResponse.data
+        };
+      } else if (apiResponse.data && apiResponse.data.id) {
+        // Formato anterior por compatibilidad
         return {
           success: true,
           orderId: apiResponse.data.id,
