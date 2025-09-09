@@ -3,8 +3,6 @@ const router = express.Router();
 const adminController = require('../controllers/admin.controller');
 const authMiddleware = require('../middlewares/auth-activity.middleware');
 const { upload, handleMulterError } = require('../middlewares/upload.middleware');
-const { getRecommendedHSCodes, getAllHSCodes, suggestHSCodeByCategory } = require('../utils/hs-codes');
-const db = require('../config/db');
 
 // Middleware para todas las rutas de admin
 router.use(authMiddleware.verifyToken);
@@ -59,5 +57,11 @@ router.post('/principal-images', adminController.createIndexImage);
 router.put('/principal-images/:id', adminController.updateIndexImage);
 router.delete('/principal-images/:id', adminController.deleteIndexImage);
 router.put('/principal-images/:id/position', adminController.updateImagePosition);
+
+// Rutas para gestión de pedidos de admin
+router.get('/orders', adminController.getAllOrders);
+router.get('/orders/stats', adminController.getOrdersStats);
+router.get('/orders/:id', adminController.getOrderById);
+router.put('/orders/:id', adminController.updateOrder);
 
 module.exports = router;

@@ -1509,6 +1509,292 @@ const updateImagePosition = async (req, res) => {
   return updateImageStatus(req, res);
 };
 
+// =====================================================
+// GESTIÓN DE PEDIDOS - ADMIN
+// =====================================================
+
+// Obtener todos los pedidos con filtros y paginación
+const getAllOrders = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      search = '',
+      estado = '',
+      fecha_desde = '',
+      fecha_hasta = '',
+      sort_by = 'fecha_creacion',
+      sort_order = 'desc'
+    } = req.query;
+
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Construir WHERE clauses
+    let whereConditions = [];
+    let queryParams = [];
+    let paramCount = 0;
+
+    if (search) {
+      whereConditions.push(`(
+        CAST(p.id_pedido AS TEXT) ILIKE $${++paramCount} OR
+        CONCAT(u.nombres, ' ', u.apellidos) ILIKE $${paramCount} OR
+        u.correo ILIKE $${paramCount}
+      )`);
+      queryParams.push(`%${search}%`);
+    }
+
+    if (estado) {
+      whereConditions.push(`p.estado = $${++paramCount}`);
+      queryParams.push(estado);
+    }
+
+    if (fecha_desde) {
+      whereConditions.push(`p.fecha_creacion >= $${++paramCount}`);
+      queryParams.push(fecha_desde);
+    }
+
+    if (fecha_hasta) {
+      whereConditions.push(`p.fecha_creacion <= $${++paramCount}`);
+      queryParams.push(fecha_hasta + ' 23:59:59');
+    }
+
+    const whereClause = whereConditions.length > 0 
+      ? 'WHERE ' + whereConditions.join(' AND ')
+      : '';
+
+    // Query principal con JOIN mejorado
+    const query = `
+      SELECT 
+        p.id_pedido,
+        p.fecha_creacion,
+        p.estado,
+        p.total,
+        p.notas,
+        u.nombres as cliente_nombres,
+        u.apellidos as cliente_apellidos,
+        u.correo as cliente_correo,
+        ie.nombre_completo as direccion_nombre,
+        ie.telefono as direccion_telefono,
+        ie.ciudad as direccion_ciudad,
+        ie.estado as direccion_estado,
+        me.nombre as metodo_envio_nombre,
+        mp.nombre as metodo_pago_nombre,
+        (
+          SELECT COUNT(*)::integer 
+          FROM detalles_pedido dp 
+          WHERE dp.id_pedido = p.id_pedido
+        ) as total_items
+      FROM pedidos p
+      LEFT JOIN usuarios u ON p.id_usuario = u.id_usuario
+      LEFT JOIN informacion_envio ie ON p.id_informacion_envio = ie.id_informacion_envio
+      LEFT JOIN metodos_envio me ON p.id_metodo_envio = me.id_metodo_envio
+      LEFT JOIN metodos_pago mp ON p.id_metodo_pago = mp.id_metodo_pago
+      ${whereClause}
+      ORDER BY p.${sort_by} ${sort_order.toUpperCase()}
+      LIMIT $${++paramCount} OFFSET $${++paramCount}
+    `;
+
+    queryParams.push(parseInt(limit), offset);
+
+    // Query para contar total
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM pedidos p
+      LEFT JOIN usuarios u ON p.id_usuario = u.id_usuario
+      LEFT JOIN informacion_envio ie ON p.id_informacion_envio = ie.id_informacion_envio
+      ${whereClause}
+    `;
+
+    const [ordersResult, countResult] = await Promise.all([
+      pool.query(query, queryParams),
+      pool.query(countQuery, queryParams.slice(0, -2)) // Remover limit y offset para count
+    ]);
+
+    const totalRecords = parseInt(countResult.rows[0].total);
+    const totalPages = Math.ceil(totalRecords / parseInt(limit));
+
+    res.json({
+      success: true,
+      data: ordersResult.rows,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages,
+        totalRecords,
+        limit: parseInt(limit)
+      }
+    });
+
+  } catch (error) {
+    console.error('Error obteniendo pedidos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener los pedidos'
+    });
+  }
+};
+
+// Obtener estadísticas de pedidos
+const getOrdersStats = async (req, res) => {
+  try {
+    const statsQuery = `
+      SELECT 
+        COUNT(*) as total_pedidos,
+        COUNT(*) FILTER (WHERE estado = 'no_revisado') as no_revisado,
+        COUNT(*) FILTER (WHERE estado = 'en_proceso') as en_proceso,
+        COUNT(*) FILTER (WHERE estado = 'preparado') as preparado,
+        COUNT(*) FILTER (WHERE estado = 'enviado') as enviado,
+        COUNT(*) FILTER (WHERE estado = 'listo') as listo,
+        COALESCE(SUM(total), 0) as ingresos_totales,
+        COALESCE(AVG(total), 0) as ticket_promedio,
+        COUNT(*) FILTER (WHERE DATE(fecha_creacion) = CURRENT_DATE) as pedidos_hoy,
+        COUNT(*) FILTER (WHERE fecha_creacion >= CURRENT_DATE - INTERVAL '7 days') as pedidos_semana
+      FROM pedidos
+    `;
+
+    const result = await pool.query(statsQuery);
+    const stats = result.rows[0];
+
+    // Convertir strings a números
+    Object.keys(stats).forEach(key => {
+      if (stats[key] && !isNaN(stats[key])) {
+        stats[key] = parseFloat(stats[key]);
+      }
+    });
+
+    res.json({
+      success: true,
+      data: stats
+    });
+
+  } catch (error) {
+    console.error('Error obteniendo estadísticas:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener las estadísticas'
+    });
+  }
+};
+
+// Obtener detalles de un pedido específico
+const getOrderById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Query para obtener información del pedido
+    const orderQuery = `
+      SELECT 
+        p.id_pedido,
+        p.fecha_creacion,
+        p.estado,
+        p.total,
+        p.notas,
+        u.nombres as cliente_nombres,
+        u.apellidos as cliente_apellidos,
+        u.correo as cliente_correo,
+        ie.nombre_completo as direccion_nombre,
+        ie.telefono as direccion_telefono,
+        ie.ciudad as direccion_ciudad,
+        ie.estado as direccion_estado,
+        ie.codigo_postal as direccion_codigo_postal,
+        ie.colonia as direccion_colonia,
+        ie.direccion as direccion_calle,
+        ie.referencia as direccion_referencia,
+        me.nombre as metodo_envio_nombre,
+        mp.nombre as metodo_pago_nombre
+      FROM pedidos p
+      LEFT JOIN usuarios u ON p.id_usuario = u.id_usuario
+      LEFT JOIN informacion_envio ie ON p.id_informacion_envio = ie.id_informacion_envio
+      LEFT JOIN metodos_envio me ON p.id_metodo_envio = me.id_metodo_envio
+      LEFT JOIN metodos_pago mp ON p.id_metodo_pago = mp.id_metodo_pago
+      WHERE p.id_pedido = $1
+    `;
+
+    // Query para obtener detalles del pedido
+    const detailsQuery = `
+      SELECT 
+        dp.id_detalle,
+        dp.id_producto,
+        dp.id_variante,
+        dp.id_talla,
+        dp.cantidad,
+        dp.precio_unitario,
+        pr.nombre as producto_nombre,
+        v.nombre as variante_nombre,
+        t.nombre_talla
+      FROM detalles_pedido dp
+      LEFT JOIN productos pr ON dp.id_producto = pr.id_producto
+      LEFT JOIN variantes v ON dp.id_variante = v.id_variante
+      LEFT JOIN tallas t ON dp.id_talla = t.id_talla
+      WHERE dp.id_pedido = $1
+      ORDER BY dp.id_detalle
+    `;
+
+    const [orderResult, detailsResult] = await Promise.all([
+      pool.query(orderQuery, [id]),
+      pool.query(detailsQuery, [id])
+    ]);
+
+    if (orderResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Pedido no encontrado'
+      });
+    }
+
+    const order = orderResult.rows[0];
+    order.detalles = detailsResult.rows;
+
+    res.json({
+      success: true,
+      data: order
+    });
+
+  } catch (error) {
+    console.error('Error obteniendo pedido:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener el pedido'
+    });
+  }
+};
+
+// Actualizar un pedido (estado y notas)
+const updateOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { estado, notas } = req.body;
+
+    const updateQuery = `
+      UPDATE pedidos 
+      SET estado = $1, notas = $2, fecha_actualizacion = CURRENT_TIMESTAMP
+      WHERE id_pedido = $3
+      RETURNING *
+    `;
+
+    const result = await pool.query(updateQuery, [estado, notas, id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Pedido no encontrado'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: result.rows[0],
+      message: 'Pedido actualizado correctamente'
+    });
+
+  } catch (error) {
+    console.error('Error actualizando pedido:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al actualizar el pedido'
+    });
+  }
+};
+
 // Exportar las nuevas funciones junto con las existentes
 module.exports = {
   getAllVariants,
@@ -1532,5 +1818,10 @@ module.exports = {
   updateIndexImage,
   deleteIndexImage,
   updateImageStatus,
-  updateImagePosition
+  updateImagePosition,
+  // Funciones para gestión de pedidos de admin
+  getAllOrders,
+  getOrdersStats,
+  getOrderById,
+  updateOrder
 };
