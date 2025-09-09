@@ -1,5 +1,11 @@
 const express = require('express');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+// Validar que existe la clave de Stripe antes de inicializar
+const stripeKey = process.env.STRIPE_SECRET_KEY;
+if (!stripeKey) {
+  console.warn('⚠️ [STRIPE] STRIPE_SECRET_KEY no encontrada en variables de entorno');
+  console.warn('⚠️ [STRIPE] Las rutas de Stripe no estarán disponibles');
+}
+const stripe = stripeKey ? require('stripe')(stripeKey) : null;
 const router = express.Router();
 
 // Middleware para parsear JSON en los webhooks de Stripe

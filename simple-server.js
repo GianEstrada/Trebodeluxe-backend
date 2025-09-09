@@ -219,6 +219,7 @@ try {
     - DELETE /api/cart/clear (CARRITO) 🛒
     - GET  /api/public/index-images (PÚBLICO) 🌐
     - GET  /api/public/index-images/:seccion/:estado (PÚBLICO) 🌐
+    - GET  /api/postal-codes/:cp (CÓDIGOS POSTALES) 📮
     - POST /api/stripe/create-payment-intent (STRIPE) 💳
     - GET  /api/stripe/payment-intent/:id (STRIPE) 💳
     - POST /api/stripe/webhook (STRIPE) 💳
