@@ -1544,7 +1544,7 @@ const getAllOrders = async (req, res) => {
     }
 
     if (estado) {
-      whereConditions.push(`o.estado = $${++paramCount}`);
+      whereConditions.push(`o.estado_orden = $${++paramCount}`);
       queryParams.push(estado);
     }
 
@@ -1567,9 +1567,9 @@ const getAllOrders = async (req, res) => {
       SELECT 
         o.id_orden as id_pedido,
         o.fecha_creacion,
-        o.estado,
+        o.estado_orden as estado,
         o.total,
-        o.notas,
+        o.skydropx_status as notas,
         u.nombres as cliente_nombres,
         u.apellidos as cliente_apellidos,
         u.correo as cliente_correo,
@@ -1577,8 +1577,8 @@ const getAllOrders = async (req, res) => {
         ie.telefono as direccion_telefono,
         ie.ciudad as direccion_ciudad,
         ie.estado as direccion_estado,
-        me.nombre as metodo_envio_nombre,
-        mp.nombre as metodo_pago_nombre,
+        o.metodo_envio as metodo_envio_nombre,
+        'Stripe' as metodo_pago_nombre,
         (
           SELECT COUNT(*)::integer 
           FROM detalles_orden do 
@@ -1587,8 +1587,6 @@ const getAllOrders = async (req, res) => {
       FROM ordenes o
       LEFT JOIN usuarios u ON o.id_usuario = u.id_usuario
       LEFT JOIN informacion_envio ie ON o.id_informacion_envio = ie.id_informacion_envio
-      LEFT JOIN metodos_envio me ON o.id_metodo_envio = me.id_metodo_envio
-      LEFT JOIN metodos_pago mp ON o.id_metodo_pago = mp.id_metodo_pago
       ${whereClause}
       ORDER BY o.${sort_by} ${sort_order.toUpperCase()}
       LIMIT $${++paramCount} OFFSET $${++paramCount}
@@ -1639,11 +1637,13 @@ const getOrdersStats = async (req, res) => {
     const statsQuery = `
       SELECT 
         COUNT(*) as total_pedidos,
-        COUNT(*) FILTER (WHERE estado = 'no_revisado') as no_revisado,
-        COUNT(*) FILTER (WHERE estado = 'en_proceso') as en_proceso,
-        COUNT(*) FILTER (WHERE estado = 'preparado') as preparado,
-        COUNT(*) FILTER (WHERE estado = 'enviado') as enviado,
-        COUNT(*) FILTER (WHERE estado = 'listo') as listo,
+        COUNT(*) FILTER (WHERE estado_orden = 'no_revisado') as no_revisado,
+        COUNT(*) FILTER (WHERE estado_orden = 'en_proceso') as en_proceso,
+        COUNT(*) FILTER (WHERE estado_orden = 'preparado') as preparado,
+        COUNT(*) FILTER (WHERE estado_orden = 'enviado') as enviado,
+        COUNT(*) FILTER (WHERE estado_orden = 'listo') as listo,
+        COUNT(*) FILTER (WHERE estado_orden = 'procesando') as procesando,
+        COUNT(*) FILTER (WHERE estado_orden = 'completado') as completado,
         COALESCE(SUM(total), 0) as ingresos_totales,
         COALESCE(AVG(total), 0) as ticket_promedio,
         COUNT(*) FILTER (WHERE DATE(fecha_creacion) = CURRENT_DATE) as pedidos_hoy,
@@ -1685,9 +1685,9 @@ const getOrderById = async (req, res) => {
       SELECT 
         o.id_orden as id_pedido,
         o.fecha_creacion,
-        o.estado,
+        o.estado_orden as estado,
         o.total,
-        o.notas,
+        o.skydropx_status as notas,
         u.nombres as cliente_nombres,
         u.apellidos as cliente_apellidos,
         u.correo as cliente_correo,
@@ -1699,13 +1699,11 @@ const getOrderById = async (req, res) => {
         ie.colonia as direccion_colonia,
         ie.direccion as direccion_calle,
         ie.referencia as direccion_referencia,
-        me.nombre as metodo_envio_nombre,
-        mp.nombre as metodo_pago_nombre
+        o.metodo_envio as metodo_envio_nombre,
+        'Stripe' as metodo_pago_nombre
       FROM ordenes o
       LEFT JOIN usuarios u ON o.id_usuario = u.id_usuario
       LEFT JOIN informacion_envio ie ON o.id_informacion_envio = ie.id_informacion_envio
-      LEFT JOIN metodos_envio me ON o.id_metodo_envio = me.id_metodo_envio
-      LEFT JOIN metodos_pago mp ON o.id_metodo_pago = mp.id_metodo_pago
       WHERE o.id_orden = $1
     `;
 
@@ -1766,7 +1764,7 @@ const updateOrder = async (req, res) => {
 
     const updateQuery = `
       UPDATE ordenes 
-      SET estado = $1, notas = $2, fecha_actualizacion = CURRENT_TIMESTAMP
+      SET estado_orden = $1, skydropx_status = $2, fecha_actualizacion = CURRENT_TIMESTAMP
       WHERE id_orden = $3
       RETURNING *
     `;
