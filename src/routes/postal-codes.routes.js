@@ -96,4 +96,47 @@ router.get('/stats', (req, res) => {
   }
 });
 
+// GET /api/postal-codes/debug - Información de debugging
+router.get('/debug', (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    
+    const filePath = path.join(__dirname, '../Data/CPdescarga.txt');
+    const fileExists = fs.existsSync(filePath);
+    
+    let fileSize = 0;
+    let firstLines = [];
+    
+    if (fileExists) {
+      const stats = fs.statSync(filePath);
+      fileSize = stats.size;
+      
+      const content = fs.readFileSync(filePath, 'utf-8');
+      firstLines = content.split('\n').slice(0, 5);
+    }
+    
+    res.json({
+      success: true,
+      debug: {
+        archivo_existe: fileExists,
+        ruta_archivo: filePath,
+        tamaño_archivo: fileSize,
+        primeras_lineas: firstLines,
+        total_cps_cargados: postalCodesService.postalData?.size || 0,
+        cp_66058_existe: postalCodesService.postalData?.has('66058') || false,
+        datos_66058: postalCodesService.postalData?.get('66058') || null
+      }
+    });
+  } catch (error) {
+    console.error('❌ [POSTAL] Error en endpoint debug:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error interno del servidor',
+      message: error.message,
+      stack: error.stack
+    });
+  }
+});
+
 module.exports = router;
