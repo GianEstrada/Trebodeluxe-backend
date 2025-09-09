@@ -1,8 +1,28 @@
 // src/routes/orders.routes.js - Rutas para gestión de órdenes
 const express = require('express');
 const router = express.Router();
-const OrdersController = require('../controllers/orders.controller');
+
+// Import with error handling for deployment safety
+let OrdersController;
+try {
+  OrdersController = require('../controllers/orders.controller');
+  console.log('✅ OrdersController loaded successfully');
+} catch (error) {
+  console.error('❌ Error loading OrdersController:', error.message);
+  throw new Error('Failed to load OrdersController');
+}
+
 const authMiddleware = require('../middlewares/auth.middleware');
+
+// Verify all required methods exist
+const requiredMethods = ['createOrder', 'getOrderById', 'getOrderByReference', 'getOrderByPaymentIntent', 'updateOrderStatus', 'createSkyDropXOrder', 'getUserOrders', 'handleStripeWebhook'];
+for (const method of requiredMethods) {
+  if (typeof OrdersController[method] !== 'function') {
+    console.error(`❌ Missing method: OrdersController.${method}`);
+    throw new Error(`OrdersController.${method} is not a function`);
+  }
+}
+console.log('✅ All OrdersController methods verified');
 
 // @route   POST /api/orders/create
 // @desc    Crear nueva orden después del pago exitoso
