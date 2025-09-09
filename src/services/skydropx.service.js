@@ -4,6 +4,67 @@ const axios = require('axios');
 
 class SkyDropXService {
 
+  // Mapeo de carriers para SkyDropX
+  static getCarrierMapping() {
+    return {
+      'fedex': 'fedex',
+      'express': 'fedex',
+      'estandar': 'fedex',
+      'estándar': 'fedex',
+      'dhl': 'dhl',
+      'ups': 'ups',
+      'paquetexpress': 'paquetexpress',
+      'estafeta': 'estafeta',
+      'redpack': 'redpack',
+      'j&t': 'j&t'
+    };
+  }
+
+  // Extraer carrier del método de envío
+  static extractCarrierFromShippingMethod(shippingMethod) {
+    if (!shippingMethod || typeof shippingMethod !== 'string') {
+      return 'fedex'; // Default fallback
+    }
+
+    const method = shippingMethod.toLowerCase();
+    const mapping = this.getCarrierMapping();
+    
+    // Buscar coincidencias en el nombre del método
+    for (const [key, value] of Object.entries(mapping)) {
+      if (method.includes(key)) {
+        return value;
+      }
+    }
+    
+    return 'fedex'; // Default fallback
+  }
+
+  // Calcular valor declarado automáticamente
+  static calculateDeclaredValue(totalPrice) {
+    // Mínimo $100 MXN para evitar problemas con paqueterías
+    const minValue = 100;
+    const calculatedValue = Math.max(minValue, Math.round(totalPrice));
+    
+    console.log(`💰 [SKYDROPX] Valor declarado calculado: $${calculatedValue} MXN (total: $${totalPrice})`);
+    return calculatedValue;
+  }
+
+  // Determinar si debe activarse el seguro automáticamente
+  static shouldEnableInsurance(totalPrice, userChoice = false) {
+    // Si el usuario eligió explícitamente, respetar su decisión
+    if (userChoice !== undefined) {
+      console.log(`🛡️ [SKYDROPX] Seguro elegido por usuario: ${userChoice}`);
+      return userChoice;
+    }
+    
+    // Regla automática: activar para órdenes > $500 MXN
+    const threshold = 500;
+    const autoInsurance = totalPrice > threshold;
+    
+    console.log(`🛡️ [SKYDROPX] Seguro automático: ${autoInsurance} (total: $${totalPrice}, threshold: $${threshold})`);
+    return autoInsurance;
+  }
+
   // Obtener token de acceso de SkyDropX
   static async getAccessToken() {
     try {
@@ -60,7 +121,9 @@ class SkyDropXService {
         totalPrice,
         total, // Compatibilidad con versión anterior
         cartItems,
-        shippingInfo
+        shippingInfo,
+        shippingMethod,
+        insurance
       } = orderData;
 
       // Usar referenceNumber o reference como fallback
@@ -167,11 +230,26 @@ class SkyDropXService {
             company: shippingInfo.empresa || "",
             phone: shippingInfo.telefono,
             email: shippingInfo.correo || ""
-          }
+          },
+          // ✨ CAMPOS AUTOMATIZADOS
+          declared_value: this.calculateDeclaredValue(finalTotalPrice),
+          provider: this.extractCarrierFromShippingMethod(shippingMethod),
+          insurance: this.shouldEnableInsurance(finalTotalPrice, insurance),
+          content: "Mercancía general",
+          delivery_type: 1,
+          dangerous_goods: false,
+          oversized: false
         }
       };
 
       console.log('📦 [SKYDROPX] Payload preparado:', JSON.stringify(skyDropXPayload, null, 2));
+      
+      // Logging de automatización
+      console.log('🤖 [SKYDROPX] Automatización aplicada:');
+      console.log(`   💰 Valor declarado: $${skyDropXPayload.order.declared_value} MXN`);
+      console.log(`   📦 Carrier: ${skyDropXPayload.order.provider}`);
+      console.log(`   🛡️ Seguro: ${skyDropXPayload.order.insurance ? 'Activado' : 'Desactivado'}`);
+      console.log(`   📋 Contenido: ${skyDropXPayload.order.content}`);
 
       // 5. Obtener token de acceso
       const accessToken = await SkyDropXService.getAccessToken();
