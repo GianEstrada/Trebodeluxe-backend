@@ -1581,12 +1581,12 @@ const getAllOrders = async (req, res) => {
         'Stripe' as metodo_pago_nombre,
         (
           SELECT COUNT(*)::integer 
-          FROM detalles_orden "do" 
-          WHERE "do".id_orden = o.id_orden
+          FROM pedido_detalle pd 
+          WHERE pd.id_pedido = o.id_orden
         ) as total_items
       FROM ordenes o
       LEFT JOIN usuarios u ON o.id_usuario = u.id_usuario
-      LEFT JOIN informacion_envio ie ON o.id_informacion_envio = ie.id_informacion_envio
+      LEFT JOIN informacion_envio ie ON o.id_informacion_envio = ie.id_informacion
       ${whereClause}
       ORDER BY o.${sort_by} ${sort_order.toUpperCase()}
       LIMIT $${++paramCount} OFFSET $${++paramCount}
@@ -1599,7 +1599,7 @@ const getAllOrders = async (req, res) => {
       SELECT COUNT(*) as total
       FROM ordenes o
       LEFT JOIN usuarios u ON o.id_usuario = u.id_usuario
-      LEFT JOIN informacion_envio ie ON o.id_informacion_envio = ie.id_informacion_envio
+      LEFT JOIN informacion_envio ie ON o.id_informacion_envio = ie.id_informacion
       ${whereClause}
     `;
 
@@ -1703,28 +1703,28 @@ const getOrderById = async (req, res) => {
         'Stripe' as metodo_pago_nombre
       FROM ordenes o
       LEFT JOIN usuarios u ON o.id_usuario = u.id_usuario
-      LEFT JOIN informacion_envio ie ON o.id_informacion_envio = ie.id_informacion_envio
+      LEFT JOIN informacion_envio ie ON o.id_informacion_envio = ie.id_informacion
       WHERE o.id_orden = $1
     `;
 
     // Query para obtener detalles del pedido
     const detailsQuery = `
       SELECT 
-        "do".id_detalle,
-        "do".id_producto,
-        "do".id_variante,
-        "do".id_talla,
-        "do".cantidad,
-        "do".precio_unitario,
+        pd.id_detalle,
+        pd.id_producto,
+        pd.id_variante,
+        pd.id_talla,
+        pd.cantidad,
+        pd.precio_unitario,
         pr.nombre as producto_nombre,
         v.nombre as variante_nombre,
         t.nombre_talla
-      FROM detalles_orden "do"
-      LEFT JOIN productos pr ON "do".id_producto = pr.id_producto
-      LEFT JOIN variantes v ON "do".id_variante = v.id_variante
-      LEFT JOIN tallas t ON "do".id_talla = t.id_talla
-      WHERE "do".id_orden = $1
-      ORDER BY "do".id_detalle
+      FROM pedido_detalle pd
+      LEFT JOIN productos pr ON pd.id_producto = pr.id_producto
+      LEFT JOIN variantes v ON pd.id_variante = v.id_variante
+      LEFT JOIN tallas t ON pd.id_talla = t.id_talla
+      WHERE pd.id_pedido = $1
+      ORDER BY pd.id_detalle
     `;
 
     const [orderResult, detailsResult] = await Promise.all([
