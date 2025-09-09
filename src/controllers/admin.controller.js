@@ -1566,9 +1566,13 @@ const getAllOrders = async (req, res) => {
     const query = `
       SELECT 
         o.id_orden as id_pedido,
+        o.numero_referencia,
+        o.stripe_payment_intent_id,
         o.fecha_creacion,
         o.estado_orden as estado,
         o.total,
+        o.costo_envio,
+        o.seguro_envio,
         o.skydropx_status as notas,
         u.nombres as cliente_nombres,
         u.apellidos as cliente_apellidos,
@@ -1684,9 +1688,13 @@ const getOrderById = async (req, res) => {
     const orderQuery = `
       SELECT 
         o.id_orden as id_pedido,
+        o.numero_referencia,
+        o.stripe_payment_intent_id,
         o.fecha_creacion,
         o.estado_orden as estado,
         o.total,
+        o.costo_envio,
+        o.seguro_envio,
         o.skydropx_status as notas,
         u.nombres as cliente_nombres,
         u.apellidos as cliente_apellidos,
