@@ -1,7 +1,53 @@
 // src/services/skydropx.service.js - Servicio para integración con SkyDropX
 const db = require('../config/db');
+const axios = require('axios');
 
 class SkyDropXService {
+
+  // Obtener token de acceso de SkyDropX
+  static async getAccessToken() {
+    try {
+      const clientId = process.env.SKYDROP_API_KEY;
+      const clientSecret = process.env.SKYDROP_API_SECRET;
+      
+      if (!clientId || !clientSecret) {
+        throw new Error('Credenciales de SkyDropX no configuradas');
+      }
+
+      const params = new URLSearchParams();
+      params.append('client_id', clientId);
+      params.append('client_secret', clientSecret);
+      params.append('grant_type', 'client_credentials');
+      params.append('redirect_uri', 'urn:ietf:wg:oauth:2.0:oob');
+      params.append('refresh_token', '');
+      params.append('scope', 'default orders.create');
+
+      console.log('🔑 [SKYDROPX] Obteniendo token de acceso...');
+      
+      const response = await axios.post(
+        'https://pro.skydropx.com/api/v1/oauth/token',
+        params,
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json'
+          },
+          timeout: 15000
+        }
+      );
+
+      if (response.data.access_token) {
+        console.log('✅ [SKYDROPX] Token obtenido exitosamente');
+        return response.data.access_token;
+      } else {
+        throw new Error('No se recibió token de acceso');
+      }
+
+    } catch (error) {
+      console.error('❌ [SKYDROPX] Error obteniendo token:', error.response?.data || error.message);
+      throw new Error(`Error de autenticación SkyDropX: ${error.message}`);
+    }
+  }
   
   // Crear orden en SkyDropX
   static async createOrder(orderData) {
@@ -100,38 +146,61 @@ class SkyDropXService {
 
       console.log('📦 [SKYDROPX] Payload preparado:', JSON.stringify(skyDropXPayload, null, 2));
 
-      // 5. Enviar a SkyDropX (simulado por ahora)
-      // En producción, aquí harías la llamada real a la API de SkyDropX
+      // 5. Obtener token de acceso
+      const accessToken = await this.getAccessToken();
+
+      // 6. Enviar orden a SkyDropX
+      console.log('📡 [SKYDROPX] Enviando orden a la API...');
       
-      // Simulación de respuesta exitosa
-      const simulatedResponse = {
-        success: true,
-        orderId: `SKY${referenceNumber}${Date.now()}`,
-        trackingNumber: `TRK${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-        status: 'created',
-        estimatedDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        shippingCost: packageDimensions.estimatedCost
-      };
-
-      console.log('✅ [SKYDROPX] Orden creada exitosamente:', simulatedResponse.orderId);
-
-      return {
-        success: true,
-        orderId: simulatedResponse.orderId,
-        trackingNumber: simulatedResponse.trackingNumber,
-        details: {
-          payload: skyDropXPayload,
-          response: simulatedResponse,
-          packageInfo: packageDimensions
+      const apiResponse = await axios.post(
+        'https://pro.skydropx.com/api/v1/orders',
+        skyDropXPayload,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          timeout: 30000 // 30 segundos timeout
         }
-      };
+      );
+
+      console.log('✅ [SKYDROPX] Respuesta de la API:', apiResponse.status);
+      console.log('📋 [SKYDROPX] Datos recibidos:', JSON.stringify(apiResponse.data, null, 2));
+
+      // 7. Procesar respuesta exitosa
+      if (apiResponse.data && apiResponse.data.id) {
+        return {
+          success: true,
+          orderId: apiResponse.data.id,
+          trackingNumber: apiResponse.data.tracking_number || null,
+          status: apiResponse.data.status || 'created',
+          details: {
+            payload: skyDropXPayload,
+            response: apiResponse.data,
+            packageInfo: packageDimensions
+          }
+        };
+      } else {
+        throw new Error('Respuesta inválida de SkyDropX');
+      }
 
     } catch (error) {
-      console.error('❌ [SKYDROPX] Error creando orden:', error);
+      console.error('❌ [SKYDROPX] Error creando orden:', error.message);
+      
+      // Log detallado del error si es de axios
+      if (error.response) {
+        console.error('📊 [SKYDROPX] Status:', error.response.status);
+        console.error('📋 [SKYDROPX] Response data:', JSON.stringify(error.response.data, null, 2));
+      }
+      
       return {
         success: false,
         error: error.message,
-        details: { orderData }
+        details: { 
+          orderData,
+          errorResponse: error.response?.data || null
+        }
       };
     }
   }
