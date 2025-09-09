@@ -10,32 +10,53 @@ router.post('/create-payment-intent', async (req, res) => {
   try {
     const { amount, currency = 'mxn', metadata = {} } = req.body;
 
+    console.log('💳 [STRIPE] Creando Payment Intent:', { amount, currency, metadata });
+
     // Validar que se proporcione el monto
     if (!amount || amount <= 0) {
       return res.status(400).json({ 
+        success: false,
         error: 'El monto debe ser mayor a 0' 
+      });
+    }
+
+    // Validar moneda
+    const validCurrencies = ['mxn', 'usd', 'eur'];
+    const normalizedCurrency = currency.toLowerCase();
+    
+    if (!validCurrencies.includes(normalizedCurrency)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Moneda no soportada'
       });
     }
 
     // Crear el Payment Intent
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100), // Stripe usa centavos
-      currency: currency.toLowerCase(),
-      payment_method_types: ['card'], // Especificar métodos de pago explícitamente
+      amount: Math.round(amount), // Ya viene en centavos desde el frontend
+      currency: normalizedCurrency,
+      payment_method_types: ['card'],
       metadata: {
         ...metadata,
-        integration_check: 'accept_a_payment',
+        integration_check: 'trebodeluxe_checkout',
+        timestamp: new Date().toISOString()
       },
     });
 
+    console.log('✅ [STRIPE] Payment Intent creado:', paymentIntent.id);
+
     res.json({
+      success: true,
       clientSecret: paymentIntent.client_secret,
-      paymentIntentId: paymentIntent.id
+      paymentIntentId: paymentIntent.id,
+      amount: paymentIntent.amount,
+      currency: paymentIntent.currency
     });
 
   } catch (error) {
-    console.error('Error creando Payment Intent:', error);
+    console.error('❌ [STRIPE] Error creando Payment Intent:', error);
     res.status(500).json({ 
+      success: false,
       error: 'Error interno del servidor',
       message: error.message 
     });
