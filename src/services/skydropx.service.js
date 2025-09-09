@@ -61,6 +61,20 @@ class SkyDropXService {
         shippingInfo
       } = orderData;
 
+      // Validar datos requeridos
+      if (!referenceNumber) {
+        throw new Error('referenceNumber es requerido');
+      }
+      if (!cartItems || cartItems.length === 0) {
+        throw new Error('cartItems es requerido y debe tener al menos un item');
+      }
+      if (!shippingInfo) {
+        throw new Error('shippingInfo es requerido');
+      }
+      if (!totalPrice || isNaN(totalPrice)) {
+        throw new Error('totalPrice debe ser un número válido');
+      }
+
       console.log('🚀 [SKYDROPX] Creando orden:', referenceNumber);
 
       // 1. Obtener configuración del shipper
@@ -81,9 +95,9 @@ class SkyDropXService {
       const products = cartItems.map(item => ({
         name: item.producto_nombre || `Producto ${item.id_producto}`,
         hs_code: SkyDropXService.getHSCodeByCategory(item.categoria || 'general'),
-        sku: `${item.id_producto}-${item.id_variante}-${item.id_talla}`,
-        price: item.precio_unitario.toString(),
-        quantity: item.cantidad,
+        sku: `${item.id_producto}-${item.id_variante || 0}-${item.id_talla || 0}`,
+        price: (item.precio_unitario || item.precio || 0).toString(),
+        quantity: item.cantidad || 1,
         weight: (item.peso_gramos || 100) / 1000, // Convertir a kg
         height: 0.05, // 5cm por defecto
         length: 0.10, // 10cm por defecto
@@ -96,7 +110,7 @@ class SkyDropXService {
           reference: referenceNumber,
           reference_number: referenceNumber,
           payment_status: paymentStatus === 'succeeded' ? 'paid' : 'pending',
-          total_price: totalPrice.toString(),
+          total_price: (totalPrice || 0).toString(),
           merchant_store_id: "1",
           headquarter_id: "1", 
           platform: "trebodeluxe",
