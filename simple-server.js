@@ -60,6 +60,7 @@ try {
   const publicIndexImagesRoutes = require('./src/routes/public-index-images.routes');
   const categoriasRoutes = require('./src/routes/categorias.routes');
   const skydropxRoutes = require('./src/routes/skydropx.routes');
+  const postalCodesRoutes = require('./src/routes/postal-codes.routes');
   const adminVariantRoutes = require('./src/routes/admin.variant.routes');
   const stripeRoutes = require('./routes/stripe.routes');
   const { setupSiteSettings } = require('./src/setup-site-settings');
@@ -147,6 +148,7 @@ try {
   app.use('/api/public', publicIndexImagesRoutes);
   app.use('/api/categorias', categoriasRoutes);
   app.use('/api/skydropx', skydropxRoutes);
+  app.use('/api/postal-codes', postalCodesRoutes);
   app.use('/api/admin/variants', adminVariantRoutes);
   app.use('/api/stripe', stripeRoutes);
   
