@@ -1567,6 +1567,7 @@ const getAllOrders = async (req, res) => {
       SELECT 
         o.id_orden as id_pedido,
         o.numero_referencia,
+        o.skydropx_order_id,
         o.stripe_payment_intent_id,
         o.fecha_creacion,
         o.estado_orden as estado,
@@ -1689,6 +1690,7 @@ const getOrderById = async (req, res) => {
       SELECT 
         o.id_orden as id_pedido,
         o.numero_referencia,
+        o.skydropx_order_id,
         o.stripe_payment_intent_id,
         o.fecha_creacion,
         o.estado_orden as estado,
