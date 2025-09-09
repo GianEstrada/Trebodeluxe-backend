@@ -23,7 +23,7 @@ class PostalCodesService {
       }
       
       console.log('✅ [POSTAL] Archivo encontrado, leyendo contenido...');
-      const fileContent = fs.readFileSync(filePath, 'utf-8');
+      const fileContent = fs.readFileSync(filePath, 'latin1'); // Usar latin1 en lugar de utf-8
       console.log('📊 [POSTAL] Tamaño del archivo:', fileContent.length, 'caracteres');
       
       // Parsear el archivo

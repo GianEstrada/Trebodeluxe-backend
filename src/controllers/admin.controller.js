@@ -1698,7 +1698,7 @@ const getOrderById = async (req, res) => {
         ie.codigo_postal as direccion_codigo_postal,
         ie.colonia as direccion_colonia,
         ie.direccion as direccion_calle,
-        ie.referencia as direccion_referencia,
+        ie.referencias as direccion_referencia,
         o.metodo_envio as metodo_envio_nombre,
         'Stripe' as metodo_pago_nombre
       FROM ordenes o
