@@ -1581,8 +1581,8 @@ const getAllOrders = async (req, res) => {
         'Stripe' as metodo_pago_nombre,
         (
           SELECT COUNT(*)::integer 
-          FROM detalles_orden do 
-          WHERE do.id_orden = o.id_orden
+          FROM detalles_orden "do" 
+          WHERE "do".id_orden = o.id_orden
         ) as total_items
       FROM ordenes o
       LEFT JOIN usuarios u ON o.id_usuario = u.id_usuario
@@ -1710,21 +1710,21 @@ const getOrderById = async (req, res) => {
     // Query para obtener detalles del pedido
     const detailsQuery = `
       SELECT 
-        do.id_detalle,
-        do.id_producto,
-        do.id_variante,
-        do.id_talla,
-        do.cantidad,
-        do.precio_unitario,
+        "do".id_detalle,
+        "do".id_producto,
+        "do".id_variante,
+        "do".id_talla,
+        "do".cantidad,
+        "do".precio_unitario,
         pr.nombre as producto_nombre,
         v.nombre as variante_nombre,
         t.nombre_talla
-      FROM detalles_orden do
-      LEFT JOIN productos pr ON do.id_producto = pr.id_producto
-      LEFT JOIN variantes v ON do.id_variante = v.id_variante
-      LEFT JOIN tallas t ON do.id_talla = t.id_talla
-      WHERE do.id_orden = $1
-      ORDER BY do.id_detalle
+      FROM detalles_orden "do"
+      LEFT JOIN productos pr ON "do".id_producto = pr.id_producto
+      LEFT JOIN variantes v ON "do".id_variante = v.id_variante
+      LEFT JOIN tallas t ON "do".id_talla = t.id_talla
+      WHERE "do".id_orden = $1
+      ORDER BY "do".id_detalle
     `;
 
     const [orderResult, detailsResult] = await Promise.all([
