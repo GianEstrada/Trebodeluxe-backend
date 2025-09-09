@@ -61,9 +61,16 @@ class SkyDropXService {
         shippingInfo
       } = orderData;
 
-      // Validar datos requeridos
-      if (!referenceNumber) {
-        throw new Error('referenceNumber es requerido');
+      // Debug logging para identificar el problema
+      console.log('🔍 [SKYDROPX] orderData recibido:', JSON.stringify(orderData, null, 2));
+      console.log('🔍 [SKYDROPX] referenceNumber valor:', JSON.stringify(referenceNumber));
+      console.log('🔍 [SKYDROPX] referenceNumber tipo:', typeof referenceNumber);
+
+      // Validar datos requeridos con protección adicional
+      if (!referenceNumber || referenceNumber.toString().trim() === '') {
+        console.error('❌ [SKYDROPX] referenceNumber inválido:', referenceNumber);
+        console.error('📋 [SKYDROPX] orderData completo:', orderData);
+        throw new Error('referenceNumber es requerido y debe ser un string no vacío');
       }
       if (!cartItems || cartItems.length === 0) {
         throw new Error('cartItems es requerido y debe tener al menos un item');
