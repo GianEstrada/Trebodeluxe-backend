@@ -157,8 +157,8 @@ class SkyDropXService {
           recipient_address: {
             address: shippingInfo.direccion,
             internal_number: shippingInfo.numero_interior || "",
-            reference: shippingInfo.referencia || ".",
-            sector: shippingInfo.sector || "",
+            reference: shippingInfo.referencias || shippingInfo.referencia || ".",
+            sector: shippingInfo.colonia || shippingInfo.sector || "",
             city: shippingInfo.ciudad,
             state: shippingInfo.estado,
             postal_code: shippingInfo.codigo_postal,

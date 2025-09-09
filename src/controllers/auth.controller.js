@@ -70,17 +70,19 @@ const registerUser = async (req, res) => {
         ciudad,
         estado,
         codigo_postal,
-        pais
+        pais,
+        colonia,
+        referencias
       } = shippingInfo;
 
       // Validar que todos los campos requeridos estén presentes
-      if (nombre_completo && telefono && direccion && ciudad && estado && codigo_postal && pais) {
+      if (nombre_completo && telefono && direccion && ciudad && estado && codigo_postal && pais && colonia) {
         const shippingResult = await client.query(
           `INSERT INTO informacion_envio 
-           (id_usuario, nombre_completo, telefono, direccion, ciudad, estado, codigo_postal, pais) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
-           RETURNING id_informacion, nombre_completo, telefono, direccion, ciudad, estado, codigo_postal, pais`,
-          [newUser.id_usuario, nombre_completo, telefono, direccion, ciudad, estado, codigo_postal, pais]
+           (id_usuario, nombre_completo, telefono, direccion, ciudad, estado, codigo_postal, pais, colonia, referencias) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
+           RETURNING id_informacion, nombre_completo, telefono, direccion, ciudad, estado, codigo_postal, pais, colonia, referencias`,
+          [newUser.id_usuario, nombre_completo, telefono, direccion, ciudad, estado, codigo_postal, pais, colonia || null, referencias || null]
         );
 
         shippingData = shippingResult.rows[0];
