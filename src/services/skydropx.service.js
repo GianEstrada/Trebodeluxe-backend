@@ -75,12 +75,12 @@ class SkyDropXService {
       const shipper = shipperResult.rows[0];
 
       // 2. Calcular dimensiones y peso del paquete
-      const packageDimensions = this.calculatePackageDimensions(cartItems);
+      const packageDimensions = SkyDropXService.calculatePackageDimensions(cartItems);
       
       // 3. Preparar productos para SkyDropX
       const products = cartItems.map(item => ({
         name: item.producto_nombre || `Producto ${item.id_producto}`,
-        hs_code: this.getHSCodeByCategory(item.categoria || 'general'),
+        hs_code: SkyDropXService.getHSCodeByCategory(item.categoria || 'general'),
         sku: `${item.id_producto}-${item.id_variante}-${item.id_talla}`,
         price: item.precio_unitario.toString(),
         quantity: item.cantidad,
@@ -147,7 +147,7 @@ class SkyDropXService {
       console.log('📦 [SKYDROPX] Payload preparado:', JSON.stringify(skyDropXPayload, null, 2));
 
       // 5. Obtener token de acceso
-      const accessToken = await this.getAccessToken();
+      const accessToken = await SkyDropXService.getAccessToken();
 
       // 6. Enviar orden a SkyDropX
       console.log('📡 [SKYDROPX] Enviando orden a la API...');
@@ -226,7 +226,7 @@ class SkyDropXService {
       length = 50; width = 35; height = 25;
     }
 
-    const estimatedCost = this.estimateShippingCost(totalWeight, length, width, height);
+    const estimatedCost = SkyDropXService.estimateShippingCost(totalWeight, length, width, height);
 
     return {
       totalWeight: Math.round(totalWeight * 100) / 100, // Redondear a 2 decimales

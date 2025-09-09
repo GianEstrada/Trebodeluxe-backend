@@ -1,7 +1,7 @@
 // src/routes/orders.routes.js - Rutas para gestión de órdenes (VERSIÓN SIMPLIFICADA PARA DEBUG)
 const express = require('express');
 const router = express.Router();
-const ordersController = require('../controllers/orders.controller.simple');
+const ordersController = require('../controllers/orders.controller');
 
 console.log('🔍 [ORDERS ROUTES] Inicializando rutas de órdenes...');
 console.log('🔍 [ORDERS ROUTES] ordersController:', typeof ordersController);

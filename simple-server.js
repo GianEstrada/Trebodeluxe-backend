@@ -54,7 +54,7 @@ try {
   const mainImagesRoutes = require('./src/routes/main-images.routes');
   const promotionsAdminRoutes = require('./src/routes/promotions-admin.routes');
   const ordersAdminRoutes = require('./src/routes/orders-admin.routes');
-  const ordersRoutes = require('./src/routes/orders.routes.debug');
+  const ordersRoutes = require('./src/routes/orders.routes');
   const notesRoutes = require('./src/routes/notes.routes');
   const cartRoutes = require('./src/routes/cart.routes');
   const publicIndexImagesRoutes = require('./src/routes/public-index-images.routes');
