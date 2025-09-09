@@ -54,6 +54,7 @@ try {
   const mainImagesRoutes = require('./src/routes/main-images.routes');
   const promotionsAdminRoutes = require('./src/routes/promotions-admin.routes');
   const ordersAdminRoutes = require('./src/routes/orders-admin.routes');
+  const ordersRoutes = require('./src/routes/orders.routes');
   const notesRoutes = require('./src/routes/notes.routes');
   const cartRoutes = require('./src/routes/cart.routes');
   const publicIndexImagesRoutes = require('./src/routes/public-index-images.routes');
@@ -140,6 +141,7 @@ try {
   app.use('/api/main-images', mainImagesRoutes);
   app.use('/api/admin/promotions', promotionsAdminRoutes);
   app.use('/api/admin/orders', ordersAdminRoutes);
+  app.use('/api/orders', ordersRoutes);
   app.use('/api/notes', notesRoutes);
   app.use('/api/cart', cartRoutes);
   app.use('/api/public', publicIndexImagesRoutes);
