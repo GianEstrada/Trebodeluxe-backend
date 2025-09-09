@@ -55,20 +55,26 @@ class SkyDropXService {
       const {
         orderId,
         referenceNumber,
+        reference, // Compatibilidad con versión anterior
         paymentStatus,
         totalPrice,
+        total, // Compatibilidad con versión anterior
         cartItems,
         shippingInfo
       } = orderData;
 
+      // Usar referenceNumber o reference como fallback
+      const finalReferenceNumber = referenceNumber || reference;
+      const finalTotalPrice = totalPrice || total;
+
       // Debug logging para identificar el problema
       console.log('🔍 [SKYDROPX] orderData recibido:', JSON.stringify(orderData, null, 2));
-      console.log('🔍 [SKYDROPX] referenceNumber valor:', JSON.stringify(referenceNumber));
-      console.log('🔍 [SKYDROPX] referenceNumber tipo:', typeof referenceNumber);
+      console.log('🔍 [SKYDROPX] referenceNumber valor:', JSON.stringify(finalReferenceNumber));
+      console.log('🔍 [SKYDROPX] referenceNumber tipo:', typeof finalReferenceNumber);
 
       // Validar datos requeridos con protección adicional
-      if (!referenceNumber || referenceNumber.toString().trim() === '') {
-        console.error('❌ [SKYDROPX] referenceNumber inválido:', referenceNumber);
+      if (!finalReferenceNumber || finalReferenceNumber.toString().trim() === '') {
+        console.error('❌ [SKYDROPX] referenceNumber inválido:', finalReferenceNumber);
         console.error('📋 [SKYDROPX] orderData completo:', orderData);
         throw new Error('referenceNumber es requerido y debe ser un string no vacío');
       }
@@ -78,11 +84,11 @@ class SkyDropXService {
       if (!shippingInfo) {
         throw new Error('shippingInfo es requerido');
       }
-      if (!totalPrice || isNaN(totalPrice)) {
+      if (!finalTotalPrice || isNaN(finalTotalPrice)) {
         throw new Error('totalPrice debe ser un número válido');
       }
 
-      console.log('🚀 [SKYDROPX] Creando orden:', referenceNumber);
+      console.log('🚀 [SKYDROPX] Creando orden:', finalReferenceNumber);
 
       // 1. Obtener configuración del shipper
       const shipperResult = await db.pool.query(`
@@ -114,10 +120,10 @@ class SkyDropXService {
       // 4. Construir JSON para SkyDropX
       const skyDropXPayload = {
         order: {
-          reference: referenceNumber,
-          reference_number: referenceNumber,
+          reference: finalReferenceNumber,
+          reference_number: finalReferenceNumber,
           payment_status: paymentStatus === 'succeeded' ? 'paid' : 'pending',
-          total_price: (totalPrice || 0).toString(),
+          total_price: (finalTotalPrice || 0).toString(),
           merchant_store_id: "1",
           headquarter_id: "1", 
           platform: "trebodeluxe",
@@ -131,7 +137,7 @@ class SkyDropXService {
             dimension_unit: "CM",
             mass_unit: "KG",
             package_type: "box",
-            consignment_note: `Orden ${referenceNumber} - ${cartItems.length} items`,
+            consignment_note: `Orden ${finalReferenceNumber} - ${cartItems.length} items`,
             products: products
           }],
           shipper_address: {
