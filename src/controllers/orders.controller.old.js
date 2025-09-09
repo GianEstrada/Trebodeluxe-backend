@@ -1,10 +1,10 @@
 // src/controllers/orders.controller.js - Controlador para gestión de órdenes
-// FORCE DEPLOYMENT VERSION 2025-09-09 - FIXED ultima_actualizacion column
 
 class OrdersController {
   
   // Crear nueva orden después del pago exitoso
   static async createOrder(req, res) {
+    // Import dependencies inside the method to avoid load-time errors
     const db = require('../config/db');
     const skyDropXService = require('../services/skydropx.service');
     
@@ -14,123 +14,146 @@ class OrdersController {
       await client.query('BEGIN');
       
       const {
+        // Datos del carrito
         cartItems,
+        // Datos del usuario (puede ser null para anónimos)
         userId = null,
+        // Datos de envío
         shippingInfo,
+        // Datos del pago
         paymentIntentId,
         paymentStatus = 'succeeded',
+        // Datos de costo
         subtotal,
         iva,
         total,
         moneda = 'MXN',
         tasaCambio = 1.0,
+        // Datos de envío
         costoEnvio = 0,
-        tiempoEntrega = '3-5 días hábiles',
-        metodoPago = 'stripe',
-        metodoEnvio = 'standard'
+        tiempoEntrega = '3-5 días hábiles'
       } = req.body;
 
-      console.log(`🔄 [ORDERS] Iniciando creación de orden - Usuario: ${userId}, PaymentIntent: ${paymentIntentId}`);
-
-      // 1. Validaciones básicas
+      // Validar datos requeridos
       if (!cartItems || !Array.isArray(cartItems) || cartItems.length === 0) {
         return res.status(400).json({
           success: false,
-          message: 'Se requieren items del carrito'
+          message: 'Los items del carrito son requeridos'
         });
       }
 
-      if (!shippingInfo) {
+      if (!shippingInfo || !shippingInfo.nombre_completo || !shippingInfo.telefono) {
         return res.status(400).json({
           success: false,
-          message: 'Se requiere información de envío'
+          message: 'La información de envío es requerida'
         });
       }
 
-      // 2. Crear o actualizar información de envío  
-      let shippingInfoId;
-      
-      if (userId && shippingInfo.id_informacion) {
-        // Usuario logueado con información existente - actualizar datos
-        // FIXED: Using 'ultima_actualizacion' column (verified in DB schema)
-        console.log(`🔄 [ORDERS] Actualizando información de envío para usuario ${userId}`);
-        console.log(`🔄 [ORDERS] Using ultima_actualizacion column - DEPLOYMENT FIXED`);
-        await client.query(`
-          UPDATE informacion_envio 
-          SET nombre_completo = $1, telefono = $2, direccion = $3, 
-              ciudad = $4, estado = $5, codigo_postal = $6, pais = $7,
-              ultima_actualizacion = CURRENT_TIMESTAMP
-          WHERE id_informacion = $8
-        `, [
-          shippingInfo.nombre_completo,
-          shippingInfo.telefono,
-          shippingInfo.direccion,
-          shippingInfo.ciudad,
-          shippingInfo.estado,
-          shippingInfo.codigo_postal,
-          shippingInfo.pais || 'MX',
-          shippingInfo.id_informacion
-        ]);
-        
-        shippingInfoId = shippingInfo.id_informacion;
-      } else {
-        // Crear nueva información de envío
-        console.log(`🔄 [ORDERS] Creando nueva información de envío`);
-        const shippingResult = await client.query(`
-          INSERT INTO informacion_envio (
-            id_usuario, nombre_completo, telefono, direccion,
-            ciudad, estado, codigo_postal, pais
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-          RETURNING id_informacion
-        `, [
-          userId,
-          shippingInfo.nombre_completo,
-          shippingInfo.telefono,
-          shippingInfo.direccion,
-          shippingInfo.ciudad,
-          shippingInfo.estado,
-          shippingInfo.codigo_postal,
-          shippingInfo.pais || 'MX'
-        ]);
-        
-        shippingInfoId = shippingResult.rows[0].id_informacion;
+      if (!paymentIntentId) {
+        return res.status(400).json({
+          success: false,
+          message: 'El ID del Payment Intent es requerido'
+        });
       }
 
-      // 3. Generar número de referencia único
-      const referenceResult = await client.query('SELECT generate_reference_number() as numero');
-      const numeroReferencia = referenceResult.rows[0].numero;
+      // Generar número de referencia único
+      const numeroReferencia = `TDX-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
 
-      console.log(`🔄 [ORDERS] Número de referencia generado: ${numeroReferencia}`);
+      // Insertar información de envío si no existe
+      let shippingId;
+      if (userId) {
+        // Para usuarios autenticados, buscar info de envío existente
+        const existingShipping = await client.query(
+          'SELECT id_informacion FROM informacion_envio WHERE id_usuario = $1',
+          [userId]
+        );
 
-      // 4. Crear la orden principal
+        if (existingShipping.rows.length > 0) {
+          shippingId = existingShipping.rows[0].id_informacion;
+          
+          // Actualizar con nueva información si es diferente
+          await client.query(`
+            UPDATE informacion_envio 
+            SET nombre_completo = $1, telefono = $2, direccion = $3, 
+                ciudad = $4, estado = $5, codigo_postal = $6, pais = $7,
+                fecha_actualizacion = CURRENT_TIMESTAMP
+            WHERE id_informacion = $8
+          `, [
+            shippingInfo.nombre_completo,
+            shippingInfo.telefono,
+            shippingInfo.direccion || '',
+            shippingInfo.ciudad || '',
+            shippingInfo.estado || '',
+            shippingInfo.codigo_postal || '',
+            shippingInfo.pais || 'México',
+            shippingId
+          ]);
+        } else {
+          // Crear nueva información de envío
+          const shippingResult = await client.query(`
+            INSERT INTO informacion_envio 
+            (id_usuario, nombre_completo, telefono, direccion, ciudad, estado, codigo_postal, pais)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING id_informacion
+          `, [
+            userId,
+            shippingInfo.nombre_completo,
+            shippingInfo.telefono,
+            shippingInfo.direccion || '',
+            shippingInfo.ciudad || '',
+            shippingInfo.estado || '',
+            shippingInfo.codigo_postal || '',
+            shippingInfo.pais || 'México'
+          ]);
+          shippingId = shippingResult.rows[0].id_informacion;
+        }
+      } else {
+        // Para usuarios anónimos, crear nueva información de envío
+        const shippingResult = await client.query(`
+          INSERT INTO informacion_envio 
+          (nombre_completo, telefono, direccion, ciudad, estado, codigo_postal, pais)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          RETURNING id_informacion
+        `, [
+          shippingInfo.nombre_completo,
+          shippingInfo.telefono,
+          shippingInfo.direccion || '',
+          shippingInfo.ciudad || '',
+          shippingInfo.estado || '',
+          shippingInfo.codigo_postal || '',
+          shippingInfo.pais || 'México'
+        ]);
+        shippingId = shippingResult.rows[0].id_informacion;
+      }
+
+      // Crear la orden principal
       const orderResult = await client.query(`
-        INSERT INTO ordenes (
-          id_usuario, id_informacion_envio, numero_referencia,
-          metodo_envio, costo_envio, subtotal, iva, total,
-          moneda, tasa_cambio, stripe_payment_intent_id, stripe_payment_status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        INSERT INTO ordenes 
+        (id_usuario, numero_referencia, id_informacion_envio, 
+         subtotal, iva, total, moneda, tasa_cambio, costo_envio, tiempo_entrega,
+         payment_intent_id, estado_pago, estado, fecha_creacion)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, CURRENT_TIMESTAMP)
         RETURNING id_orden, numero_referencia, fecha_creacion
       `, [
         userId,
-        shippingInfoId,
         numeroReferencia,
-        metodoEnvio,
-        costoEnvio,
+        shippingId,
         subtotal,
         iva,
         total,
         moneda,
         tasaCambio,
+        costoEnvio,
+        tiempoEntrega,
         paymentIntentId,
-        paymentStatus
+        paymentStatus,
+        'procesando'
       ]);
 
       const orderId = orderResult.rows[0].id_orden;
       const orderData = orderResult.rows[0];
 
-      console.log(`✅ [ORDERS] Orden principal creada con ID: ${orderId}`);
-
-      // 5. Insertar detalles de la orden
+      // Insertar detalles de la orden
       const orderDetails = [];
       for (const item of cartItems) {
         const detailResult = await client.query(`
@@ -144,19 +167,20 @@ class OrdersController {
           item.id_variante || null,
           item.id_talla || null,
           item.cantidad,
-          item.precio_unitario || item.precio,
-          (item.cantidad * (item.precio_unitario || item.precio))
+          item.precio_unitario,
+          item.cantidad * item.precio_unitario
         ]);
         
         orderDetails.push(detailResult.rows[0]);
       }
 
-      console.log(`✅ [ORDERS] ${orderDetails.length} detalles de orden insertados`);
+      await client.query('COMMIT');
+      console.log(`✅ [ORDERS] Orden creada exitosamente: ${numeroReferencia}`);
 
-      // 6. Intentar crear orden en SkyDropX
+      // Crear orden en SkyDropX de forma asíncrona (no bloquear la respuesta)
       let skyDropXResult = null;
       try {
-        console.log(`🚀 [ORDERS] Iniciando creación de orden en SkyDropX...`);
+        console.log('🚀 [ORDERS] Iniciando creación de orden en SkyDropX...');
         
         skyDropXResult = await skyDropXService.createOrder({
           orderId: orderId,
@@ -167,25 +191,24 @@ class OrdersController {
           moneda: moneda
         });
 
-        if (skyDropXResult && skyDropXResult.success) {
+        if (skyDropXResult.success) {
           // Actualizar la orden con la información de SkyDropX
           await client.query(`
             UPDATE ordenes 
-            SET skydropx_order_id = $1, skydropx_status = 'created'
+            SET skydropx_created = true, skydropx_order_id = $1
             WHERE id_orden = $2
           `, [skyDropXResult.orderId, orderId]);
           
-          console.log(`✅ [ORDERS] Orden creada en SkyDropX: ${skyDropXResult.orderId}`);
+          console.log('✅ [ORDERS] Orden creada en SkyDropX:', skyDropXResult.orderId);
+        } else {
+          console.log('⚠️ [ORDERS] No se pudo crear orden en SkyDropX:', skyDropXResult.error);
         }
       } catch (skyDropXError) {
-        console.error(`⚠️ [ORDERS] Error en SkyDropX (no crítico):`, skyDropXError.message);
+        console.error('❌ [ORDERS] Error al crear orden en SkyDropX:', skyDropXError);
         // No fallar toda la operación por error en SkyDropX
       }
 
-      await client.query('COMMIT');
-      console.log(`✅ [ORDERS] Transacción completada exitosamente`);
-
-      // 7. Responder con la orden creada
+      // Responder con la orden creada
       res.status(201).json({
         success: true,
         message: 'Orden creada exitosamente',
@@ -356,7 +379,7 @@ class OrdersController {
         FROM ordenes o
         LEFT JOIN informacion_envio ie ON o.id_informacion_envio = ie.id_informacion
         LEFT JOIN usuarios u ON o.id_usuario = u.id_usuario
-        WHERE o.stripe_payment_intent_id = $1
+        WHERE o.payment_intent_id = $1
       `, [paymentIntentId]);
 
       if (orderResult.rows.length === 0) {
@@ -407,17 +430,35 @@ class OrdersController {
     
     try {
       const { id } = req.params;
-      const { estado_orden, skydropx_status } = req.body;
+      const { estado, estado_pago } = req.body;
 
-      const result = await db.pool.query(`
-        UPDATE ordenes 
-        SET 
-          estado_orden = COALESCE($2, estado_orden),
-          skydropx_status = COALESCE($3, skydropx_status),
-          fecha_actualizacion = CURRENT_TIMESTAMP
-        WHERE id_orden = $1
-        RETURNING *
-      `, [id, estado_orden, skydropx_status]);
+      if (!estado && !estado_pago) {
+        return res.status(400).json({
+          success: false,
+          message: 'Se requiere al menos un estado para actualizar'
+        });
+      }
+
+      let updateQuery = 'UPDATE ordenes SET fecha_actualizacion = CURRENT_TIMESTAMP';
+      let updateParams = [];
+      let paramIndex = 1;
+
+      if (estado) {
+        updateQuery += `, estado = $${paramIndex}`;
+        updateParams.push(estado);
+        paramIndex++;
+      }
+
+      if (estado_pago) {
+        updateQuery += `, estado_pago = $${paramIndex}`;
+        updateParams.push(estado_pago);
+        paramIndex++;
+      }
+
+      updateQuery += ` WHERE id_orden = $${paramIndex} RETURNING *`;
+      updateParams.push(id);
+
+      const result = await db.pool.query(updateQuery, updateParams);
 
       if (result.rows.length === 0) {
         return res.status(404).json({
@@ -508,8 +549,8 @@ class OrdersController {
         // Actualizar el estado de la orden
         await db.pool.query(`
           UPDATE ordenes 
-          SET stripe_payment_status = 'succeeded', estado_orden = 'pagado'
-          WHERE stripe_payment_intent_id = $1
+          SET estado_pago = 'succeeded', estado = 'confirmado'
+          WHERE payment_intent_id = $1
         `, [paymentIntent.id]);
 
         console.log(`✅ [WEBHOOK] Pago confirmado para Payment Intent: ${paymentIntent.id}`);
@@ -555,7 +596,7 @@ class OrdersController {
 
       const order = orderResult.rows[0];
 
-      if (order.skydropx_order_id) {
+      if (order.skydropx_created) {
         return res.status(400).json({
           success: false,
           message: 'La orden ya tiene una orden creada en SkyDropX'
@@ -598,7 +639,7 @@ class OrdersController {
         // Actualizar la orden con la información de SkyDropX
         await db.pool.query(`
           UPDATE ordenes 
-          SET skydropx_order_id = $1, skydropx_status = 'created'
+          SET skydropx_created = true, skydropx_order_id = $1
           WHERE id_orden = $2
         `, [skyDropXResult.orderId, id]);
 
