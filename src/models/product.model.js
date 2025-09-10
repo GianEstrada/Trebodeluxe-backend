@@ -254,6 +254,8 @@ class ProductModel {
               'precio', stock_precios.precio,
               'descuento_porcentaje', NULL,
               'activo', v.activo,
+              'disponible', (v.activo AND COALESCE(stock_info.stock_total, 0) > 0 AND COALESCE(stock_precios.precio, 0) > 0),
+              'stock_total', COALESCE(stock_info.stock_total, 0),
               'imagenes', COALESCE(img.imagenes, '[]'::json),
               'stock_disponible', COALESCE(stock_info.stock_total, 0),
               'tallas_disponibles', COALESCE(stock_info.tallas, '[]'::json),
