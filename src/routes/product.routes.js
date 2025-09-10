@@ -73,6 +73,11 @@ router.get('/variants', ProductController.getVariants);
 // @access  Public
 router.get('/catalog-items', ProductController.getProductsForCatalog);
 
+// @route   GET /api/products/variants/:variantId/stock
+// @desc    Obtener stock específico por variante (SOLUCIÓN AL PROBLEMA DE STOCK INCORRECTO)
+// @access  Public
+router.get('/variants/:variantId/stock', ProductController.getStockByVariant);
+
 // === RUTAS PARA ADMINISTRADORES ===
 
 // @route   GET /api/products/admin

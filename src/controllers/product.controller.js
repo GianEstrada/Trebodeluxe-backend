@@ -934,6 +934,94 @@ class ProductController {
       });
     }
   }
+
+  // Obtener stock específico por variante
+  static async getStockByVariant(req, res) {
+    try {
+      const { variantId } = req.params;
+      
+      console.log(`🔍 Obteniendo stock para variante ID: ${variantId}`);
+      
+      const query = `
+        SELECT 
+          s.id_talla,
+          t.nombre_talla,
+          t.orden,
+          s.cantidad,
+          s.precio
+        FROM stock s
+        INNER JOIN tallas t ON s.id_talla = t.id_talla
+        WHERE s.id_variante = $1 
+          AND s.cantidad > 0
+        ORDER BY t.orden, t.nombre_talla;
+      `;
+      
+      const result = await pool.query(query, [variantId]);
+      
+      console.log(`✅ Stock encontrado para variante ${variantId}:`, result.rows);
+      
+      res.json({
+        success: true,
+        message: 'Stock obtenido exitosamente',
+        data: {
+          id_variante: parseInt(variantId),
+          tallas_stock: result.rows
+        }
+      });
+      
+    } catch (error) {
+      console.error('❌ Error obteniendo stock por variante:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener stock',
+        error: error.message
+      });
+    }
+  }
+
+  // Obtener stock específico por variante (SOLUCIÓN AL PROBLEMA DE STOCK INCORRECTO)
+  static async getStockByVariant(req, res) {
+    try {
+      const { variantId } = req.params;
+      
+      console.log(`🔍 Obteniendo stock para variante ID: ${variantId}`);
+      
+      const query = `
+        SELECT 
+          s.id_talla,
+          t.nombre_talla,
+          t.orden,
+          s.cantidad,
+          s.precio
+        FROM stock s
+        INNER JOIN tallas t ON s.id_talla = t.id_talla
+        WHERE s.id_variante = $1 
+          AND s.cantidad > 0
+        ORDER BY t.orden, t.nombre_talla;
+      `;
+      
+      const result = await pool.query(query, [variantId]);
+      
+      console.log(`✅ Stock encontrado para variante ${variantId}:`, result.rows);
+      
+      res.json({
+        success: true,
+        message: 'Stock obtenido exitosamente',
+        data: {
+          id_variante: parseInt(variantId),
+          tallas_stock: result.rows
+        }
+      });
+      
+    } catch (error) {
+      console.error('❌ Error obteniendo stock por variante:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener stock',
+        error: error.message
+      });
+    }
+  }
 }
 
 module.exports = ProductController;
