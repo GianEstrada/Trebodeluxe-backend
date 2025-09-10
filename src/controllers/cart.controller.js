@@ -144,8 +144,8 @@ class CartController {
             
             let cartId;
             
-            if (req.user && req.user.id) {
-                cartId = await CartModel.getOrCreateCartForUser(req.user.id);
+            if (req.user && req.user.id_usuario) {
+                cartId = await CartModel.getOrCreateCartForUser(req.user.id_usuario);
             } else {
                 let sessionToken = req.headers['x-session-token'];
                 if (!sessionToken) {
@@ -200,8 +200,8 @@ class CartController {
             
             let cartId;
             
-            if (req.user && req.user.id) {
-                cartId = await CartModel.getOrCreateCartForUser(req.user.id);
+            if (req.user && req.user.id_usuario) {
+                cartId = await CartModel.getOrCreateCartForUser(req.user.id_usuario);
             } else {
                 let sessionToken = req.headers['x-session-token'];
                 if (!sessionToken) {
@@ -245,8 +245,8 @@ class CartController {
         try {
             let cartId;
             
-            if (req.user && req.user.id) {
-                cartId = await CartModel.getOrCreateCartForUser(req.user.id);
+            if (req.user && req.user.id_usuario) {
+                cartId = await CartModel.getOrCreateCartForUser(req.user.id_usuario);
             } else {
                 let sessionToken = req.headers['x-session-token'];
                 if (!sessionToken) {
@@ -285,7 +285,7 @@ class CartController {
     // Migrar carrito de sesión a usuario autenticado (se ejecuta automáticamente al hacer login)
     static async migrateCart(req, res) {
         try {
-            if (!req.user || !req.user.id) {
+            if (!req.user || !req.user.id_usuario) {
                 return res.status(401).json({
                     success: false,
                     message: 'Usuario no autenticado'
@@ -300,7 +300,7 @@ class CartController {
                 });
             }
             
-            const result = await CartModel.migrateSessionCartToUser(sessionToken, req.user.id);
+            const result = await CartModel.migrateSessionCartToUser(sessionToken, req.user.id_usuario);
             
             if (!result.success) {
                 return res.status(400).json(result);
@@ -375,8 +375,8 @@ class CartController {
         try {
             let cartId;
             
-            if (req.user && req.user.id) {
-                cartId = await CartModel.getOrCreateCartForUser(req.user.id);
+            if (req.user && req.user.id_usuario) {
+                cartId = await CartModel.getOrCreateCartForUser(req.user.id_usuario);
             } else {
                 let sessionToken = req.headers['x-session-token'];
                 if (!sessionToken) {
