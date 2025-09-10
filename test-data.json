@@ -1,0 +1,31 @@
+{
+  "cartItems": [
+    {
+      "id_producto": 1,
+      "id_variante": 1,
+      "id_talla": 1,
+      "cantidad": 1,
+      "precio_unitario": 1000
+    }
+  ],
+  "userId": null,
+  "shippingInfo": {
+    "nombre_completo": "Usuario Prueba",
+    "telefono": "555-0123",
+    "direccion": "Calle Falsa 123",
+    "ciudad": "Ciudad Prueba",
+    "estado": "Estado Prueba",
+    "codigo_postal": "12345",
+    "pais": "MX"
+  },
+  "paymentIntentId": "pi_test_123",
+  "paymentStatus": "succeeded",
+  "subtotal": 1000,
+  "iva": 160,
+  "total": 1310,
+  "moneda": "MXN",
+  "tasaCambio": 1.0,
+  "metodoEnvio": "standard",
+  "costoEnvio": 150,
+  "seguroPaquete": true
+}
