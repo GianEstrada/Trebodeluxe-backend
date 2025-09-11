@@ -1,4 +1,5 @@
 const { pool } = require('../config/db');
+const PromotionModel = require('./promotion.model');
 
 class CartModel {
     // Generar un token de sesión único para usuarios no autenticados
@@ -74,6 +75,7 @@ class CartModel {
                     p.id_producto,
                     p.nombre AS nombre_producto,
                     p.descripcion AS descripcion_producto,
+                    p.id_categoria,
                     v.id_variante,
                     v.nombre AS nombre_variante,
                     t.id_talla,
@@ -90,9 +92,7 @@ class CartModel {
                         LIMIT 1
                     ) AS imagen_variante,
                     -- Calcular precio total por item
-                    (s.precio * cc.cantidad) AS precio_total_item,
-                    -- Por ahora, sin promociones para simplificar
-                    0 AS descuento_porcentaje
+                    (s.precio * cc.cantidad) AS precio_total_item
                 FROM contenido_carrito cc
                 JOIN productos p ON cc.id_producto = p.id_producto
                 JOIN variantes v ON cc.id_variante = v.id_variante
@@ -107,26 +107,47 @@ class CartModel {
             
             const result = await client.query(query, [cartId]);
             
-            // Procesar los resultados para calcular precios con descuentos
-            const items = result.rows.map(item => {
+            // Procesar los resultados para calcular precios con descuentos dinámicos
+            const items = [];
+            
+            for (const item of result.rows) {
                 const precioOriginal = parseFloat(item.precio_total_item);
                 let precioFinal = precioOriginal;
                 let tieneDescuento = false;
+                let descuentoPorcentaje = 0;
                 
-                if (item.descuento_porcentaje > 0) {
-                    precioFinal = precioOriginal * (1 - item.descuento_porcentaje / 100);
-                    tieneDescuento = true;
+                try {
+                    // Buscar promociones activas para este producto
+                    const promociones = await PromotionModel.getPromotionsForProduct(
+                        item.id_producto, 
+                        item.id_categoria || null
+                    );
+                    
+                    if (promociones.length > 0) {
+                        const promocion = promociones[0]; // Tomar la primera (más prioritaria)
+                        
+                        if (promocion.tipo === 'porcentaje' && promocion.porcentaje_descuento > 0) {
+                            descuentoPorcentaje = parseFloat(promocion.porcentaje_descuento);
+                            precioFinal = precioOriginal * (1 - descuentoPorcentaje / 100);
+                            tieneDescuento = true;
+                            
+                            console.log(`🎯 Aplicando ${descuentoPorcentaje}% descuento al producto ${item.nombre_producto}`);
+                        }
+                    }
+                } catch (error) {
+                    console.error(`Error calculando promociones para producto ${item.id_producto}:`, error);
+                    // Continuar sin descuento si hay error
                 }
                 
-                return {
+                items.push({
                     ...item,
                     precio: parseFloat(item.precio),
                     precio_total_item: precioOriginal,
                     precio_final_item: precioFinal,
                     tiene_descuento: tieneDescuento,
-                    descuento_porcentaje: parseFloat(item.descuento_porcentaje || 0)
-                };
-            });
+                    descuento_porcentaje: descuentoPorcentaje
+                });
+            }
             
             return items;
         } finally {
