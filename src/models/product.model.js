@@ -832,9 +832,16 @@ class ProductModel {
       let paramIndex = 3;
 
       if (categoria) {
-        // Filtrar por slug de categoría en lugar de ID
-        whereClause += ` AND LOWER(REPLACE(c.nombre, ' ', '-')) = $${paramIndex}`;
-        params.push(categoria.toLowerCase());
+        // Manejar tanto ID numérico como slug de categoría
+        if (typeof categoria === 'number' || /^\d+$/.test(categoria)) {
+          // Si es un ID numérico, filtrar por id_categoria
+          whereClause += ` AND p.id_categoria = $${paramIndex}`;
+          params.push(parseInt(categoria));
+        } else {
+          // Si es un string, filtrar por slug de categoría
+          whereClause += ` AND LOWER(REPLACE(c.nombre, ' ', '-')) = $${paramIndex}`;
+          params.push(categoria.toLowerCase());
+        }
         paramIndex++;
       }
 
@@ -846,41 +853,59 @@ class ProductModel {
       if (!validSortOrder.includes(sortOrder.toUpperCase())) sortOrder = 'DESC';
 
       const query = `
-        SELECT DISTINCT ON (p.id_producto)
-          p.id_producto,
-          p.nombre,
-          p.descripcion,
-          p.id_categoria,
+        SELECT 
+          p.*,
           c.nombre as categoria_nombre,
-          p.marca,
-          p.fecha_creacion,
-          stock_precios.precio as precio_min,
-          NULL as precio_original,
-          NULL as descuento_porcentaje,
-          iv.url as imagen_principal,
-          iv.public_id as imagen_public_id,
-          COALESCE(stock_total.total, 0) as stock_disponible
+          COALESCE(
+            json_agg(
+              json_build_object(
+                'id_variante', v.id_variante,
+                'nombre', v.nombre,
+                'precio', stock_precios.precio,
+                'descuento_porcentaje', NULL,
+                'imagenes', COALESCE(img.imagenes, '[]'::json),
+                'stock_total', COALESCE(stock.total_stock, 0),
+                'disponible', COALESCE(stock.total_stock, 0) > 0
+              )
+            ) FILTER (WHERE v.id_variante IS NOT NULL), 
+            '[]'::json
+          ) as variantes
         FROM productos p
         LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
-        JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
+        LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
         LEFT JOIN (
           SELECT 
-            s.id_variante,
-            MIN(s.precio) as precio
-          FROM stock s
-          WHERE s.precio IS NOT NULL
-          GROUP BY s.id_variante
+            id_variante,
+            MIN(precio) as precio
+          FROM stock
+          WHERE precio IS NOT NULL
+          GROUP BY id_variante
         ) stock_precios ON v.id_variante = stock_precios.id_variante
-        LEFT JOIN imagenes_variante iv ON v.id_variante = iv.id_variante AND iv.orden = 1
         LEFT JOIN (
           SELECT 
-            s.id_variante,
-            SUM(s.cantidad) as total
-          FROM stock s
-          GROUP BY s.id_variante
-        ) stock_total ON v.id_variante = stock_total.id_variante
+            id_variante,
+            json_agg(
+              json_build_object(
+                'id_imagen', id_imagen,
+                'url', url,
+                'public_id', public_id,
+                'orden', orden
+              )
+            ) as imagenes
+          FROM imagenes_variante
+          GROUP BY id_variante
+        ) img ON v.id_variante = img.id_variante
+        LEFT JOIN (
+          SELECT 
+            id_variante,
+            SUM(cantidad) as total_stock
+          FROM stock
+          GROUP BY id_variante
+        ) stock ON v.id_variante = stock.id_variante
         ${whereClause}
-        ORDER BY p.id_producto, stock_precios.precio ASC
+        GROUP BY p.id_producto, p.nombre, p.descripcion, p.id_categoria, p.marca, 
+                 p.id_sistema_talla, p.activo, p.fecha_creacion, c.nombre
+        ORDER BY p.${sortBy} ${sortOrder}
         LIMIT $1 OFFSET $2
       `;
 
@@ -888,6 +913,21 @@ class ProductModel {
       console.log('Parámetros:', params);
 
       const result = await db.query(query, params);
+
+      // Obtener tallas disponibles para cada producto por separado
+      for (let product of result.rows) {
+        const tallasQuery = `
+          SELECT DISTINCT t.id_talla, t.nombre_talla
+          FROM variantes v
+          JOIN stock s ON v.id_variante = s.id_variante
+          JOIN tallas t ON s.id_talla = t.id_talla
+          WHERE v.id_producto = $1 AND v.activo = true AND s.cantidad > 0
+          ORDER BY t.id_talla
+        `;
+        
+        const tallasResult = await db.query(tallasQuery, [product.id_producto]);
+        product.tallas_disponibles = tallasResult.rows;
+      }
       
       // Obtener total de productos para paginación
       const countQuery = `
@@ -895,10 +935,14 @@ class ProductModel {
         FROM productos p
         LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
         JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
-        ${categoria ? 'WHERE p.activo = true AND LOWER(REPLACE(c.nombre, \' \', \'-\')) = $1' : 'WHERE p.activo = true'}
+        ${categoria ? (typeof categoria === 'number' || /^\d+$/.test(categoria) ? 
+          'WHERE p.activo = true AND p.id_categoria = $1' : 
+          'WHERE p.activo = true AND LOWER(REPLACE(c.nombre, \' \', \'-\')) = $1') : 
+          'WHERE p.activo = true'}
       `;
 
-      const countParams = categoria ? [categoria.toLowerCase()] : [];
+      const countParams = categoria ? [typeof categoria === 'number' || /^\d+$/.test(categoria) ? 
+        parseInt(categoria) : categoria.toLowerCase()] : [];
       const countResult = await db.query(countQuery, countParams);
       
       return {
