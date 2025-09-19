@@ -27,7 +27,7 @@ class ProductModel {
 
       if (categoria) {
         paramCount++;
-        whereConditions.push(`p.categoria = $${paramCount}`);
+        whereConditions.push(`p.id_categoria = $${paramCount}`);
         queryParams.push(categoria);
       }
 
@@ -76,7 +76,7 @@ class ProductModel {
           END as tiene_stock
         FROM productos p
         LEFT JOIN sistemas_talla st ON p.id_sistema_talla = st.id_sistema_talla
-        LEFT JOIN categorias c ON p.categoria = c.id_categoria
+        LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
         LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
         LEFT JOIN (
           SELECT 
@@ -131,7 +131,7 @@ class ProductModel {
           GROUP BY s.id_variante
         ) precios_info ON v.id_variante = precios_info.id_variante
         ${whereClause}
-        GROUP BY p.id_producto, p.nombre, p.descripcion, p.categoria, p.marca, 
+        GROUP BY p.id_producto, p.nombre, p.descripcion, p.id_categoria, p.marca, 
                  p.id_sistema_talla, p.activo, p.fecha_creacion, st.nombre, 
                  c.nombre_categoria
         ORDER BY p.${sortBy} ${sortOrder}
@@ -705,7 +705,7 @@ class ProductModel {
           FROM imagenes_variante
           GROUP BY id_variante
         ) img ON v.id_variante = img.id_variante
-        WHERE p.activo = true AND p.categoria = $1
+        WHERE p.activo = true AND p.id_categoria = $1
         GROUP BY p.id_producto
         ORDER BY p.fecha_creacion DESC
         LIMIT $2 OFFSET $3
@@ -755,6 +755,7 @@ class ProductModel {
             ) ORDER BY v.id_variante
           ) FILTER (WHERE v.id_variante IS NOT NULL) as variantes
         FROM productos p
+        LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
         LEFT JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
         LEFT JOIN (
           SELECT 
@@ -782,7 +783,7 @@ class ProductModel {
           AND (
             p.nombre ILIKE $1 OR 
             p.descripcion ILIKE $1 OR 
-            p.categoria ILIKE $1 OR 
+            c.nombre ILIKE $1 OR 
             p.marca ILIKE $1
           )
         GROUP BY p.id_producto
@@ -806,7 +807,7 @@ class ProductModel {
           p.id_producto, 
           p.nombre, 
           p.descripcion, 
-          p.categoria, 
+          p.id_categoria, 
           p.marca, 
           p.activo, 
           p.fecha_creacion, 
@@ -831,8 +832,9 @@ class ProductModel {
       let paramIndex = 3;
 
       if (categoria) {
-        whereClause += ` AND p.categoria = $${paramIndex}`;
-        params.push(categoria);
+        // Filtrar por slug de categoría en lugar de ID
+        whereClause += ` AND LOWER(REPLACE(c.nombre, ' ', '-')) = $${paramIndex}`;
+        params.push(categoria.toLowerCase());
         paramIndex++;
       }
 
@@ -848,7 +850,8 @@ class ProductModel {
           p.id_producto,
           p.nombre,
           p.descripcion,
-          p.categoria,
+          p.id_categoria,
+          c.nombre as categoria_nombre,
           p.marca,
           p.fecha_creacion,
           stock_precios.precio as precio_min,
@@ -858,6 +861,7 @@ class ProductModel {
           iv.public_id as imagen_public_id,
           COALESCE(stock_total.total, 0) as stock_disponible
         FROM productos p
+        LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
         JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
         LEFT JOIN (
           SELECT 
@@ -889,11 +893,12 @@ class ProductModel {
       const countQuery = `
         SELECT COUNT(DISTINCT p.id_producto) as total
         FROM productos p
+        LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
         JOIN variantes v ON p.id_producto = v.id_producto AND v.activo = true
-        ${categoria ? 'WHERE p.activo = true AND p.categoria = $1' : 'WHERE p.activo = true'}
+        ${categoria ? 'WHERE p.activo = true AND LOWER(REPLACE(c.nombre, \' \', \'-\')) = $1' : 'WHERE p.activo = true'}
       `;
 
-      const countParams = categoria ? [categoria] : [];
+      const countParams = categoria ? [categoria.toLowerCase()] : [];
       const countResult = await db.query(countQuery, countParams);
       
       return {
@@ -1062,7 +1067,7 @@ class ProductModel {
       }
 
       if (categoria) {
-        whereConditions.push(`p.categoria = $${paramIndex}`);
+        whereConditions.push(`p.id_categoria = $${paramIndex}`);
         params.push(categoria);
         paramIndex++;
       }
@@ -1094,7 +1099,7 @@ class ProductModel {
           p.id_producto,
           p.nombre,
           p.descripcion,
-          p.categoria,
+          p.id_categoria,
           p.marca,
           p.activo,
           p.fecha_creacion,
@@ -1359,7 +1364,7 @@ class ProductModel {
         SELECT 
           v.*,
           p.nombre as producto_nombre,
-          p.categoria,
+          p.id_categoria,
           p.marca,
           p.id_sistema_talla,
           st.nombre as sistema_talla,
