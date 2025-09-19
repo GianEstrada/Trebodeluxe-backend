@@ -413,7 +413,9 @@ class ProductController {
       let products;
 
       if (categoria) {
-        products = await ProductModel.getByCategory(categoria);
+        // Si getByCategory devuelve un objeto con products, extraer el array
+        const result = await ProductModel.getByCategory(categoria);
+        products = result && result.products ? result.products : result;
       } else if (busqueda) {
         products = await ProductModel.search(busqueda);
       } else {
