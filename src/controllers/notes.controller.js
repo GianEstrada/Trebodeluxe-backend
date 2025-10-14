@@ -326,7 +326,7 @@ class NotesController {
       }
       
       if (activo !== undefined) {
-        updateFields.push(`activo = $${paramCount++}`);
+        updateFields.push(`activa = $${paramCount++}`);
         params.push(activo);
       }
       
@@ -379,7 +379,7 @@ class NotesController {
       
       const query = `
         UPDATE notas_generales 
-        SET activo = false
+        SET activa = false
         WHERE id_nota = $1
         RETURNING id_nota, titulo
       `;
@@ -452,7 +452,7 @@ class NotesController {
       const query = `
         SELECT DISTINCT unnest(etiquetas) as etiqueta
         FROM notas_generales
-        WHERE activo = true AND etiquetas IS NOT NULL
+        WHERE activa = true AND etiquetas IS NOT NULL
         ORDER BY etiqueta
       `;
       
