@@ -199,20 +199,19 @@ class NotesController {
         color = 'default'
       } = req.body;
 
-      // Verificar que el usuario esté autenticado
-      if (!req.user) {
+      // Obtener datos del usuario autenticado desde el middleware de auth
+      const id_usuario_creador = req.user?.id_usuario;
+      const nombre_usuario_creador = req.user ? `${req.user.nombres} ${req.user.apellidos}`.trim() : 'Usuario desconocido';
+      const rol_usuario_creador = req.user?.rol || 'user';
+      
+      // Validaciones
+      if (!req.user || !id_usuario_creador) {
         return res.status(401).json({
           success: false,
           message: 'Usuario no autenticado'
         });
       }
 
-      // Obtener datos del usuario autenticado
-      const id_usuario_creador = req.user.id_usuario;
-      const nombre_usuario_creador = `${req.user.nombres} ${req.user.apellidos}`.trim();
-      const rol_usuario_creador = req.user.rol;
-      
-      // Validaciones
       if (!titulo || !contenido) {
         return res.status(400).json({
           success: false,
