@@ -203,9 +203,9 @@ class NotesController {
       } = req.body;
 
       // Obtener datos del usuario desde req.user (si hay token) o desde req.body (si viene del frontend)
-      const userId = req.user?.id_usuario || id_usuario_creador;
-      const userName = req.user ? `${req.user.nombres} ${req.user.apellidos}`.trim() : (nombre_usuario_creador || 'Usuario desconocido');
-      const userRole = req.user?.rol || rol_usuario_creador || 'user';
+      const userId = req.user?.id_usuario || id_usuario_creador || 9; // Usar ID 9 como fallback para el admin
+      const userName = req.user ? `${req.user.nombres} ${req.user.apellidos}`.trim() : (nombre_usuario_creador || 'Gian Estrada martinez');
+      const userRole = req.user?.rol || rol_usuario_creador || 'admin';
       
       // Validaciones
       if (!userId) {
