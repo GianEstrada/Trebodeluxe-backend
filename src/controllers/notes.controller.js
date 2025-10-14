@@ -196,12 +196,21 @@ class NotesController {
         prioridad = 'normal', 
         fecha_vencimiento = null,
         etiquetas = [],
-        color = 'default',
-        // Simulamos datos de usuario (en producción vendrían del middleware de auth)
-        id_usuario_creador = 1,
-        nombre_usuario_creador = 'Admin User',
-        rol_usuario_creador = 'admin'
+        color = 'default'
       } = req.body;
+
+      // Verificar que el usuario esté autenticado
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          message: 'Usuario no autenticado'
+        });
+      }
+
+      // Obtener datos del usuario autenticado
+      const id_usuario_creador = req.user.id_usuario;
+      const nombre_usuario_creador = `${req.user.nombres} ${req.user.apellidos}`.trim();
+      const rol_usuario_creador = req.user.rol;
       
       // Validaciones
       if (!titulo || !contenido) {
