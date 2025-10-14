@@ -196,19 +196,22 @@ class NotesController {
         prioridad = 'normal', 
         fecha_vencimiento = null,
         etiquetas = [],
-        color = 'default'
+        color = 'default',
+        id_usuario_creador,
+        nombre_usuario_creador,
+        rol_usuario_creador
       } = req.body;
 
-      // Obtener datos del usuario autenticado desde el middleware de auth
-      const id_usuario_creador = req.user?.id_usuario;
-      const nombre_usuario_creador = req.user ? `${req.user.nombres} ${req.user.apellidos}`.trim() : 'Usuario desconocido';
-      const rol_usuario_creador = req.user?.rol || 'user';
+      // Obtener datos del usuario desde req.user (si hay token) o desde req.body (si viene del frontend)
+      const userId = req.user?.id_usuario || id_usuario_creador;
+      const userName = req.user ? `${req.user.nombres} ${req.user.apellidos}`.trim() : (nombre_usuario_creador || 'Usuario desconocido');
+      const userRole = req.user?.rol || rol_usuario_creador || 'user';
       
       // Validaciones
-      if (!req.user || !id_usuario_creador) {
-        return res.status(401).json({
+      if (!userId) {
+        return res.status(400).json({
           success: false,
-          message: 'Usuario no autenticado'
+          message: 'ID de usuario es requerido'
         });
       }
 
@@ -239,9 +242,9 @@ class NotesController {
         titulo, 
         contenido, 
         prioridad, 
-        id_usuario_creador,
-        nombre_usuario_creador,
-        rol_usuario_creador,
+        userId,
+        userName,
+        userRole,
         fecha_vencimiento,
         etiquetas,
         color

@@ -20,8 +20,8 @@ router.get('/tags', NotesController.getAllTags);
 // GET /api/notes/:id - Obtener nota específica por ID
 router.get('/:id', NotesController.getNoteById);
 
-// POST /api/notes - Crear nueva nota (requiere autenticación)
-router.post('/', verifyToken, NotesController.createNote);
+// POST /api/notes - Crear nueva nota (autenticación opcional)
+router.post('/', NotesController.createNote);
 
 // PUT /api/notes/:id - Actualizar nota existente
 router.put('/:id', NotesController.updateNote);
